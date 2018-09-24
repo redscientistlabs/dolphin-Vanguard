@@ -26,6 +26,8 @@ using namespace RTCV;
 using namespace RTCV::NetCore;
 using namespace RTCV::Vanguard;
 using namespace System::Runtime::InteropServices;
+using namespace System::Threading;
+using namespace System::Collections::Generic;
 
 #using <system.dll>
 using namespace System::Diagnostics;
@@ -41,6 +43,7 @@ Trace::WriteLine(filename);
 */
 
 
+delegate void MessageDelegate(Object ^);
 
 
 public ref class MemoryDomain
@@ -73,13 +76,16 @@ public ref class VanguardClient
 
 
   array<Byte>^ PeekAddresses(array<long>^ addresses);
-  void PokeAddresses(array<long>^ addresses, array<Byte>^ values);
+  void PokeAddresses(Object ^ data);
 
   
 	static System::Collections::Generic::Queue<Delegate ^> ^ actionQueue = gcnew System::Collections::Generic::Queue<Delegate ^>();
   static System::Collections::Generic::Queue<Object ^> ^ parameterQueue = gcnew System::Collections::Generic::Queue<Object ^>();
 
+
   MemoryDomain^ GetDomain(long address, int range, MemoryDomain ^ domain);
+
+  static Mutex ^ mutex = gcnew Mutex(false, "VanguardMutex");
 
 };
 
@@ -87,14 +93,26 @@ public ref class VanguardClient
 
 void VanguardClientUnmanaged::CORE_STEP()
 {
-  Trace::WriteLine("Entering Core_STEP");
   // Consume the action queue
-  while (VanguardClient::actionQueue->Count != 0)
+
+  Stopwatch ^ watch1 = Stopwatch::StartNew();
+  if (VanguardClient::actionQueue->Count != 0 && VanguardClient::mutex->WaitOne())
   {
-    VanguardClient::actionQueue->Dequeue()->DynamicInvoke((VanguardClient::parameterQueue->Dequeue()));
-    Trace::WriteLine("There are items: " + VanguardClient::actionQueue->Count);
+    Stopwatch ^ watch2 = Stopwatch::StartNew();
+    int count = VanguardClient::actionQueue->Count;
+    for (int i = 0; i < count; i++)
+    {
+      MessageDelegate ^ temp = (MessageDelegate ^)(VanguardClient::actionQueue->Dequeue());
+      Object ^ temp2 = (VanguardClient::parameterQueue->Dequeue());
+      temp(temp2);
+
+    }
+    Trace::WriteLine("Took " + watch2->ElapsedTicks + " ticks / " + watch2->ElapsedMilliseconds + " ms to empty the queue");
+    VanguardClient::mutex->ReleaseMutex();
   }
-  Trace::WriteLine("Exiting Core_STEP");
+  if (watch1->ElapsedMilliseconds > 0)
+    Trace::WriteLine("Took " + watch1->ElapsedTicks + " ticks / " + watch1->ElapsedMilliseconds +
+                   " ms to CORE_Step");
 }
 
 //Create our VanguardClient
@@ -159,16 +177,22 @@ void VanguardClient::SaveState(String^ filename, bool wait) {
 
 void VanguardClient::PokeByte(Object ^ data)
 {
+ // Stopwatch ^ unbox = Stopwatch::StartNew();
   long long address = Convert::ToInt64(((array<Object ^> ^) data)[0]);
   Byte value = Convert::ToByte(((array<Object ^> ^) data)[1]);
   MemoryDomain ^ domain = (MemoryDomain ^)((array<Object ^> ^) data)[2];
+ // unbox->Stop();
+ // Trace::WriteLine("Took " + unbox->ElapsedTicks + " ms to unbox PokeByte params");
 
+  //Stopwatch ^ pokebyte = Stopwatch::StartNew();
   if (domain->name == "SRAM" && (address - domain->offset) < domain->size)
     Memory::Write_U8((Convert::ToByte(value)), Convert::ToUInt32(address));
   else if (domain->name == "EXRAM" && (address - domain->offset) < domain->size)
     Memory::Write_U8(Convert::ToByte(value), Convert::ToUInt32(address));
   else if (domain->name == "ARAM" && (address - domain->size - domain->offset) < domain->size)
     DSP::WriteARAM(Convert::ToByte(value), Convert::ToUInt32(address - SRAM_SIZE));
+ // pokebyte->Stop();
+ // Trace::WriteLine("Took " + pokebyte->ElapsedTicks + " ms to PokeByte params");
 }
 
 Byte VanguardClient::PeekByte(long address, MemoryDomain ^ domain) {
@@ -228,14 +252,17 @@ array<Byte>^ VanguardClient::PeekAddresses(array<long>^ addresses) {
   return bytes;
 }
 
-void VanguardClient::PokeAddresses(array<long>^ addresses, array<Byte>^ values) {
+void VanguardClient::PokeAddresses(Object ^ data){
 
-  /*
-  MemoryDomain ^ domain = gcnew MemoryDomain;
+  array<long long> ^ addresses = (array<long long> ^)((array<Object ^> ^) data)[0];
+  array<Byte> ^ values = (array<Byte> ^)((array<Object ^> ^) data)[1];
+  MemoryDomain^ domain = gcnew MemoryDomain;
+
   for (int i = 0; i < sizeof(addresses); i++) {
     domain = GetDomain(addresses[i], 1, domain);
-    PokeByte(addresses[i], values[i], domain);
-  }*/
+    array<Object ^> ^ temp = {addresses[i], values[i], domain};
+    PokeByte(temp);
+  }
     
 }
 
@@ -282,7 +309,6 @@ inline COMMANDS CheckCommand(String^ inString) {
   return UNKNOWN;
 }
 
-delegate void MessageDelegate(Object ^);
 
 /* THIS IS WHERE YOU HANDLE ANY RECEIVED MESSAGES */
 void VanguardClient::OnMessageReceived(Object^ sender, NetCoreEventArgs^ e)
@@ -316,8 +342,6 @@ void VanguardClient::OnMessageReceived(Object^ sender, NetCoreEventArgs^ e)
 
     if (Core::GetState() == Core::State::Running) {
 
-      Trace::WriteLine("Entering POKEBYTE");
-
       long address = Convert::ToInt64(((array<Object^>^)advancedMessage->objectValue)[0]);
       Byte value = Convert::ToByte(((array<Object^>^)advancedMessage->objectValue)[1]);
 
@@ -330,7 +354,6 @@ void VanguardClient::OnMessageReceived(Object^ sender, NetCoreEventArgs^ e)
 
       parameterQueue->Enqueue(params);
 
-      Trace::WriteLine("Exiting POKEBYTE");
     }
     break;
 
@@ -354,7 +377,7 @@ void VanguardClient::OnMessageReceived(Object^ sender, NetCoreEventArgs^ e)
   case POKEBYTES: {
 
     if (Core::GetState() == Core::State::Running) {
-      Trace::WriteLine("Entering POKEBYTES");
+    //  Trace::WriteLine("Entering POKEBYTES");
 
       long address = Convert::ToInt64(((array<Object^>^)advancedMessage->objectValue)[0]);
       int range = Convert::ToInt32(((array<Object^>^)advancedMessage->objectValue)[1]);
@@ -367,12 +390,11 @@ void VanguardClient::OnMessageReceived(Object^ sender, NetCoreEventArgs^ e)
       MessageDelegate ^ actionObject = gcnew MessageDelegate(this, &VanguardClient::PokeBytes);
       array<Object ^> ^ params = {address, value, range, domain};
       actionQueue->Enqueue(actionObject);
-
       parameterQueue->Enqueue(params);
 
       //PokeBytes(address, value, range, domain);
 
-      Trace::WriteLine("Exiting POKEBYTES");
+    //  Trace::WriteLine("Exiting POKEBYTES");
     }
     break;
   }
@@ -400,11 +422,16 @@ void VanguardClient::OnMessageReceived(Object^ sender, NetCoreEventArgs^ e)
     if (Core::GetState() == Core::State::Running) {
       Trace::WriteLine("Entering POKEADDRESSES");
 
-      array<long>^ addresses = (array<long>^)((array<Object^>^)advancedMessage->objectValue)[0];
-      array<Byte>^ values = (array<Byte>^)((array<Object^>^)advancedMessage->objectValue)[1];
+      array<long long> ^ addresses =
+          (array<long long> ^)((array<Object ^> ^) advancedMessage->objectValue)[0];
+      array<Byte> ^ values = (array<Byte> ^)((array<Object ^> ^) advancedMessage->objectValue)[1];
 
+      MessageDelegate ^ actionObject = gcnew MessageDelegate(this, &VanguardClient::PokeAddresses);
+      array<Object ^> ^ params = {addresses, values};
+      actionQueue->Enqueue(actionObject);
+      parameterQueue->Enqueue(params);
 
-      PokeAddresses(addresses, values);
+      //PokeAddresses(addresses, values);
       Trace::WriteLine("Exiting POKEADDRESSES");
     }
     break;
