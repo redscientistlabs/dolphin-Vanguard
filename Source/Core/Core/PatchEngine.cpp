@@ -27,6 +27,8 @@
 #include "Core/PowerPC/MMU.h"
 #include "Core/PowerPC/PowerPC.h"
 
+#include "DolphinQt//NarrysMod/VanguardClient.h"
+
 namespace PatchEngine
 {
 constexpr std::array<const char*, 3> s_patch_type_strings{{
@@ -244,6 +246,10 @@ bool ApplyFramePatches()
   // Run the Gecko code handler
   Gecko::RunCodeHandler();
   ActionReplay::RunAllActive();
+
+  //NARRYSMOD_HIJACK - Corruptcore Step is called here
+  VanguardClientUnmanaged::CORE_STEP();
+  
 
   return true;
 }

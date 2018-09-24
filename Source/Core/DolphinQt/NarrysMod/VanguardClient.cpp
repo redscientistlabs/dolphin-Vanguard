@@ -11,6 +11,7 @@
 #include "Core/PowerPC/PowerPC.h"
 #include "Core/ConfigManager.h"
 #include "Core/Core.h"
+#include "Common/SPSCQueue.h"
 
 #include <string>  
 #include <iostream>
@@ -41,6 +42,7 @@ Trace::WriteLine(filename);
 
 
 
+
 public ref class MemoryDomain
 {
 public:
@@ -65,19 +67,35 @@ public ref class VanguardClient
   void LoadState(String^ filename);
   void SaveState(String^ filename, bool wait);
   Byte PeekByte(long address, MemoryDomain ^ domain);
-  void PokeByte(long address, Byte ^ value, MemoryDomain ^ domain);
+  void PokeByte(Object ^ data);
   array<Byte>^ PeekBytes(long address, int range, MemoryDomain ^ domain);
-  void PokeBytes(long address, array<Byte>^ value, int range, MemoryDomain ^ domain);
+  void PokeBytes(Object ^ data);
 
 
   array<Byte>^ PeekAddresses(array<long>^ addresses);
   void PokeAddresses(array<long>^ addresses, array<Byte>^ values);
 
+  
+	static System::Collections::Generic::Queue<Delegate ^> ^ actionQueue = gcnew System::Collections::Generic::Queue<Delegate ^>();
+  static System::Collections::Generic::Queue<Object ^> ^ parameterQueue = gcnew System::Collections::Generic::Queue<Object ^>();
 
   MemoryDomain^ GetDomain(long address, int range, MemoryDomain ^ domain);
+
 };
 
 
+
+void VanguardClientUnmanaged::CORE_STEP()
+{
+  Trace::WriteLine("Entering Core_STEP");
+  // Consume the action queue
+  while (VanguardClient::actionQueue->Count != 0)
+  {
+    VanguardClient::actionQueue->Dequeue()->DynamicInvoke((VanguardClient::parameterQueue->Dequeue()));
+    Trace::WriteLine("There are items: " + VanguardClient::actionQueue->Count);
+  }
+  Trace::WriteLine("Exiting Core_STEP");
+}
 
 //Create our VanguardClient
 void VanguardClientInitializer::Initialize()
@@ -139,7 +157,11 @@ void VanguardClient::SaveState(String^ filename, bool wait) {
 
 //THE INTERNAL FUNCTIONS TAKE VALUE, ADDRESS NOT ADDRESS,VALUE
 
-void VanguardClient::PokeByte(long address, Byte ^ value, MemoryDomain ^ domain) {
+void VanguardClient::PokeByte(Object ^ data)
+{
+  long long address = Convert::ToInt64(((array<Object ^> ^) data)[0]);
+  Byte value = Convert::ToByte(((array<Object ^> ^) data)[1]);
+  MemoryDomain ^ domain = (MemoryDomain ^)((array<Object ^> ^) data)[2];
 
   if (domain->name == "SRAM" && (address - domain->offset) < domain->size)
     Memory::Write_U8((Convert::ToByte(value)), Convert::ToUInt32(address));
@@ -164,12 +186,20 @@ Byte VanguardClient::PeekByte(long address, MemoryDomain ^ domain) {
 }
 
 
-void VanguardClient::PokeBytes(long address, array<Byte>^ value, int range, MemoryDomain ^ domain){
+void VanguardClient::PokeBytes(Object ^ data){
 
- // array<Byte>^ byte = gcnew array<Byte>(range);
+  /**/
+    long long address = Convert::ToInt64(((array<Object ^> ^) data)[0]);
+    array<Byte>^ values = (array<Byte>^)((array<Object ^> ^) data)[1];
+    int range = Convert::ToInt32(((array<Object ^> ^) data)[2]);
+    MemoryDomain ^ domain = (MemoryDomain ^)((array<Object ^> ^) data)[3];
 
-  for (int i = 0; i < range; i++)
-    PokeByte(address + i, value[i], domain);
+   for (int i = 0; i < range; i++)
+   {
+     array<Object ^> ^ temp = {address, values[i], domain};
+     PokeByte(temp);
+   }
+   
 
 }
 
@@ -200,14 +230,14 @@ array<Byte>^ VanguardClient::PeekAddresses(array<long>^ addresses) {
 
 void VanguardClient::PokeAddresses(array<long>^ addresses, array<Byte>^ values) {
 
+  /*
   MemoryDomain ^ domain = gcnew MemoryDomain;
   for (int i = 0; i < sizeof(addresses); i++) {
     domain = GetDomain(addresses[i], 1, domain);
     PokeByte(addresses[i], values[i], domain);
-  }
+  }*/
     
 }
-
 
 MemoryDomain^ VanguardClient::GetDomain(long address, int range, MemoryDomain ^ domain) {
   //Hardcode this logic for now.
@@ -252,6 +282,8 @@ inline COMMANDS CheckCommand(String^ inString) {
   return UNKNOWN;
 }
 
+delegate void MessageDelegate(Object ^);
+
 /* THIS IS WHERE YOU HANDLE ANY RECEIVED MESSAGES */
 void VanguardClient::OnMessageReceived(Object^ sender, NetCoreEventArgs^ e)
 {
@@ -292,7 +324,12 @@ void VanguardClient::OnMessageReceived(Object^ sender, NetCoreEventArgs^ e)
       MemoryDomain ^ domain = gcnew MemoryDomain;
       domain = GetDomain(address,1,domain);
 
-      PokeByte(address, value, domain);
+      MessageDelegate ^ actionObject = gcnew MessageDelegate(this, &VanguardClient::PokeByte);
+      array<Object ^> ^ params = {address, value, domain};
+      actionQueue->Enqueue(actionObject);
+
+      parameterQueue->Enqueue(params);
+
       Trace::WriteLine("Exiting POKEBYTE");
     }
     break;
@@ -326,7 +363,15 @@ void VanguardClient::OnMessageReceived(Object^ sender, NetCoreEventArgs^ e)
       MemoryDomain ^ domain = gcnew MemoryDomain;
       domain = GetDomain(address, range, domain);
 
-      PokeBytes(address, value, range, domain);
+      
+      MessageDelegate ^ actionObject = gcnew MessageDelegate(this, &VanguardClient::PokeBytes);
+      array<Object ^> ^ params = {address, value, range, domain};
+      actionQueue->Enqueue(actionObject);
+
+      parameterQueue->Enqueue(params);
+
+      //PokeBytes(address, value, range, domain);
+
       Trace::WriteLine("Exiting POKEBYTES");
     }
     break;
