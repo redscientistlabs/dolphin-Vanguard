@@ -46,7 +46,9 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="library\aes.c" />
-    <ClCompile Include="library\aesni.c" />
+    <ClCompile Include="library\aesni.c">
+      <ExcludedFromBuild>true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="library\arc4.c" />
     <ClCompile Include="library\asn1parse.c" />
     <ClCompile Include="library\asn1write.c" />
@@ -82,7 +84,9 @@
     <ClCompile Include="library\memory_buffer_alloc.c" />
     <ClCompile Include="library\net_sockets.c" />
     <ClCompile Include="library\oid.c" />
-    <ClCompile Include="library\padlock.c" />
+    <ClCompile Include="library\padlock.c">
+      <ExcludedFromBuild>true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="library\pem.c" />
     <ClCompile Include="library\pk.c" />
     <ClCompile Include="library\pk_wrap.c" />
