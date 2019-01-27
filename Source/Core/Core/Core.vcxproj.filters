@@ -13,9 +13,6 @@
     <Filter Include="Debugger">
       <UniqueIdentifier>{ed683a12-55f0-49cb-918b-c7edbcf57268}</UniqueIdentifier>
     </Filter>
-    <Filter Include="DSPCore">
-      <UniqueIdentifier>{35594696-15a6-44cb-b811-04e3195eecf5}</UniqueIdentifier>
-    </Filter>
     <Filter Include="FifoPlayer">
       <UniqueIdentifier>{659f0a99-77cf-46a0-a7a3-95afdd99be72}</UniqueIdentifier>
     </Filter>
@@ -42,15 +39,6 @@
     </Filter>
     <Filter Include="PowerPC\JitCommon">
       <UniqueIdentifier>{c88ec388-371f-4401-851c-a32dcdc0b88b}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="DSPCore\Interpreter">
-      <UniqueIdentifier>{6204f663-bbd0-4eb5-bc15-e3778d8b6091}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="DSPCore\Jit">
-      <UniqueIdentifier>{5377680f-d667-4f1a-aa86-b616c19a5cd4}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="DSPCore\Jit\x64">
-      <UniqueIdentifier>{712e3a61-b818-434e-a724-ef8de1f09027}</UniqueIdentifier>
     </Filter>
     <Filter Include="HW %28Flipper/Hollywood%29\AI - Audio Interface">
       <UniqueIdentifier>{d657188a-426d-46c8-af0a-caa148c6ed1b}</UniqueIdentifier>
@@ -166,6 +154,18 @@
     <Filter Include="HW %28Flipper/Hollywood%29\WiimoteCommon">
       <UniqueIdentifier>{ee6645da-3ad9-4fe7-809f-e4646d0b0ca5}</UniqueIdentifier>
     </Filter>
+    <Filter Include="HW %28Flipper/Hollywood%29\DSPCore">
+      <UniqueIdentifier>{35594696-15a6-44cb-b811-04e3195eecf5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="HW %28Flipper/Hollywood%29\DSPCore\Interpreter">
+      <UniqueIdentifier>{6204f663-bbd0-4eb5-bc15-e3778d8b6091}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="HW %28Flipper/Hollywood%29\DSPCore\Jit">
+      <UniqueIdentifier>{5377680f-d667-4f1a-aa86-b616c19a5cd4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="HW %28Flipper/Hollywood%29\DSPCore\Jit\x64">
+      <UniqueIdentifier>{712e3a61-b818-434e-a724-ef8de1f09027}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BootManager.cpp" />
@@ -217,67 +217,67 @@
       <Filter>Debugger</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Interpreter\DSPIntArithmetic.cpp">
-      <Filter>DSPCore\Interpreter</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Interpreter</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Interpreter\DSPIntBranch.cpp">
-      <Filter>DSPCore\Interpreter</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Interpreter</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Interpreter\DSPIntCCUtil.cpp">
-      <Filter>DSPCore\Interpreter</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Interpreter</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Interpreter\DSPInterpreter.cpp">
-      <Filter>DSPCore\Interpreter</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Interpreter</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Interpreter\DSPIntExtOps.cpp">
-      <Filter>DSPCore\Interpreter</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Interpreter</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Interpreter\DSPIntLoadStore.cpp">
-      <Filter>DSPCore\Interpreter</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Interpreter</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Interpreter\DSPIntMisc.cpp">
-      <Filter>DSPCore\Interpreter</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Interpreter</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Interpreter\DSPIntMultiplier.cpp">
-      <Filter>DSPCore\Interpreter</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Interpreter</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Interpreter\DSPIntTables.cpp">
-      <Filter>DSPCore\Interpreter</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Interpreter</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Jit\DSPEmitterBase.cpp">
-      <Filter>DSPCore\Jit</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Jit</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Jit\x64\DSPJitRegCache.cpp">
-      <Filter>DSPCore\Jit\x64</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Jit\x64</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Jit\x64\DSPJitMultiplier.cpp">
-      <Filter>DSPCore\Jit\x64</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Jit\x64</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Jit\x64\DSPJitMisc.cpp">
-      <Filter>DSPCore\Jit\x64</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Jit\x64</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Jit\x64\DSPJitLoadStore.cpp">
-      <Filter>DSPCore\Jit\x64</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Jit\x64</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Jit\x64\DSPJitExtOps.cpp">
-      <Filter>DSPCore\Jit\x64</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Jit\x64</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Jit\x64\DSPJitCCUtil.cpp">
-      <Filter>DSPCore\Jit\x64</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Jit\x64</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Jit\x64\DSPJitArithmetic.cpp">
-      <Filter>DSPCore\Jit\x64</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Jit\x64</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Jit\x64\DSPJitBranch.cpp">
-      <Filter>DSPCore\Jit\x64</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Jit\x64</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Jit\x64\DSPEmitter.cpp">
-      <Filter>DSPCore\Jit\x64</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Jit\x64</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Jit\x64\DSPJitTables.cpp">
-      <Filter>DSPCore\Jit\x64</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Jit\x64</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Jit\x64\DSPJitUtil.cpp">
-      <Filter>DSPCore\Jit\x64</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Jit\x64</Filter>
     </ClCompile>
     <ClCompile Include="FifoPlayer\FifoAnalyzer.cpp">
       <Filter>FifoPlayer</Filter>
@@ -574,43 +574,43 @@
       <Filter>HW %28Flipper/Hollywood%29</Filter>
     </ClCompile>
     <ClCompile Include="DSP\DSPAssembler.cpp">
-      <Filter>DSPCore</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
     </ClCompile>
     <ClCompile Include="DSP\DSPAccelerator.cpp">
-      <Filter>DSPCore</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
     </ClCompile>
     <ClCompile Include="DSP\DSPAnalyzer.cpp">
-      <Filter>DSPCore</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
     </ClCompile>
     <ClCompile Include="DSP\DSPCaptureLogger.cpp">
-      <Filter>DSPCore</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
     </ClCompile>
     <ClCompile Include="DSP\DSPCodeUtil.cpp">
-      <Filter>DSPCore</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
     </ClCompile>
     <ClCompile Include="DSP\DSPCore.cpp">
-      <Filter>DSPCore</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
     </ClCompile>
     <ClCompile Include="DSP\DSPDisassembler.cpp">
-      <Filter>DSPCore</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
     </ClCompile>
     <ClCompile Include="DSPEmulator.cpp">
-      <Filter>DSPCore</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
     </ClCompile>
     <ClCompile Include="DSP\DSPHWInterface.cpp">
-      <Filter>DSPCore</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
     </ClCompile>
     <ClCompile Include="DSP\DSPMemoryMap.cpp">
-      <Filter>DSPCore</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
     </ClCompile>
     <ClCompile Include="DSP\DSPStacks.cpp">
-      <Filter>DSPCore</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
     </ClCompile>
     <ClCompile Include="DSP\DSPTables.cpp">
-      <Filter>DSPCore</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
     </ClCompile>
     <ClCompile Include="DSP\LabelMap.cpp">
-      <Filter>DSPCore</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
     </ClCompile>
     <ClCompile Include="HW\Wiimote.cpp">
       <Filter>HW %28Flipper/Hollywood%29\Wiimote</Filter>
@@ -642,12 +642,6 @@
     <ClCompile Include="PowerPC\JitCommon\JitCache.cpp">
       <Filter>PowerPC\JitCommon</Filter>
     </ClCompile>
-    <ClCompile Include="PowerPC\Jit64\FPURegCache.cpp">
-      <Filter>PowerPC\Jit64</Filter>
-    </ClCompile>
-    <ClCompile Include="PowerPC\Jit64\GPRRegCache.cpp">
-      <Filter>PowerPC\Jit64</Filter>
-    </ClCompile>
     <ClCompile Include="PowerPC\Jit64\Jit_Branch.cpp">
       <Filter>PowerPC\Jit64</Filter>
     </ClCompile>
@@ -673,9 +667,6 @@
       <Filter>PowerPC\Jit64</Filter>
     </ClCompile>
     <ClCompile Include="PowerPC\Jit64\JitAsm.cpp">
-      <Filter>PowerPC\Jit64</Filter>
-    </ClCompile>
-    <ClCompile Include="PowerPC\Jit64\JitRegCache.cpp">
       <Filter>PowerPC\Jit64</Filter>
     </ClCompile>
     <ClCompile Include="HW\GCKeyboardEmu.cpp">
@@ -907,6 +898,9 @@
     <ClCompile Include="Config\WiimoteInputSettings.cpp">
       <Filter>Config</Filter>
     </ClCompile>
+    <ClCompile Include="PowerPC\Jit64\RegCache\FPURegCache.cpp" />
+    <ClCompile Include="PowerPC\Jit64\RegCache\GPRRegCache.cpp" />
+    <ClCompile Include="PowerPC\Jit64\RegCache\JitRegCache.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BootManager.h" />
@@ -961,31 +955,31 @@
       <Filter>Debugger</Filter>
     </ClInclude>
     <ClInclude Include="DSP\Interpreter\DSPIntCCUtil.h">
-      <Filter>DSPCore\Interpreter</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Interpreter</Filter>
     </ClInclude>
     <ClInclude Include="DSP\Interpreter\DSPInterpreter.h">
-      <Filter>DSPCore\Interpreter</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Interpreter</Filter>
     </ClInclude>
     <ClInclude Include="DSP\Interpreter\DSPIntExtOps.h">
-      <Filter>DSPCore\Interpreter</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Interpreter</Filter>
     </ClInclude>
     <ClInclude Include="DSP\Interpreter\DSPIntTables.h">
-      <Filter>DSPCore\Interpreter</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Interpreter</Filter>
     </ClInclude>
     <ClInclude Include="DSP\Interpreter\DSPIntUtil.h">
-      <Filter>DSPCore\Interpreter</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Interpreter</Filter>
     </ClInclude>
     <ClInclude Include="DSP\Jit\DSPEmitterBase.h">
-      <Filter>DSPCore\Jit</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Jit</Filter>
     </ClInclude>
     <ClInclude Include="DSP\Jit\x64\DSPJitRegCache.h">
-      <Filter>DSPCore\Jit\x64</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Jit\x64</Filter>
     </ClInclude>
     <ClInclude Include="DSP\Jit\x64\DSPJitTables.h">
-      <Filter>DSPCore\Jit\x64</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Jit\x64</Filter>
     </ClInclude>
     <ClInclude Include="DSP\Jit\x64\DSPEmitter.h">
-      <Filter>DSPCore\Jit\x64</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Jit\x64</Filter>
     </ClInclude>
     <ClInclude Include="FifoPlayer\FifoAnalyzer.h">
       <Filter>FifoPlayer</Filter>
@@ -1270,49 +1264,49 @@
       <Filter>HW %28Flipper/Hollywood%29</Filter>
     </ClInclude>
     <ClInclude Include="DSP\DSPAssembler.h">
-      <Filter>DSPCore</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
     </ClInclude>
     <ClInclude Include="DSP\DSPAccelerator.h">
-      <Filter>DSPCore</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
     </ClInclude>
     <ClInclude Include="DSP\DSPAnalyzer.h">
-      <Filter>DSPCore</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
     </ClInclude>
     <ClInclude Include="DSP\DSPBreakpoints.h">
-      <Filter>DSPCore</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
     </ClInclude>
     <ClInclude Include="DSP\DSPCaptureLogger.h">
-      <Filter>DSPCore</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
     </ClInclude>
     <ClInclude Include="DSP\DSPCodeUtil.h">
-      <Filter>DSPCore</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
     </ClInclude>
     <ClInclude Include="DSP\DSPCommon.h">
-      <Filter>DSPCore</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
     </ClInclude>
     <ClInclude Include="DSP\DSPCore.h">
-      <Filter>DSPCore</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
     </ClInclude>
     <ClInclude Include="DSP\DSPDisassembler.h">
-      <Filter>DSPCore</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
     </ClInclude>
     <ClInclude Include="DSPEmulator.h">
-      <Filter>DSPCore</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
     </ClInclude>
     <ClInclude Include="DSP\DSPHWInterface.h">
-      <Filter>DSPCore</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
     </ClInclude>
     <ClInclude Include="DSP\DSPMemoryMap.h">
-      <Filter>DSPCore</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
     </ClInclude>
     <ClInclude Include="DSP\DSPStacks.h">
-      <Filter>DSPCore</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
     </ClInclude>
     <ClInclude Include="DSP\DSPTables.h">
-      <Filter>DSPCore</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
     </ClInclude>
     <ClInclude Include="DSP\LabelMap.h">
-      <Filter>DSPCore</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
     </ClInclude>
     <ClInclude Include="HW\Wiimote.h">
       <Filter>HW %28Flipper/Hollywood%29\Wiimote</Filter>
