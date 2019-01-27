@@ -46,6 +46,7 @@ Trace::WriteLine(filename);
 delegate void MessageDelegate(Object ^);
 
 
+
 public ref class MemoryDomain
 {
 public:
@@ -59,7 +60,7 @@ public:
 public ref class VanguardClient
 {
   public:
-   static RTCV::Vanguard::TargetSpec ^ spec;
+   static RTCV::NetCore::NetCoreReceiver ^ receiver;
    static RTCV::Vanguard::VanguardConnector ^ connector;
 
   void OnMessageReceived(Object^  sender, RTCV::NetCore::NetCoreEventArgs^  e);
@@ -133,9 +134,9 @@ void VanguardClientInitializer::isWii()
 //Initialize it 
 void VanguardClient::StartClient() 
 {
-  VanguardClient::spec = gcnew RTCV::Vanguard::TargetSpec();
-  VanguardClient::spec->MessageReceived += gcnew EventHandler<NetCore::NetCoreEventArgs ^>(this, &VanguardClient::OnMessageReceived);
-  VanguardClient::connector = gcnew RTCV::Vanguard::VanguardConnector(spec);
+  VanguardClient::receiver = gcnew RTCV::NetCore::NetCoreReceiver();
+  VanguardClient::receiver->MessageReceived += gcnew EventHandler<NetCore::NetCoreEventArgs ^>(this, &VanguardClient::OnMessageReceived);
+  VanguardClient::connector = gcnew RTCV::Vanguard::VanguardConnector(receiver);
 }
 
 void VanguardClient::RestartClient()
