@@ -34,3 +34,7 @@ CMakeLists.txt.user
 *.kdev4
 # Ignore IDEA/Clion files/dirs
 /.idea/
+
+
+#Ignore Nuget packages
+Source/packages/*
