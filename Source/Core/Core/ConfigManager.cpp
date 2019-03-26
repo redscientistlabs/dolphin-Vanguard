@@ -513,9 +513,9 @@ void SConfig::LoadCoreSettings(IniFile& ini)
   core->Get("Fastmem", &bFastmem, true);
   core->Get("DSPHLE", &bDSPHLE, true);
   core->Get("TimingVariance", &iTimingVariance, 40);
-  core->Get("CPUThread", &bCPUThread, true);
+  core->Get("CPUThread", &bCPUThread, true); //NARRYSMOD_HIJACK - Dual core off
   core->Get("SyncOnSkipIdle", &bSyncGPUOnSkipIdleHack, true);
-  core->Get("EnableCheats", &bEnableCheats, false);
+  core->Get("EnableCheats", &bEnableCheats, true); //NARRYSMOD_HIJACK -Cheats on
   core->Get("SelectedLanguage", &SelectedLanguage, 0);
   core->Get("OverrideGCLang", &bOverrideGCLanguage, false);
   core->Get("DPL2Decoder", &bDPL2Decoder, false);
