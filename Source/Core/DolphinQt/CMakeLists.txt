@@ -30,6 +30,8 @@ add_executable(dolphin-emu
   Config/CheatWarningWidget.cpp
   Config/ControllersWindow.cpp
   Config/FilesystemWidget.cpp
+  Config/GameConfigEdit.cpp
+  Config/GameConfigHighlighter.cpp
   Config/GameConfigWidget.cpp
   Config/GeckoCodeWidget.cpp
   Config/Graphics/AdvancedWidget.cpp
@@ -102,6 +104,7 @@ add_executable(dolphin-emu
   QtUtils/DoubleClickEventFilter.cpp
   QtUtils/ElidedButton.cpp
   QtUtils/FlowLayout.cpp
+  QtUtils/ModalMessageBox.cpp
   QtUtils/ImageConverter.cpp
   QtUtils/SignalDaemon.cpp
   QtUtils/WindowActivationEventFilter.cpp
@@ -143,6 +146,7 @@ PRIVATE
   core
   Qt5::Widgets
   uicommon
+  imgui
 )
 
 if(WIN32)

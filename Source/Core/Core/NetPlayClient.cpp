@@ -43,6 +43,7 @@
 #include "Core/HW/Sram.h"
 #include "Core/HW/WiiSave.h"
 #include "Core/HW/WiiSaveStructs.h"
+#include "Core/HW/WiimoteCommon/WiimoteReport.h"
 #include "Core/HW/WiimoteEmu/WiimoteEmu.h"
 #include "Core/HW/WiimoteReal/WiimoteReal.h"
 #include "Core/IOS/FS/FileSystem.h"
@@ -52,7 +53,7 @@
 #include "Core/Movie.h"
 #include "Core/PowerPC/PowerPC.h"
 #include "Core/WiiRoot.h"
-#include "InputCommon/ControllerEmu/ControlGroup/Extension.h"
+#include "InputCommon/ControllerEmu/ControlGroup/Attachments.h"
 #include "InputCommon/GCAdapter.h"
 #include "InputCommon/InputConfig.h"
 #include "UICommon/GameFile.h"
@@ -61,6 +62,8 @@
 
 namespace NetPlay
 {
+using namespace WiimoteCommon;
+
 static std::mutex crit_netplay_client;
 static NetPlayClient* netplay_client = nullptr;
 static std::unique_ptr<IOS::HLE::FS::FileSystem> s_wii_sync_fs;
@@ -398,7 +401,7 @@ unsigned int NetPlayClient::OnData(sf::Packet& packet)
 
   case NP_MSG_PAD_MAPPING:
   {
-    for (PadMapping& mapping : m_pad_map)
+    for (PlayerId& mapping : m_pad_map)
     {
       packet >> mapping;
     }
@@ -411,7 +414,7 @@ unsigned int NetPlayClient::OnData(sf::Packet& packet)
 
   case NP_MSG_WIIMOTE_MAPPING:
   {
-    for (PadMapping& mapping : m_wiimote_map)
+    for (PlayerId& mapping : m_wiimote_map)
     {
       packet >> mapping;
     }
@@ -424,7 +427,7 @@ unsigned int NetPlayClient::OnData(sf::Packet& packet)
   {
     while (!packet.endOfPacket())
     {
-      PadMapping map;
+      PadIndex map;
       packet >> map;
 
       GCPadStatus pad;
@@ -441,7 +444,7 @@ unsigned int NetPlayClient::OnData(sf::Packet& packet)
 
   case NP_MSG_WIIMOTE_DATA:
   {
-    PadMapping map = 0;
+    PadIndex map;
     NetWiimote nw;
     u8 size;
     packet >> map >> size;
@@ -470,7 +473,7 @@ unsigned int NetPlayClient::OnData(sf::Packet& packet)
 
   case NP_MSG_PAD_FIRST_RECEIVED:
   {
-    PadMapping map;
+    PadIndex map;
     packet >> map;
     packet >> m_first_pad_status_received[map];
     m_first_pad_status_received_event.Set();
@@ -1318,7 +1321,7 @@ void NetPlayClient::SendChatMessage(const std::string& msg)
 void NetPlayClient::AddPadStateToPacket(const int in_game_pad, const GCPadStatus& pad,
                                         sf::Packet& packet)
 {
-  packet << static_cast<PadMapping>(in_game_pad);
+  packet << static_cast<PadIndex>(in_game_pad);
   packet << pad.button << pad.analogA << pad.analogB << pad.stickX << pad.stickY << pad.substickX
          << pad.substickY << pad.triggerLeft << pad.triggerRight << pad.isConnected;
 }
@@ -1328,7 +1331,7 @@ void NetPlayClient::SendWiimoteState(const int in_game_pad, const NetWiimote& nw
 {
   sf::Packet packet;
   packet << static_cast<MessageId>(NP_MSG_WIIMOTE_DATA);
-  packet << static_cast<PadMapping>(in_game_pad);
+  packet << static_cast<PadIndex>(in_game_pad);
   packet << static_cast<u8>(nw.size());
   for (auto it : nw)
   {
@@ -1436,7 +1439,7 @@ void NetPlayClient::SyncCodeResponse(const bool success)
   // If something failed, immediately report back that code sync failed
   if (!success)
   {
-    m_dialog->AppendChat(GetStringT("Error processing Codes."));
+    m_dialog->AppendChat(GetStringT("Error processing codes."));
 
     sf::Packet response_packet;
     response_packet << static_cast<MessageId>(NP_MSG_SYNC_CODES);
@@ -1566,21 +1569,21 @@ void NetPlayClient::UpdateDevices()
     {
       if (SerialInterface::SIDevice_IsGCController(SConfig::GetInstance().m_SIDevice[local_pad]))
       {
-        SerialInterface::AddDevice(SConfig::GetInstance().m_SIDevice[local_pad], pad);
+        SerialInterface::ChangeDevice(SConfig::GetInstance().m_SIDevice[local_pad], pad);
       }
       else
       {
-        SerialInterface::AddDevice(SerialInterface::SIDEVICE_GC_CONTROLLER, pad);
+        SerialInterface::ChangeDevice(SerialInterface::SIDEVICE_GC_CONTROLLER, pad);
       }
       local_pad++;
     }
     else if (player_id > 0)
     {
-      SerialInterface::AddDevice(SerialInterface::SIDEVICE_GC_CONTROLLER, pad);
+      SerialInterface::ChangeDevice(SerialInterface::SIDEVICE_GC_CONTROLLER, pad);
     }
     else
     {
-      SerialInterface::AddDevice(SerialInterface::SIDEVICE_NONE, pad);
+      SerialInterface::ChangeDevice(SerialInterface::SIDEVICE_NONE, pad);
     }
     pad++;
   }
@@ -1882,7 +1885,7 @@ bool NetPlayClient::PollLocalPad(const int local_pad, sf::Packet& packet)
   return data_added;
 }
 
-void NetPlayClient::SendPadHostPoll(const PadMapping pad_num)
+void NetPlayClient::SendPadHostPoll(const PadIndex pad_num)
 {
   if (!m_local_player->IsHost())
     return;
@@ -1903,7 +1906,7 @@ void NetPlayClient::SendPadHostPoll(const PadMapping pad_num)
       }
     }
   }
-  else if (m_pad_map[pad_num] > 0)
+  else if (m_pad_map[pad_num] != 0)
   {
     while (!m_first_pad_status_received[pad_num])
     {
@@ -1977,7 +1980,7 @@ void NetPlayClient::SendPowerButtonEvent()
 // called from ---GUI--- thread
 bool NetPlayClient::LocalPlayerHasControllerMapped() const
 {
-  const auto mapping_matches_player_id = [this](const PadMapping& mapping) {
+  const auto mapping_matches_player_id = [this](const PlayerId& mapping) {
     return mapping == m_local_player->pid;
   };
 
@@ -2184,14 +2187,14 @@ void SetupWiimotes()
   ASSERT(IsNetPlayRunning());
   const NetSettings& netplay_settings = netplay_client->GetNetSettings();
   const PadMappingArray& wiimote_map = netplay_client->GetWiimoteMapping();
-  for (int i = 0; i < netplay_settings.m_WiimoteExtension.size(); i++)
+  for (size_t i = 0; i < netplay_settings.m_WiimoteExtension.size(); i++)
   {
     if (wiimote_map[i] > 0)
     {
-      static_cast<ControllerEmu::Extension*>(
-          static_cast<WiimoteEmu::Wiimote*>(Wiimote::GetConfig()->GetController(i))
-              ->GetWiimoteGroup(WiimoteEmu::WiimoteGroup::Extension))
-          ->switch_extension = netplay_settings.m_WiimoteExtension[i];
+      static_cast<ControllerEmu::Attachments*>(
+          static_cast<WiimoteEmu::Wiimote*>(Wiimote::GetConfig()->GetController(int(i)))
+              ->GetWiimoteGroup(WiimoteEmu::WiimoteGroup::Attachments))
+          ->SetSelectedAttachment(netplay_settings.m_WiimoteExtension[i]);
     }
   }
 }

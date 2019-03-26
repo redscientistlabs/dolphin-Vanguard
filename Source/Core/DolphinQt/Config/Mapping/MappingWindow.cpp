@@ -9,7 +9,6 @@
 #include <QDialogButtonBox>
 #include <QGroupBox>
 #include <QHBoxLayout>
-#include <QMessageBox>
 #include <QPushButton>
 #include <QTabWidget>
 #include <QVBoxLayout>
@@ -36,6 +35,7 @@
 #include "DolphinQt/Config/Mapping/WiimoteEmuExtension.h"
 #include "DolphinQt/Config/Mapping/WiimoteEmuGeneral.h"
 #include "DolphinQt/Config/Mapping/WiimoteEmuMotionControl.h"
+#include "DolphinQt/QtUtils/ModalMessageBox.h"
 #include "DolphinQt/QtUtils/WrapInScrollArea.h"
 #include "DolphinQt/Settings.h"
 
@@ -67,7 +67,9 @@ void MappingWindow::CreateDevicesLayout()
   m_devices_combo = new QComboBox();
   m_devices_refresh = new QPushButton(tr("Refresh"));
 
+  m_devices_combo->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
   m_devices_refresh->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+
   m_devices_layout->addWidget(m_devices_combo);
   m_devices_layout->addWidget(m_devices_refresh);
 
@@ -85,7 +87,7 @@ void MappingWindow::CreateProfilesLayout()
 
   auto* button_layout = new QHBoxLayout();
 
-  m_profiles_box->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+  m_profiles_combo->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
   m_profiles_combo->setEditable(true);
 
   m_profiles_layout->addWidget(m_profiles_combo);
@@ -143,11 +145,13 @@ void MappingWindow::ConnectWidgets()
   connect(m_devices_refresh, &QPushButton::clicked, this, &MappingWindow::RefreshDevices);
   connect(m_devices_combo, static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
           this, &MappingWindow::OnDeviceChanged);
-  connect(m_reset_clear, &QPushButton::clicked, this, [this] { emit ClearFields(); });
+  connect(m_reset_clear, &QPushButton::clicked, this, &MappingWindow::OnClearFieldsPressed);
   connect(m_reset_default, &QPushButton::clicked, this, &MappingWindow::OnDefaultFieldsPressed);
   connect(m_profiles_save, &QPushButton::clicked, this, &MappingWindow::OnSaveProfilePressed);
   connect(m_profiles_load, &QPushButton::clicked, this, &MappingWindow::OnLoadProfilePressed);
   connect(m_profiles_delete, &QPushButton::clicked, this, &MappingWindow::OnDeleteProfilePressed);
+  // We currently use the "Close" button as an "Accept" button so we must save on reject.
+  connect(this, &QDialog::rejected, [this] { emit Save(); });
 }
 
 void MappingWindow::OnDeleteProfilePressed()
@@ -157,7 +161,7 @@ void MappingWindow::OnDeleteProfilePressed()
 
   if (!File::Exists(profile_path.toStdString()))
   {
-    QMessageBox error(this);
+    ModalMessageBox error(this);
     error.setIcon(QMessageBox::Critical);
     error.setWindowTitle(tr("Error"));
     error.setText(tr("The profile '%1' does not exist").arg(profile_name));
@@ -165,7 +169,7 @@ void MappingWindow::OnDeleteProfilePressed()
     return;
   }
 
-  QMessageBox confirm(this);
+  ModalMessageBox confirm(this);
 
   confirm.setIcon(QMessageBox::Warning);
   confirm.setWindowTitle(tr("Confirm"));
@@ -182,8 +186,9 @@ void MappingWindow::OnDeleteProfilePressed()
 
   File::Delete(profile_path.toStdString());
 
-  QMessageBox result(this);
+  ModalMessageBox result(this);
   result.setIcon(QMessageBox::Information);
+  result.setWindowModality(Qt::WindowModal);
   result.setWindowTitle(tr("Success"));
   result.setText(tr("Successfully deleted '%1'.").arg(profile_name));
 }
@@ -354,7 +359,7 @@ void MappingWindow::SetMappingType(MappingWindow::Type type)
 
 void MappingWindow::AddWidget(const QString& name, QWidget* widget)
 {
-  m_tab_widget->addTab(GetWrappedWidget(widget, this, 150, 205), name);
+  m_tab_widget->addTab(GetWrappedWidget(widget, this, 150, 210), name);
 }
 
 int MappingWindow::GetPort() const
@@ -375,6 +380,16 @@ std::shared_ptr<ciface::Core::Device> MappingWindow::GetDevice() const
 void MappingWindow::OnDefaultFieldsPressed()
 {
   m_controller->LoadDefaults(g_controller_interface);
+  m_controller->UpdateReferences(g_controller_interface);
+  emit Update();
+  emit Save();
+}
+
+void MappingWindow::OnClearFieldsPressed()
+{
+  // Loading an empty inifile section clears everything.
+  IniFile::Section sec;
+  m_controller->LoadConfig(&sec);
   m_controller->UpdateReferences(g_controller_interface);
   emit Update();
   emit Save();

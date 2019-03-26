@@ -68,6 +68,8 @@
     <QtMoc Include="Config\CheatWarningWidget.h" />
     <QtMoc Include="Config\ControllersWindow.h" />
     <QtMoc Include="Config\FilesystemWidget.h" />
+    <QtMoc Include="Config\GameConfigEdit.h" />
+    <QtMoc Include="Config\GameConfigHighlighter.h" />
     <QtMoc Include="Config\GameConfigWidget.h" />
     <QtMoc Include="Config\GeckoCodeWidget.h" />
     <QtMoc Include="Config\Mapping\GCKeyboardEmu.h" />
@@ -157,6 +159,7 @@
     <QtMoc Include="QtUtils\DoubleClickEventFilter.h" />
     <QtMoc Include="QtUtils\ElidedButton.h" />
     <QtMoc Include="QtUtils\FlowLayout.h" />
+    <QtMoc Include="QtUtils\ModalMessageBox.h" />
     <QtMoc Include="QtUtils\WindowActivationEventFilter.h" />
     <QtMoc Include="QtUtils\WrapInScrollArea.h" />
     <QtMoc Include="RenderWidget.h" />
@@ -199,6 +202,8 @@
     <ClCompile Include="$(QtMocOutPrefix)GCPadEmu.cpp" />
     <ClCompile Include="$(QtMocOutPrefix)GCPadWiiUConfigDialog.cpp" />
     <ClCompile Include="$(QtMocOutPrefix)GCTASInputWindow.cpp" />
+    <ClCompile Include="$(QtMocOutPrefix)GameConfigEdit.cpp" />
+    <ClCompile Include="$(QtMocOutPrefix)GameConfigHighlighter.cpp" />
     <ClCompile Include="$(QtMocOutPrefix)GameConfigWidget.cpp" />
     <ClCompile Include="$(QtMocOutPrefix)GameCubePane.cpp" />
     <ClCompile Include="$(QtMocOutPrefix)GameList.cpp" />
@@ -246,6 +251,7 @@
     <ClCompile Include="$(QtMocOutPrefix)MemoryViewWidget.cpp" />
     <ClCompile Include="$(QtMocOutPrefix)MemoryWidget.cpp" />
     <ClCompile Include="$(QtMocOutPrefix)MenuBar.cpp" />
+    <ClCompile Include="$(QtMocOutPrefix)ModalMessageBox.cpp" />
     <ClCompile Include="$(QtMocOutPrefix)NetPlayDialog.cpp" />
     <ClCompile Include="$(QtMocOutPrefix)NetPlaySetupDialog.cpp" />
     <ClCompile Include="$(QtMocOutPrefix)NewBreakpointDialog.cpp" />
@@ -280,6 +286,8 @@
     <ClCompile Include="Config\CheatWarningWidget.cpp" />
     <ClCompile Include="Config\ControllersWindow.cpp" />
     <ClCompile Include="Config\FilesystemWidget.cpp" />
+    <ClCompile Include="Config\GameConfigEdit.cpp" />
+    <ClCompile Include="Config\GameConfigHighlighter.cpp" />
     <ClCompile Include="Config\GameConfigWidget.cpp" />
     <ClCompile Include="Config\GeckoCodeWidget.cpp" />
     <ClCompile Include="Config\Graphics\AdvancedWidget.cpp" />
@@ -426,6 +434,7 @@
     <ClCompile Include="QtUtils\ElidedButton.cpp" />
     <ClCompile Include="QtUtils\FlowLayout.cpp" />
     <ClCompile Include="QtUtils\ImageConverter.cpp" />
+    <ClCompile Include="QtUtils\ModalMessageBox.cpp" />
     <ClCompile Include="QtUtils\WindowActivationEventFilter.cpp" />
     <ClCompile Include="QtUtils\WrapInScrollArea.cpp" />
     <ClCompile Include="RenderWidget.cpp" />
@@ -534,6 +543,8 @@
     </ProjectReference>
     <ProjectReference Include="C:\Users\Daniel\Documents\RTCV\Vanguard\Vanguard.csproj">
       <Project>{364c705e-b7ab-4a94-a59b-88899ce65958}</Project>
+    <ProjectReference Include="..\..\..\Externals\imgui\imgui.vcxproj">
+      <Project>{4c3b2264-ea73-4a7b-9cfe-65b0fd635ebb}</Project>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

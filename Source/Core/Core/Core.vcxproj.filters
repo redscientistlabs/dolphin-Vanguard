@@ -13,6 +13,9 @@
     <Filter Include="Debugger">
       <UniqueIdentifier>{ed683a12-55f0-49cb-918b-c7edbcf57268}</UniqueIdentifier>
     </Filter>
+    <Filter Include="DSPCore">
+      <UniqueIdentifier>{35594696-15a6-44cb-b811-04e3195eecf5}</UniqueIdentifier>
+    </Filter>
     <Filter Include="FifoPlayer">
       <UniqueIdentifier>{659f0a99-77cf-46a0-a7a3-95afdd99be72}</UniqueIdentifier>
     </Filter>
@@ -40,6 +43,15 @@
     <Filter Include="PowerPC\JitCommon">
       <UniqueIdentifier>{c88ec388-371f-4401-851c-a32dcdc0b88b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="DSPCore\Interpreter">
+      <UniqueIdentifier>{6204f663-bbd0-4eb5-bc15-e3778d8b6091}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DSPCore\Jit">
+      <UniqueIdentifier>{5377680f-d667-4f1a-aa86-b616c19a5cd4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DSPCore\Jit\x64">
+      <UniqueIdentifier>{712e3a61-b818-434e-a724-ef8de1f09027}</UniqueIdentifier>
+    </Filter>
     <Filter Include="HW %28Flipper/Hollywood%29\AI - Audio Interface">
       <UniqueIdentifier>{d657188a-426d-46c8-af0a-caa148c6ed1b}</UniqueIdentifier>
     </Filter>
@@ -66,9 +78,6 @@
     </Filter>
     <Filter Include="HW %28Flipper/Hollywood%29\Wiimote\Real">
       <UniqueIdentifier>{bc3e845a-3d01-4713-aa32-f27110838d0c}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="HW %28Flipper/Hollywood%29\Wiimote\Emu\Attachment">
-      <UniqueIdentifier>{cdbd65da-541f-47d2-8fdc-e99e73e98e69}</UniqueIdentifier>
     </Filter>
     <Filter Include="HW %28Flipper/Hollywood%29\EXI - Expansion Interface">
       <UniqueIdentifier>{d19f1218-0e28-4f24-a4b3-33fac750a899}</UniqueIdentifier>
@@ -151,20 +160,11 @@
     <Filter Include="PowerPC\SignatureDB">
       <UniqueIdentifier>{f0b52c84-49f4-470a-b037-edeea5634b9e}</UniqueIdentifier>
     </Filter>
-    <Filter Include="HW %28Flipper/Hollywood%29\WiimoteCommon">
+    <Filter Include="HW %28Flipper/Hollywood%29\Wiimote\Common">
       <UniqueIdentifier>{ee6645da-3ad9-4fe7-809f-e4646d0b0ca5}</UniqueIdentifier>
     </Filter>
-    <Filter Include="HW %28Flipper/Hollywood%29\DSPCore">
-      <UniqueIdentifier>{35594696-15a6-44cb-b811-04e3195eecf5}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="HW %28Flipper/Hollywood%29\DSPCore\Interpreter">
-      <UniqueIdentifier>{6204f663-bbd0-4eb5-bc15-e3778d8b6091}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="HW %28Flipper/Hollywood%29\DSPCore\Jit">
-      <UniqueIdentifier>{5377680f-d667-4f1a-aa86-b616c19a5cd4}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="HW %28Flipper/Hollywood%29\DSPCore\Jit\x64">
-      <UniqueIdentifier>{712e3a61-b818-434e-a724-ef8de1f09027}</UniqueIdentifier>
+    <Filter Include="HW %28Flipper/Hollywood%29\Wiimote\Emu\Extension">
+      <UniqueIdentifier>{68c09d7e-4f5a-435d-a0d2-7eb7a74d7054}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -217,67 +217,67 @@
       <Filter>Debugger</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Interpreter\DSPIntArithmetic.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Interpreter</Filter>
+      <Filter>DSPCore\Interpreter</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Interpreter\DSPIntBranch.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Interpreter</Filter>
+      <Filter>DSPCore\Interpreter</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Interpreter\DSPIntCCUtil.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Interpreter</Filter>
+      <Filter>DSPCore\Interpreter</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Interpreter\DSPInterpreter.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Interpreter</Filter>
+      <Filter>DSPCore\Interpreter</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Interpreter\DSPIntExtOps.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Interpreter</Filter>
+      <Filter>DSPCore\Interpreter</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Interpreter\DSPIntLoadStore.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Interpreter</Filter>
+      <Filter>DSPCore\Interpreter</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Interpreter\DSPIntMisc.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Interpreter</Filter>
+      <Filter>DSPCore\Interpreter</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Interpreter\DSPIntMultiplier.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Interpreter</Filter>
+      <Filter>DSPCore\Interpreter</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Interpreter\DSPIntTables.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Interpreter</Filter>
+      <Filter>DSPCore\Interpreter</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Jit\DSPEmitterBase.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Jit</Filter>
+      <Filter>DSPCore\Jit</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Jit\x64\DSPJitRegCache.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Jit\x64</Filter>
+      <Filter>DSPCore\Jit\x64</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Jit\x64\DSPJitMultiplier.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Jit\x64</Filter>
+      <Filter>DSPCore\Jit\x64</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Jit\x64\DSPJitMisc.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Jit\x64</Filter>
+      <Filter>DSPCore\Jit\x64</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Jit\x64\DSPJitLoadStore.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Jit\x64</Filter>
+      <Filter>DSPCore\Jit\x64</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Jit\x64\DSPJitExtOps.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Jit\x64</Filter>
+      <Filter>DSPCore\Jit\x64</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Jit\x64\DSPJitCCUtil.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Jit\x64</Filter>
+      <Filter>DSPCore\Jit\x64</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Jit\x64\DSPJitArithmetic.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Jit\x64</Filter>
+      <Filter>DSPCore\Jit\x64</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Jit\x64\DSPJitBranch.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Jit\x64</Filter>
+      <Filter>DSPCore\Jit\x64</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Jit\x64\DSPEmitter.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Jit\x64</Filter>
+      <Filter>DSPCore\Jit\x64</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Jit\x64\DSPJitTables.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Jit\x64</Filter>
+      <Filter>DSPCore\Jit\x64</Filter>
     </ClCompile>
     <ClCompile Include="DSP\Jit\x64\DSPJitUtil.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Jit\x64</Filter>
+      <Filter>DSPCore\Jit\x64</Filter>
     </ClCompile>
     <ClCompile Include="FifoPlayer\FifoAnalyzer.cpp">
       <Filter>FifoPlayer</Filter>
@@ -516,31 +516,10 @@
     <ClCompile Include="HW\VideoInterface.cpp">
       <Filter>HW %28Flipper/Hollywood%29\VI - Video Interface</Filter>
     </ClCompile>
-    <ClCompile Include="HW\WiimoteEmu\Attachment\Attachment.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu\Attachment</Filter>
-    </ClCompile>
-    <ClCompile Include="HW\WiimoteEmu\Attachment\Classic.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu\Attachment</Filter>
-    </ClCompile>
-    <ClCompile Include="HW\WiimoteEmu\Attachment\Drums.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu\Attachment</Filter>
-    </ClCompile>
-    <ClCompile Include="HW\WiimoteEmu\Attachment\Guitar.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu\Attachment</Filter>
-    </ClCompile>
-    <ClCompile Include="HW\WiimoteEmu\Attachment\Nunchuk.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu\Attachment</Filter>
-    </ClCompile>
-    <ClCompile Include="HW\WiimoteEmu\Attachment\Turntable.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu\Attachment</Filter>
-    </ClCompile>
     <ClCompile Include="HW\WiimoteEmu\EmuSubroutines.cpp">
       <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu</Filter>
     </ClCompile>
     <ClCompile Include="HW\WiimoteEmu\Encryption.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu</Filter>
-    </ClCompile>
-    <ClCompile Include="HW\WiimoteEmu\Speaker.cpp">
       <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu</Filter>
     </ClCompile>
     <ClCompile Include="HW\WiimoteEmu\WiimoteEmu.cpp">
@@ -574,43 +553,43 @@
       <Filter>HW %28Flipper/Hollywood%29</Filter>
     </ClCompile>
     <ClCompile Include="DSP\DSPAssembler.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
+      <Filter>DSPCore</Filter>
     </ClCompile>
     <ClCompile Include="DSP\DSPAccelerator.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
+      <Filter>DSPCore</Filter>
     </ClCompile>
     <ClCompile Include="DSP\DSPAnalyzer.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
+      <Filter>DSPCore</Filter>
     </ClCompile>
     <ClCompile Include="DSP\DSPCaptureLogger.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
+      <Filter>DSPCore</Filter>
     </ClCompile>
     <ClCompile Include="DSP\DSPCodeUtil.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
+      <Filter>DSPCore</Filter>
     </ClCompile>
     <ClCompile Include="DSP\DSPCore.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
+      <Filter>DSPCore</Filter>
     </ClCompile>
     <ClCompile Include="DSP\DSPDisassembler.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
+      <Filter>DSPCore</Filter>
     </ClCompile>
     <ClCompile Include="DSPEmulator.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
+      <Filter>DSPCore</Filter>
     </ClCompile>
     <ClCompile Include="DSP\DSPHWInterface.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
+      <Filter>DSPCore</Filter>
     </ClCompile>
     <ClCompile Include="DSP\DSPMemoryMap.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
+      <Filter>DSPCore</Filter>
     </ClCompile>
     <ClCompile Include="DSP\DSPStacks.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
+      <Filter>DSPCore</Filter>
     </ClCompile>
     <ClCompile Include="DSP\DSPTables.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
+      <Filter>DSPCore</Filter>
     </ClCompile>
     <ClCompile Include="DSP\LabelMap.cpp">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
+      <Filter>DSPCore</Filter>
     </ClCompile>
     <ClCompile Include="HW\Wiimote.cpp">
       <Filter>HW %28Flipper/Hollywood%29\Wiimote</Filter>
@@ -901,6 +880,45 @@
     <ClCompile Include="PowerPC\Jit64\RegCache\FPURegCache.cpp" />
     <ClCompile Include="PowerPC\Jit64\RegCache\GPRRegCache.cpp" />
     <ClCompile Include="PowerPC\Jit64\RegCache\JitRegCache.cpp" />
+    <ClCompile Include="HW\WiimoteEmu\I2CBus.cpp">
+      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu</Filter>
+    </ClCompile>
+    <ClCompile Include="HW\WiimoteEmu\MotionPlus.cpp">
+      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu</Filter>
+    </ClCompile>
+    <ClCompile Include="HW\WiimoteEmu\Camera.cpp">
+      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu</Filter>
+    </ClCompile>
+    <ClCompile Include="HW\WiimoteEmu\Speaker.cpp">
+      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu</Filter>
+    </ClCompile>
+    <ClCompile Include="HW\WiimoteEmu\Dynamics.cpp">
+      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu</Filter>
+    </ClCompile>
+    <ClCompile Include="HW\WiimoteEmu\Extension\Classic.cpp">
+      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu\Extension</Filter>
+    </ClCompile>
+    <ClCompile Include="HW\WiimoteEmu\Extension\Drums.cpp">
+      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu\Extension</Filter>
+    </ClCompile>
+    <ClCompile Include="HW\WiimoteEmu\Extension\Guitar.cpp">
+      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu\Extension</Filter>
+    </ClCompile>
+    <ClCompile Include="HW\WiimoteEmu\Extension\Nunchuk.cpp">
+      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu\Extension</Filter>
+    </ClCompile>
+    <ClCompile Include="HW\WiimoteEmu\Extension\Turntable.cpp">
+      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu\Extension</Filter>
+    </ClCompile>
+    <ClCompile Include="HW\WiimoteEmu\Extension\Extension.cpp">
+      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu\Extension</Filter>
+    </ClCompile>
+    <ClCompile Include="HW\WiimoteEmu\ExtensionPort.cpp">
+      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu</Filter>
+    </ClCompile>
+    <ClCompile Include="HW\WiimoteCommon\DataReport.cpp">
+      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Common</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BootManager.h" />
@@ -955,31 +973,31 @@
       <Filter>Debugger</Filter>
     </ClInclude>
     <ClInclude Include="DSP\Interpreter\DSPIntCCUtil.h">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Interpreter</Filter>
+      <Filter>DSPCore\Interpreter</Filter>
     </ClInclude>
     <ClInclude Include="DSP\Interpreter\DSPInterpreter.h">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Interpreter</Filter>
+      <Filter>DSPCore\Interpreter</Filter>
     </ClInclude>
     <ClInclude Include="DSP\Interpreter\DSPIntExtOps.h">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Interpreter</Filter>
+      <Filter>DSPCore\Interpreter</Filter>
     </ClInclude>
     <ClInclude Include="DSP\Interpreter\DSPIntTables.h">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Interpreter</Filter>
+      <Filter>DSPCore\Interpreter</Filter>
     </ClInclude>
     <ClInclude Include="DSP\Interpreter\DSPIntUtil.h">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Interpreter</Filter>
+      <Filter>DSPCore\Interpreter</Filter>
     </ClInclude>
     <ClInclude Include="DSP\Jit\DSPEmitterBase.h">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Jit</Filter>
+      <Filter>DSPCore\Jit</Filter>
     </ClInclude>
     <ClInclude Include="DSP\Jit\x64\DSPJitRegCache.h">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Jit\x64</Filter>
+      <Filter>DSPCore\Jit\x64</Filter>
     </ClInclude>
     <ClInclude Include="DSP\Jit\x64\DSPJitTables.h">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Jit\x64</Filter>
+      <Filter>DSPCore\Jit\x64</Filter>
     </ClInclude>
     <ClInclude Include="DSP\Jit\x64\DSPEmitter.h">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore\Jit\x64</Filter>
+      <Filter>DSPCore\Jit\x64</Filter>
     </ClInclude>
     <ClInclude Include="FifoPlayer\FifoAnalyzer.h">
       <Filter>FifoPlayer</Filter>
@@ -1200,34 +1218,10 @@
     <ClInclude Include="HW\VideoInterface.h">
       <Filter>HW %28Flipper/Hollywood%29\VI - Video Interface</Filter>
     </ClInclude>
-    <ClInclude Include="HW\WiimoteEmu\Attachment\Attachment.h">
-      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu\Attachment</Filter>
-    </ClInclude>
-    <ClInclude Include="HW\WiimoteEmu\Attachment\Classic.h">
-      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu\Attachment</Filter>
-    </ClInclude>
-    <ClInclude Include="HW\WiimoteEmu\Attachment\Drums.h">
-      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu\Attachment</Filter>
-    </ClInclude>
-    <ClInclude Include="HW\WiimoteEmu\Attachment\Guitar.h">
-      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu\Attachment</Filter>
-    </ClInclude>
-    <ClInclude Include="HW\WiimoteEmu\Attachment\Nunchuk.h">
-      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu\Attachment</Filter>
-    </ClInclude>
-    <ClInclude Include="HW\WiimoteEmu\Attachment\Turntable.h">
-      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu\Attachment</Filter>
-    </ClInclude>
     <ClInclude Include="HW\WiimoteEmu\Encryption.h">
       <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu</Filter>
     </ClInclude>
-    <ClInclude Include="HW\WiimoteEmu\MatrixMath.h">
-      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu</Filter>
-    </ClInclude>
     <ClInclude Include="HW\WiimoteEmu\WiimoteEmu.h">
-      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu</Filter>
-    </ClInclude>
-    <ClInclude Include="HW\WiimoteEmu\WiimoteHid.h">
       <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu</Filter>
     </ClInclude>
     <ClInclude Include="HW\WiimoteReal\WiimoteReal.h">
@@ -1264,49 +1258,49 @@
       <Filter>HW %28Flipper/Hollywood%29</Filter>
     </ClInclude>
     <ClInclude Include="DSP\DSPAssembler.h">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
+      <Filter>DSPCore</Filter>
     </ClInclude>
     <ClInclude Include="DSP\DSPAccelerator.h">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
+      <Filter>DSPCore</Filter>
     </ClInclude>
     <ClInclude Include="DSP\DSPAnalyzer.h">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
+      <Filter>DSPCore</Filter>
     </ClInclude>
     <ClInclude Include="DSP\DSPBreakpoints.h">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
+      <Filter>DSPCore</Filter>
     </ClInclude>
     <ClInclude Include="DSP\DSPCaptureLogger.h">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
+      <Filter>DSPCore</Filter>
     </ClInclude>
     <ClInclude Include="DSP\DSPCodeUtil.h">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
+      <Filter>DSPCore</Filter>
     </ClInclude>
     <ClInclude Include="DSP\DSPCommon.h">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
+      <Filter>DSPCore</Filter>
     </ClInclude>
     <ClInclude Include="DSP\DSPCore.h">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
+      <Filter>DSPCore</Filter>
     </ClInclude>
     <ClInclude Include="DSP\DSPDisassembler.h">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
+      <Filter>DSPCore</Filter>
     </ClInclude>
     <ClInclude Include="DSPEmulator.h">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
+      <Filter>DSPCore</Filter>
     </ClInclude>
     <ClInclude Include="DSP\DSPHWInterface.h">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
+      <Filter>DSPCore</Filter>
     </ClInclude>
     <ClInclude Include="DSP\DSPMemoryMap.h">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
+      <Filter>DSPCore</Filter>
     </ClInclude>
     <ClInclude Include="DSP\DSPStacks.h">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
+      <Filter>DSPCore</Filter>
     </ClInclude>
     <ClInclude Include="DSP\DSPTables.h">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
+      <Filter>DSPCore</Filter>
     </ClInclude>
     <ClInclude Include="DSP\LabelMap.h">
-      <Filter>HW %28Flipper/Hollywood%29\DSPCore</Filter>
+      <Filter>DSPCore</Filter>
     </ClInclude>
     <ClInclude Include="HW\Wiimote.h">
       <Filter>HW %28Flipper/Hollywood%29\Wiimote</Filter>
@@ -1587,19 +1581,58 @@
       <Filter>IOS\Network\NCD</Filter>
     </ClInclude>
     <ClInclude Include="HW\WiimoteCommon\WiimoteConstants.h">
-      <Filter>HW %28Flipper/Hollywood%29\WiimoteCommon</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Common</Filter>
     </ClInclude>
     <ClInclude Include="HW\WiimoteCommon\WiimoteHid.h">
-      <Filter>HW %28Flipper/Hollywood%29\WiimoteCommon</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Common</Filter>
     </ClInclude>
     <ClInclude Include="HW\WiimoteCommon\WiimoteReport.h">
-      <Filter>HW %28Flipper/Hollywood%29\WiimoteCommon</Filter>
+      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Common</Filter>
     </ClInclude>
     <ClInclude Include="Config\UISettings.h">
       <Filter>Config</Filter>
     </ClInclude>
     <ClInclude Include="Config\WiimoteInputSettings.h">
       <Filter>Config</Filter>
+    </ClInclude>
+    <ClInclude Include="HW\WiimoteEmu\I2CBus.h">
+      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu</Filter>
+    </ClInclude>
+    <ClInclude Include="HW\WiimoteEmu\MotionPlus.h">
+      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu</Filter>
+    </ClInclude>
+    <ClInclude Include="HW\WiimoteEmu\Camera.h">
+      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu</Filter>
+    </ClInclude>
+    <ClInclude Include="HW\WiimoteEmu\Speaker.h">
+      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu</Filter>
+    </ClInclude>
+    <ClInclude Include="HW\WiimoteEmu\Dynamics.h">
+      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu</Filter>
+    </ClInclude>
+    <ClInclude Include="HW\WiimoteEmu\Extension\Classic.h">
+      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu\Extension</Filter>
+    </ClInclude>
+    <ClInclude Include="HW\WiimoteEmu\Extension\Drums.h">
+      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu\Extension</Filter>
+    </ClInclude>
+    <ClInclude Include="HW\WiimoteEmu\Extension\Guitar.h">
+      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu\Extension</Filter>
+    </ClInclude>
+    <ClInclude Include="HW\WiimoteEmu\Extension\Nunchuk.h">
+      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu\Extension</Filter>
+    </ClInclude>
+    <ClInclude Include="HW\WiimoteEmu\Extension\Turntable.h">
+      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu\Extension</Filter>
+    </ClInclude>
+    <ClInclude Include="HW\WiimoteEmu\Extension\Extension.h">
+      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu\Extension</Filter>
+    </ClInclude>
+    <ClInclude Include="HW\WiimoteEmu\ExtensionPort.h">
+      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu</Filter>
+    </ClInclude>
+    <ClInclude Include="HW\WiimoteCommon\DataReport.h">
+      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Common</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

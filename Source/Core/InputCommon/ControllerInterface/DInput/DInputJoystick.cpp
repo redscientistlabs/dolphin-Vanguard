@@ -3,6 +3,7 @@
 // Refer to the license.txt file included.
 
 #include <algorithm>
+#include <limits>
 #include <map>
 #include <sstream>
 
@@ -121,13 +122,13 @@ Joystick::Joystick(/*const LPCDIDEVICEINSTANCE lpddi, */ const LPDIRECTINPUTDEVI
   for (unsigned int offset = 0; offset < DIJOFS_BUTTON(0) / sizeof(LONG); ++offset)
   {
     range.diph.dwObj = offset * sizeof(LONG);
-    // try to set some nice power of 2 values (128) to match the GameCube controls
-    range.lMin = -(1 << 7);
-    range.lMax = (1 << 7);
+    // Try to set a range with 16 bits of precision:
+    range.lMin = std::numeric_limits<s16>::min();
+    range.lMax = std::numeric_limits<s16>::max();
     m_device->SetProperty(DIPROP_RANGE, &range.diph);
-    // but I guess not all devices support setting range
-    // so I getproperty right afterward incase it didn't set.
-    // This also checks that the axis is present
+    // Not all devices support setting DIPROP_RANGE so we must GetProperty right back.
+    // This also checks that the axis is present.
+    // Note: Even though not all devices support setting DIPROP_RANGE, some require it.
     if (SUCCEEDED(m_device->GetProperty(DIPROP_RANGE, &range.diph)))
     {
       const LONG base = (range.lMin + range.lMax) / 2;
@@ -152,8 +153,10 @@ Joystick::Joystick(/*const LPCDIDEVICEINSTANCE lpddi, */ const LPDIRECTINPUTDEVI
 
   // Zero inputs:
   m_state_in = {};
+
   // Set hats to center:
-  std::fill(std::begin(m_state_in.rgdwPOV), std::end(m_state_in.rgdwPOV), 0xFF);
+  // "The center position is normally reported as -1" -MSDN
+  std::fill(std::begin(m_state_in.rgdwPOV), std::end(m_state_in.rgdwPOV), -1);
 }
 
 Joystick::~Joystick()
@@ -258,7 +261,7 @@ std::string Joystick::Hat::GetName() const
 
 ControlState Joystick::Axis::GetState() const
 {
-  return std::max(0.0, ControlState(m_axis - m_base) / m_range);
+  return ControlState(m_axis - m_base) / m_range;
 }
 
 ControlState Joystick::Button::GetState() const
@@ -268,9 +271,11 @@ ControlState Joystick::Button::GetState() const
 
 ControlState Joystick::Hat::GetState() const
 {
-  // can this func be simplified ?
-  // hat centered code from MSDN
-  if (0xFFFF == LOWORD(m_hat))
+  // "Some drivers report the centered position of the POV indicator as 65,535.
+  // Determine whether the indicator is centered as follows" -MSDN
+  const bool is_centered = (0xffff == LOWORD(m_hat));
+
+  if (is_centered)
     return 0;
 
   return (abs((int)(m_hat / 4500 - m_direction * 2 + 8) % 8 - 4) > 2);

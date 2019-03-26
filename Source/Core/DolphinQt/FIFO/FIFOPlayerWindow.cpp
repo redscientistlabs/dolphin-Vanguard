@@ -10,7 +10,6 @@
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
-#include <QMessageBox>
 #include <QPushButton>
 #include <QSpinBox>
 #include <QTabWidget>
@@ -25,6 +24,7 @@
 #include "Core/FifoPlayer/FifoRecorder.h"
 
 #include "DolphinQt/FIFO/FIFOAnalyzer.h"
+#include "DolphinQt/QtUtils/ModalMessageBox.h"
 #include "DolphinQt/QtUtils/QueueOnObject.h"
 #include "DolphinQt/Settings.h"
 
@@ -204,7 +204,9 @@ void FIFOPlayerWindow::SaveRecording()
   bool result = file->Save(path.toStdString());
 
   if (!result)
-    QMessageBox::critical(this, tr("Error"), tr("Failed to save FIFO log."));
+  {
+    ModalMessageBox::critical(this, tr("Error"), tr("Failed to save FIFO log."));
+  }
 }
 
 void FIFOPlayerWindow::StartRecording()

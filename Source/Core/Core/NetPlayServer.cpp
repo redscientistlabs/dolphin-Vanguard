@@ -49,7 +49,7 @@
 #include "Core/IOS/IOS.h"
 #include "Core/NetPlayClient.h"  //for NetPlayUI
 #include "DiscIO/Enums.h"
-#include "InputCommon/ControllerEmu/ControlGroup/Extension.h"
+#include "InputCommon/ControllerEmu/ControlGroup/Attachments.h"
 #include "InputCommon/GCPadStatus.h"
 #include "InputCommon/InputConfig.h"
 #include "UICommon/GameFile.h"
@@ -107,8 +107,8 @@ NetPlayServer::NetPlayServer(const u16 port, const bool forward_port,
     PanicAlertT("Enet Didn't Initialize");
   }
 
-  m_pad_map.fill(-1);
-  m_wiimote_map.fill(-1);
+  m_pad_map.fill(0);
+  m_wiimote_map.fill(0);
 
   if (traversal_config.use_traversal)
   {
@@ -325,9 +325,9 @@ unsigned int NetPlayServer::OnConnect(ENetPeer* socket, sf::Packet& rpac)
   rpac >> player.name;
 
   // try to automatically assign new user a pad
-  for (PadMapping& mapping : m_pad_map)
+  for (PlayerId& mapping : m_pad_map)
   {
-    if (mapping == -1)
+    if (mapping == 0)
     {
       mapping = player.pid;
       break;
@@ -347,7 +347,7 @@ unsigned int NetPlayServer::OnConnect(ENetPeer* socket, sf::Packet& rpac)
   Send(player.socket, spac);
 
   // send new client the selected game
-  if (m_selected_game != "")
+  if (!m_selected_game.empty())
   {
     spac.clear();
     spac << static_cast<MessageId>(NP_MSG_CHANGE_GAME);
@@ -420,7 +420,7 @@ unsigned int NetPlayServer::OnDisconnect(const Client& player)
 
   if (m_is_running)
   {
-    for (PadMapping mapping : m_pad_map)
+    for (PlayerId& mapping : m_pad_map)
     {
       if (mapping == pid && pid != 1)
       {
@@ -430,7 +430,7 @@ unsigned int NetPlayServer::OnDisconnect(const Client& player)
         sf::Packet spac;
         spac << (MessageId)NP_MSG_DISABLE_GAME;
         // this thread doesn't need players lock
-        SendToClients(spac, static_cast<PlayerId>(-1));
+        SendToClients(spac);
         break;
       }
     }
@@ -450,20 +450,20 @@ unsigned int NetPlayServer::OnDisconnect(const Client& player)
   // alert other players of disconnect
   SendToClients(spac);
 
-  for (PadMapping& mapping : m_pad_map)
+  for (PlayerId& mapping : m_pad_map)
   {
     if (mapping == pid)
     {
-      mapping = -1;
+      mapping = 0;
       UpdatePadMapping();
     }
   }
 
-  for (PadMapping& mapping : m_wiimote_map)
+  for (PlayerId& mapping : m_wiimote_map)
   {
     if (mapping == pid)
     {
-      mapping = -1;
+      mapping = 0;
       UpdateWiimoteMapping();
     }
   }
@@ -501,7 +501,7 @@ void NetPlayServer::UpdatePadMapping()
 {
   sf::Packet spac;
   spac << (MessageId)NP_MSG_PAD_MAPPING;
-  for (PadMapping mapping : m_pad_map)
+  for (PlayerId mapping : m_pad_map)
   {
     spac << mapping;
   }
@@ -513,7 +513,7 @@ void NetPlayServer::UpdateWiimoteMapping()
 {
   sf::Packet spac;
   spac << (MessageId)NP_MSG_WIIMOTE_MAPPING;
-  for (PadMapping mapping : m_wiimote_map)
+  for (PlayerId mapping : m_wiimote_map)
   {
     spac << mapping;
   }
@@ -656,7 +656,7 @@ unsigned int NetPlayServer::OnData(sf::Packet& packet, Client& player)
 
     while (!packet.endOfPacket())
     {
-      PadMapping map;
+      PadIndex map;
       packet >> map;
 
       // If the data is not from the correct player,
@@ -695,7 +695,7 @@ unsigned int NetPlayServer::OnData(sf::Packet& packet, Client& player)
 
   case NP_MSG_PAD_HOST_POLL:
   {
-    PadMapping pad_num;
+    PadIndex pad_num;
     packet >> pad_num;
 
     sf::Packet spac;
@@ -705,16 +705,16 @@ unsigned int NetPlayServer::OnData(sf::Packet& packet, Client& player)
     {
       for (size_t i = 0; i < m_pad_map.size(); i++)
       {
-        if (m_pad_map[i] == -1)
+        if (m_pad_map[i] == 0)
           continue;
 
         const GCPadStatus& pad = m_last_pad_status[i];
-        spac << static_cast<PadMapping>(i) << pad.button << pad.analogA << pad.analogB << pad.stickX
+        spac << static_cast<PadIndex>(i) << pad.button << pad.analogA << pad.analogB << pad.stickX
              << pad.stickY << pad.substickX << pad.substickY << pad.triggerLeft << pad.triggerRight
              << pad.isConnected;
       }
     }
-    else if (m_pad_map.at(pad_num) != -1)
+    else if (m_pad_map.at(pad_num) != 0)
     {
       const GCPadStatus& pad = m_last_pad_status[pad_num];
       spac << pad_num << pad.button << pad.analogA << pad.analogB << pad.stickX << pad.stickY
@@ -732,7 +732,7 @@ unsigned int NetPlayServer::OnData(sf::Packet& packet, Client& player)
     if (player.current_game != m_current_game)
       break;
 
-    PadMapping map = 0;
+    PadIndex map;
     u8 size;
     packet >> map >> size;
     std::vector<u8> data(size);
@@ -853,7 +853,7 @@ unsigned int NetPlayServer::OnData(sf::Packet& packet, Client& player)
             return pair.second == timebases[0].second;
           }))
       {
-        int pid_to_blame = -1;
+        int pid_to_blame = 0;
         for (auto pair : timebases)
         {
           if (std::all_of(timebases.begin(), timebases.end(), [&](std::pair<PlayerId, u64> other) {
@@ -1115,7 +1115,7 @@ bool NetPlayServer::RequestStartGame()
     m_start_pending = true;
     if (!SyncCodes())
     {
-      PanicAlertT("Error synchronizing save gecko codes!");
+      PanicAlertT("Error synchronizing cheat codes!");
       m_start_pending = false;
       return false;
     }
@@ -1215,13 +1215,13 @@ bool NetPlayServer::StartGame()
   spac << m_settings.m_SyncCodes;
   spac << m_settings.m_SyncAllWiiSaves;
 
-  for (int i = 0; i < m_settings.m_WiimoteExtension.size(); i++)
+  for (size_t i = 0; i < m_settings.m_WiimoteExtension.size(); i++)
   {
     const int extension =
-        static_cast<ControllerEmu::Extension*>(
-            static_cast<WiimoteEmu::Wiimote*>(Wiimote::GetConfig()->GetController(i))
-                ->GetWiimoteGroup(WiimoteEmu::WiimoteGroup::Extension))
-            ->switch_extension;
+        static_cast<ControllerEmu::Attachments*>(
+            static_cast<WiimoteEmu::Wiimote*>(Wiimote::GetConfig()->GetController(int(i)))
+                ->GetWiimoteGroup(WiimoteEmu::WiimoteGroup::Attachments))
+            ->GetSelectedAttachment();
     spac << extension;
   }
 
@@ -1718,7 +1718,7 @@ bool NetPlayServer::CompressBufferIntoPacket(const std::vector<u8>& in_buffer, s
   return true;
 }
 
-void NetPlayServer::SendFirstReceivedToHost(const PadMapping map, const bool state)
+void NetPlayServer::SendFirstReceivedToHost(const PadIndex map, const bool state)
 {
   sf::Packet pac;
   pac << static_cast<MessageId>(NP_MSG_PAD_FIRST_RECEIVED);

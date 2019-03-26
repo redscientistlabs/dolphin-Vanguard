@@ -11,7 +11,6 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QIcon>
-#include <QMessageBox>
 #include <QMimeData>
 #include <QProgressDialog>
 #include <QStackedWidget>
@@ -83,6 +82,7 @@
 #include "DolphinQt/MenuBar.h"
 #include "DolphinQt/NetPlay/NetPlayDialog.h"
 #include "DolphinQt/NetPlay/NetPlaySetupDialog.h"
+#include "DolphinQt/QtUtils/ModalMessageBox.h"
 #include "DolphinQt/QtUtils/QueueOnObject.h"
 #include "DolphinQt/QtUtils/RunOnObject.h"
 #include "DolphinQt/QtUtils/WindowActivationEventFilter.h"
@@ -142,7 +142,7 @@ static WindowSystemType GetWindowSystemType()
   else if (platform_name == QStringLiteral("wayland"))
     return WindowSystemType::Wayland;
 
-  QMessageBox::critical(
+  ModalMessageBox::critical(
       nullptr, QStringLiteral("Error"),
       QString::asprintf("Unknown Qt platform: %s", platform_name.toStdString().c_str()));
   return WindowSystemType::Headless;
@@ -164,8 +164,20 @@ static WindowSystemInfo GetWindowSystemInfo(QWindow* window)
   else
     wsi.render_surface = window ? reinterpret_cast<void*>(window->winId()) : nullptr;
 #endif
+  wsi.render_surface_scale = window ? static_cast<float>(window->devicePixelRatio()) : 1.0f;
 
   return wsi;
+}
+
+static std::vector<std::string> StringListToStdVector(QStringList list)
+{
+  std::vector<std::string> result;
+  result.reserve(list.size());
+
+  for (const QString& s : list)
+    result.push_back(s.toStdString());
+
+  return result;
 }
 
 MainWindow::MainWindow(std::unique_ptr<BootParameters> boot_parameters) : QMainWindow(nullptr)
@@ -215,16 +227,17 @@ MainWindow::MainWindow(std::unique_ptr<BootParameters> boot_parameters) : QMainW
   Settings::Instance().RefreshWidgetVisibility();
 
   if (!ResourcePack::Init())
-    QMessageBox::critical(this, tr("Error"), tr("Error occured while loading some texture packs"));
+    ModalMessageBox::critical(this, tr("Error"),
+                              tr("Error occured while loading some texture packs"));
 
   for (auto& pack : ResourcePack::GetPacks())
   {
     if (!pack.IsValid())
     {
-      QMessageBox::critical(this, tr("Error"),
-                            tr("Invalid Pack %1 provided: %2")
-                                .arg(QString::fromStdString(pack.GetPath()))
-                                .arg(QString::fromStdString(pack.GetError())));
+      ModalMessageBox::critical(this, tr("Error"),
+                                tr("Invalid Pack %1 provided: %2")
+                                    .arg(QString::fromStdString(pack.GetPath()))
+                                    .arg(QString::fromStdString(pack.GetError())));
       return;
     }
   }
@@ -232,13 +245,13 @@ MainWindow::MainWindow(std::unique_ptr<BootParameters> boot_parameters) : QMainW
 
 MainWindow::~MainWindow()
 {
-  m_render_widget->deleteLater();
-  m_netplay_dialog->deleteLater();
+  delete m_render_widget;
+  delete m_netplay_dialog;
 
   for (int i = 0; i < 4; i++)
   {
-    m_gc_tas_input_windows[i]->deleteLater();
-    m_wii_tas_input_windows[i]->deleteLater();
+    delete m_gc_tas_input_windows[i];
+    delete m_wii_tas_input_windows[i];
   }
 
   ShutdownControllers();
@@ -281,11 +294,11 @@ void MainWindow::ShutdownControllers()
 {
   m_hotkey_scheduler->Stop();
 
-  g_controller_interface.Shutdown();
   Pad::Shutdown();
   Keyboard::Shutdown();
   Wiimote::Shutdown();
   HotkeyManagerEmu::Shutdown();
+  g_controller_interface.Shutdown();
 
   m_hotkey_scheduler->deleteLater();
 }
@@ -310,7 +323,7 @@ void MainWindow::InitCoreCallbacks()
 
 static void InstallHotkeyFilter(QWidget* dialog)
 {
-  auto* filter = new WindowActivationEventFilter();
+  auto* filter = new WindowActivationEventFilter(dialog);
   dialog->installEventFilter(filter);
 
   filter->connect(filter, &WindowActivationEventFilter::windowDeactivated,
@@ -338,9 +351,9 @@ void MainWindow::CreateComponents()
     m_gc_tas_input_windows[controller_id]->GetValues(pad_status);
   });
 
-  Movie::SetWiiInputManip([this](u8* input_data, WiimoteEmu::ReportFeatures rptf, int controller_id,
-                                 int ext, wiimote_key key) {
-    m_wii_tas_input_windows[controller_id]->GetValues(input_data, rptf, ext, key);
+  Movie::SetWiiInputManip([this](WiimoteCommon::DataReportBuilder& rpt, int controller_id, int ext,
+                                 const WiimoteEmu::EncryptionKey& key) {
+    m_wii_tas_input_windows[controller_id]->GetValues(rpt, ext, key);
   });
 
   m_jit_widget = new JITWidget(this);
@@ -387,7 +400,7 @@ void MainWindow::ConnectMenuBar()
   connect(m_menu_bar, &MenuBar::EjectDisc, this, &MainWindow::EjectDisc);
   connect(m_menu_bar, &MenuBar::ChangeDisc, this, &MainWindow::ChangeDisc);
   connect(m_menu_bar, &MenuBar::BootDVDBackup, this,
-          [this](const QString& drive) { StartGame(drive); });
+          [this](const QString& drive) { StartGame(drive, ScanForSecondDisc::No); });
 
   // Emulation
   connect(m_menu_bar, &MenuBar::Pause, this, &MainWindow::Pause);
@@ -439,7 +452,7 @@ void MainWindow::ConnectMenuBar()
   connect(m_menu_bar, &MenuBar::ShowList, m_game_list, &GameList::SetListView);
   connect(m_menu_bar, &MenuBar::ShowGrid, m_game_list, &GameList::SetGridView);
   connect(m_menu_bar, &MenuBar::PurgeGameListCache, m_game_list, &GameList::PurgeCache);
-  connect(m_menu_bar, &MenuBar::ToggleSearch, m_search_bar, &SearchBar::Toggle);
+  connect(m_menu_bar, &MenuBar::ShowSearch, m_search_bar, &SearchBar::Show);
 
   connect(m_menu_bar, &MenuBar::ColumnVisibilityToggled, m_game_list,
           &GameList::OnColumnVisibilityToggled);
@@ -566,6 +579,7 @@ void MainWindow::ConnectHost()
 {
   connect(Host::GetInstance(), &Host::UpdateProgressDialog, this,
           &MainWindow::OnUpdateProgressDialog);
+  connect(Host::GetInstance(), &Host::RequestStop, this, &MainWindow::RequestStop);
 }
 
 void MainWindow::ConnectStack()
@@ -584,7 +598,7 @@ void MainWindow::ConnectStack()
 
   setCentralWidget(m_stack);
 
-  setDockOptions(DockOption::AllowNestedDocks);
+  setDockOptions(DockOption::AllowNestedDocks | DockOption::AllowTabbedDocks);
   setTabPosition(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea, QTabWidget::North);
   addDockWidget(Qt::LeftDockWidgetArea, m_log_widget);
   addDockWidget(Qt::LeftDockWidgetArea, m_log_config_widget);
@@ -610,30 +624,30 @@ void MainWindow::RefreshGameList()
   Settings::Instance().RefreshGameList();
 }
 
-QString MainWindow::PromptFileName()
+QStringList MainWindow::PromptFileNames()
 {
   auto& settings = Settings::Instance().GetQSettings();
-  QString path = QFileDialog::getOpenFileName(
+  QStringList paths = QFileDialog::getOpenFileNames(
       this, tr("Select a File"),
       settings.value(QStringLiteral("mainwindow/lastdir"), QStringLiteral("")).toString(),
-      tr("All GC/Wii files (*.elf *.dol *.gcm *.iso *.tgc *.wbfs *.ciso *.gcz *.wad *.dff);;"
+      tr("All GC/Wii files (*.elf *.dol *.gcm *.iso *.tgc *.wbfs *.ciso *.gcz *.wad *.dff *.m3u);;"
          "All Files (*)"));
 
-  if (!path.isEmpty())
+  if (!paths.isEmpty())
   {
     settings.setValue(QStringLiteral("mainwindow/lastdir"),
-                      QFileInfo(path).absoluteDir().absolutePath());
+                      QFileInfo(paths.front()).absoluteDir().absolutePath());
   }
 
-  return path;
+  return paths;
 }
 
 void MainWindow::ChangeDisc()
 {
-  QString file = PromptFileName();
+  std::vector<std::string> paths = StringListToStdVector(PromptFileNames());
 
-  if (!file.isEmpty())
-    Core::RunAsCPUThread([&file] { DVDInterface::ChangeDisc(file.toStdString()); });
+  if (!paths.empty())
+    Core::RunAsCPUThread([&paths] { DVDInterface::ChangeDisc(paths); });
 }
 
 void MainWindow::EjectDisc()
@@ -643,9 +657,9 @@ void MainWindow::EjectDisc()
 
 void MainWindow::Open()
 {
-  QString file = PromptFileName();
-  if (!file.isEmpty())
-    StartGame(file);
+  QStringList files = PromptFileNames();
+  if (!files.isEmpty())
+    StartGame(StringListToStdVector(files));
 }
 
 void MainWindow::Play(const std::optional<std::string>& savestate_path)
@@ -664,7 +678,7 @@ void MainWindow::Play(const std::optional<std::string>& savestate_path)
     std::shared_ptr<const UICommon::GameFile> selection = m_game_list->GetSelectedGame();
     if (selection)
     {
-      StartGame(selection->GetFilePath(), savestate_path);
+      StartGame(selection->GetFilePath(), ScanForSecondDisc::Yes, savestate_path);
       EnableScreenSaver(false);
     }
     else
@@ -672,7 +686,7 @@ void MainWindow::Play(const std::optional<std::string>& savestate_path)
       const QString default_path = QString::fromStdString(Config::Get(Config::MAIN_DEFAULT_ISO));
       if (!default_path.isEmpty() && QFile::exists(default_path))
       {
-        StartGame(default_path, savestate_path);
+        StartGame(default_path, ScanForSecondDisc::Yes, savestate_path);
         EnableScreenSaver(false);
       }
       else
@@ -746,22 +760,23 @@ bool MainWindow::RequestStop()
     if (pause)
       Core::SetState(Core::State::Paused);
 
-    QMessageBox::StandardButton confirm;
-    confirm = QMessageBox::question(this, tr("Confirm"),
-                                    m_stop_requested ?
-                                        tr("A shutdown is already in progress. Unsaved data "
-                                           "may be lost if you stop the current emulation "
-                                           "before it completes. Force stop?") :
-                                        tr("Do you want to stop the current emulation?"));
-
-    if (pause)
-      Core::SetState(state);
+    auto confirm = ModalMessageBox::question(
+        this, tr("Confirm"),
+        m_stop_requested ? tr("A shutdown is already in progress. Unsaved data "
+                              "may be lost if you stop the current emulation "
+                              "before it completes. Force stop?") :
+                           tr("Do you want to stop the current emulation?"));
 
     if (confirm != QMessageBox::Yes)
+    {
+      if (pause)
+        Core::SetState(state);
+
       return false;
+    }
   }
 
-  // TODO: Add Movie shutdown
+  OnStopRecording();
   // TODO: Add Debugger shutdown
 
   if (!m_stop_requested && UICommon::TriggerSTMPowerEvent())
@@ -833,15 +848,44 @@ void MainWindow::ScreenShot()
   Core::SaveScreenShot();
 }
 
-void MainWindow::StartGame(const QString& path, const std::optional<std::string>& savestate_path)
+void MainWindow::ScanForSecondDiscAndStartGame(const UICommon::GameFile& game,
+                                               const std::optional<std::string>& savestate_path)
 {
-  StartGame(path.toStdString(), savestate_path);
+  auto second_game = m_game_list->FindSecondDisc(game);
+
+  std::vector<std::string> paths = {game.GetFilePath()};
+  if (second_game != nullptr)
+    paths.push_back(second_game->GetFilePath());
+
+  StartGame(paths, savestate_path);
 }
 
-void MainWindow::StartGame(const std::string& path,
+void MainWindow::StartGame(const QString& path, ScanForSecondDisc scan,
                            const std::optional<std::string>& savestate_path)
 {
+  StartGame(path.toStdString(), scan, savestate_path);
+}
+
+void MainWindow::StartGame(const std::string& path, ScanForSecondDisc scan,
+                           const std::optional<std::string>& savestate_path)
+{
+  if (scan == ScanForSecondDisc::Yes)
+  {
+    std::shared_ptr<const UICommon::GameFile> game = m_game_list->FindGame(path);
+    if (game != nullptr)
+    {
+      ScanForSecondDiscAndStartGame(*game, savestate_path);
+      return;
+    }
+  }
+
   StartGame(BootParameters::GenerateFromFile(path, savestate_path));
+}
+
+void MainWindow::StartGame(const std::vector<std::string>& paths,
+                           const std::optional<std::string>& savestate_path)
+{
+  StartGame(BootParameters::GenerateFromFile(paths, savestate_path));
 }
 
 void MainWindow::StartGame(std::unique_ptr<BootParameters>&& parameters)
@@ -864,7 +908,7 @@ void MainWindow::StartGame(std::unique_ptr<BootParameters>&& parameters)
   if (!BootManager::BootCore(std::move(parameters),
                              GetWindowSystemInfo(m_render_widget->windowHandle())))
   {
-    QMessageBox::critical(this, tr("Error"), tr("Failed to init core"), QMessageBox::Ok);
+    ModalMessageBox::critical(this, tr("Error"), tr("Failed to init core"), QMessageBox::Ok);
     HideRenderWidget();
     return;
   }
@@ -1075,7 +1119,7 @@ void MainWindow::ShowFIFOPlayer()
   {
     m_fifo_window = new FIFOPlayerWindow(this);
     connect(m_fifo_window, &FIFOPlayerWindow::LoadFIFORequested, this,
-            [this](const QString& path) { StartGame(path); });
+            [this](const QString& path) { StartGame(path, ScanForSecondDisc::No); });
   }
 
   m_fifo_window->show();
@@ -1170,7 +1214,7 @@ void MainWindow::NetPlayInit()
 #endif
 
   connect(m_netplay_dialog, &NetPlayDialog::Boot, this,
-          [this](const QString& path) { StartGame(path); });
+          [this](const QString& path) { StartGame(path, ScanForSecondDisc::Yes); });
   connect(m_netplay_dialog, &NetPlayDialog::Stop, this, &MainWindow::ForceStop);
   connect(m_netplay_dialog, &NetPlayDialog::rejected, this, &MainWindow::NetPlayQuit);
   connect(m_netplay_setup_dialog, &NetPlaySetupDialog::Join, this, &MainWindow::NetPlayJoin);
@@ -1187,7 +1231,7 @@ bool MainWindow::NetPlayJoin()
 {
   if (Core::IsRunning())
   {
-    QMessageBox::critical(
+    ModalMessageBox::critical(
         nullptr, QObject::tr("Error"),
         QObject::tr("Can't start a NetPlay Session while a game is still running!"));
     return false;
@@ -1195,8 +1239,8 @@ bool MainWindow::NetPlayJoin()
 
   if (m_netplay_dialog->isVisible())
   {
-    QMessageBox::critical(nullptr, QObject::tr("Error"),
-                          QObject::tr("A NetPlay Session is already in progress!"));
+    ModalMessageBox::critical(nullptr, QObject::tr("Error"),
+                              QObject::tr("A NetPlay Session is already in progress!"));
     return false;
   }
 
@@ -1258,7 +1302,7 @@ bool MainWindow::NetPlayHost(const QString& game_id)
 {
   if (Core::IsRunning())
   {
-    QMessageBox::critical(
+    ModalMessageBox::critical(
         nullptr, QObject::tr("Error"),
         QObject::tr("Can't start a NetPlay Session while a game is still running!"));
     return false;
@@ -1266,8 +1310,8 @@ bool MainWindow::NetPlayHost(const QString& game_id)
 
   if (m_netplay_dialog->isVisible())
   {
-    QMessageBox::critical(nullptr, QObject::tr("Error"),
-                          QObject::tr("A NetPlay Session is already in progress!"));
+    ModalMessageBox::critical(nullptr, QObject::tr("Error"),
+                              QObject::tr("A NetPlay Session is already in progress!"));
     return false;
   }
 
@@ -1290,7 +1334,7 @@ bool MainWindow::NetPlayHost(const QString& game_id)
 
   if (!Settings::Instance().GetNetPlayServer()->is_connected)
   {
-    QMessageBox::critical(
+    ModalMessageBox::critical(
         nullptr, QObject::tr("Failed to open server"),
         QObject::tr(
             "Failed to listen on port %1. Is another instance of the NetPlay server running?")
@@ -1346,38 +1390,48 @@ void MainWindow::dragEnterEvent(QDragEnterEvent* event)
 
 void MainWindow::dropEvent(QDropEvent* event)
 {
-  const auto& urls = event->mimeData()->urls();
+  const QList<QUrl>& urls = event->mimeData()->urls();
   if (urls.empty())
     return;
 
-  const auto& url = urls[0];
-  QFileInfo file_info(url.toLocalFile());
+  QStringList files;
+  QStringList folders;
 
-  auto path = file_info.filePath();
-
-  if (!file_info.exists() || !file_info.isReadable())
+  for (const QUrl& url : urls)
   {
-    QMessageBox::critical(this, tr("Error"), tr("Failed to open '%1'").arg(path));
-    return;
+    QFileInfo file_info(url.toLocalFile());
+    QString path = file_info.filePath();
+
+    if (!file_info.exists() || !file_info.isReadable())
+    {
+      ModalMessageBox::critical(this, tr("Error"), tr("Failed to open '%1'").arg(path));
+      return;
+    }
+
+    (file_info.isFile() ? files : folders).append(path);
   }
 
-  if (!file_info.isFile())
+  if (!files.isEmpty())
   {
-    auto& settings = Settings::Instance();
-
-    if (settings.GetPaths().size() != 0)
-    {
-      if (QMessageBox::question(
-              this, tr("Confirm"),
-              tr("Do you want to add \"%1\" to the list of Game Paths?").arg(path)) !=
-          QMessageBox::Yes)
-        return;
-    }
-    settings.AddPath(path);
+    StartGame(StringListToStdVector(files));
   }
   else
   {
-    StartGame(path);
+    Settings& settings = Settings::Instance();
+    const bool show_confirm = !settings.GetPaths().empty();
+
+    for (const QString& folder : folders)
+    {
+      if (show_confirm)
+      {
+        if (ModalMessageBox::question(
+                this, tr("Confirm"),
+                tr("Do you want to add \"%1\" to the list of Game Paths?").arg(folder)) !=
+            QMessageBox::Yes)
+          return;
+      }
+      settings.AddPath(folder);
+    }
   }
 }
 
@@ -1393,7 +1447,7 @@ void MainWindow::OnBootGameCubeIPL(DiscIO::Region region)
 
 void MainWindow::OnImportNANDBackup()
 {
-  auto response = QMessageBox::question(
+  auto response = ModalMessageBox::question(
       this, tr("Question"),
       tr("Merging a new NAND over your currently selected NAND will overwrite any channels "
          "and savegames that already exist. This process is not reversible, so it is "
@@ -1511,30 +1565,26 @@ void MainWindow::OnStopRecording()
 {
   if (Movie::IsRecordingInput())
     OnExportRecording();
-
-  Movie::EndPlayInput(false);
-  emit RecordingStatusChanged(true);
+  if (Movie::IsMovieActive())
+    Movie::EndPlayInput(false);
+  emit RecordingStatusChanged(false);
 }
 
 void MainWindow::OnExportRecording()
 {
   bool was_paused = Core::GetState() == Core::State::Paused;
 
-  if (was_paused)
+  if (!was_paused)
     Core::SetState(Core::State::Paused);
 
   QString dtm_file = QFileDialog::getSaveFileName(this, tr("Select the Recording File"), QString(),
                                                   tr("Dolphin TAS Movies (*.dtm)"));
 
-  if (was_paused)
+  if (!dtm_file.isEmpty())
+    Movie::SaveRecording(dtm_file.toStdString());
+
+  if (!was_paused)
     Core::SetState(Core::State::Running);
-
-  if (dtm_file.isEmpty())
-    return;
-
-  Core::SetState(Core::State::Running);
-
-  Movie::SaveRecording(dtm_file.toStdString());
 }
 
 void MainWindow::ShowTASInput()
