@@ -145,6 +145,9 @@ static std::string GetPlatformID()
 
 void AutoUpdateChecker::CheckForUpdate()
 {
+  //Narrysmod-Hijack - Nuke updater
+  return;
+
   // Don't bother checking if updates are not supported or not enabled.
   if (!SystemSupportsAutoUpdates() || SConfig::GetInstance().m_auto_update_track.empty())
     return;
