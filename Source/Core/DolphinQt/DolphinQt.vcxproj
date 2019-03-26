@@ -543,6 +543,7 @@
     </ProjectReference>
     <ProjectReference Include="C:\Users\Daniel\Documents\RTCV\Vanguard\Vanguard.csproj">
       <Project>{364c705e-b7ab-4a94-a59b-88899ce65958}</Project>
+	</ProjectReference>
     <ProjectReference Include="..\..\..\Externals\imgui\imgui.vcxproj">
       <Project>{4c3b2264-ea73-4a7b-9cfe-65b0fd635ebb}</Project>
     </ProjectReference>
