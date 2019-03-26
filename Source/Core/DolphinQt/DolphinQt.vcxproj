@@ -536,14 +536,19 @@
       <Project>{29f29a19-f141-45ad-9679-5a2923b49da3}</Project>
     </ProjectReference>
     <ProjectReference Include="C:\Users\Daniel\Documents\RTCV\DolphinCorrupt\DolphinCorrupt.csproj">
+      <DeploymentContent>true</DeploymentContent>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Project>{2d844e66-b89b-452e-a5ca-0e4b40866d2c}</Project>
+      <CopyLocalSatelliteAssemblies>true</CopyLocalSatelliteAssemblies>
     </ProjectReference>
     <ProjectReference Include="C:\Users\Daniel\Documents\RTCV\NetCore\NetCore.csproj">
       <Project>{7e106aec-5614-4206-9e4d-25759c90e8ae}</Project>
+      <CopyLocalSatelliteAssemblies>true</CopyLocalSatelliteAssemblies>
     </ProjectReference>
     <ProjectReference Include="C:\Users\Daniel\Documents\RTCV\Vanguard\Vanguard.csproj">
       <Project>{364c705e-b7ab-4a94-a59b-88899ce65958}</Project>
-	</ProjectReference>
+      <CopyLocalSatelliteAssemblies>true</CopyLocalSatelliteAssemblies>
+    </ProjectReference>
     <ProjectReference Include="..\..\..\Externals\imgui\imgui.vcxproj">
       <Project>{4c3b2264-ea73-4a7b-9cfe-65b0fd635ebb}</Project>
     </ProjectReference>
@@ -556,14 +561,20 @@
   <ItemGroup>
     <DataSysFiles Include="$(DolphinRootDir)Data\**\Sys\**\*.*" />
     <DataTxtFiles Include="$(DolphinRootDir)Data\license.txt" />
-    <BinaryFiles Include="$(TargetPath)" />
-    <AllInputFiles Include="@(DataSysFiles);@(DataTxtFiles);@(BinaryFiles)" />
+    <Executables Include="$(TargetDir)\*.exe" />
+	<Dlls Include="$(TargetDir)\*.dll" />
+	<Pdbs Include="$(TargetDir)\*.pdb" />
+    <AllInputFiles Include="@(DataSysFiles);@(DataTxtFiles);@(Executables);@(Dlls);@(Pdbs)" />
   </ItemGroup>
   <Target Name="AfterBuild" Inputs="@(AllInputFiles)" Outputs="@(AllInputFiles -> '$(BinaryOutputDir)%(RecursiveDir)%(Filename)%(Extension)')">
     <Message Text="Copying Data directory..." Importance="High" />
     <Copy SourceFiles="@(DataSysFiles)" DestinationFolder="$(BinaryOutputDir)%(RecursiveDir)" Condition="!Exists('$(BinaryOutputDir)%(RecursiveDir)%(Filename)%(DataSysFiles.Extension)') OR $([System.DateTime]::Parse('%(ModifiedTime)').Ticks) &gt; $([System.IO.File]::GetLastWriteTime('$(BinaryOutputDir)%(RecursiveDir)%(Filename)%(DataSysFiles.Extension)').Ticks)" />
     <Copy SourceFiles="@(DataTxtFiles)" DestinationFolder="$(BinaryOutputDir)" Condition="!Exists('$(BinaryOutputDir)%(Filename)%(DataTxtFiles.Extension)') OR $([System.DateTime]::Parse('%(ModifiedTime)').Ticks) &gt; $([System.IO.File]::GetLastWriteTime('$(BinaryOutputDir)%(RecursiveDir)%(Filename)%(DataTxtFiles.Extension)').Ticks)" />
-    <Message Text="Copy: @(BinaryFiles) -&gt; $(BinaryOutputDir)" Importance="High" />
-    <Copy SourceFiles="@(BinaryFiles)" DestinationFolder="$(BinaryOutputDir)" />
+    <Message Text="Copy: @(Executables) -&gt; $(BinaryOutputDir)" Importance="High" />
+    <Copy SourceFiles="@(Executables)" DestinationFolder="$(BinaryOutputDir)" />
+	<Message Text="Copy: @(Dlls) -&gt; $(BinaryOutputDir)" Importance="High" />
+    <Copy SourceFiles="@(Dlls)" DestinationFolder="$(BinaryOutputDir)" />
+	<Message Text="Copy: @(Pdbs) -&gt; $(BinaryOutputDir)" Importance="High" />
+    <Copy SourceFiles="@(Pdbs)" DestinationFolder="$(BinaryOutputDir)" />
   </Target>
 </Project>
