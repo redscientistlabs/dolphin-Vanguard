@@ -15,6 +15,7 @@ VULKAN_MODULE_ENTRY_POINT(vkGetInstanceProcAddr, true)
 VULKAN_MODULE_ENTRY_POINT(vkGetDeviceProcAddr, true)
 VULKAN_MODULE_ENTRY_POINT(vkEnumerateInstanceExtensionProperties, true)
 VULKAN_MODULE_ENTRY_POINT(vkEnumerateInstanceLayerProperties, true)
+VULKAN_MODULE_ENTRY_POINT(vkEnumerateInstanceVersion, false)
 
 #endif  // VULKAN_MODULE_ENTRY_POINT
 
@@ -59,6 +60,7 @@ VULKAN_INSTANCE_ENTRY_POINT(vkCreateMacOSSurfaceMVK, false)
 VULKAN_INSTANCE_ENTRY_POINT(vkCreateDebugReportCallbackEXT, false)
 VULKAN_INSTANCE_ENTRY_POINT(vkDestroyDebugReportCallbackEXT, false)
 VULKAN_INSTANCE_ENTRY_POINT(vkDebugReportMessageEXT, false)
+VULKAN_INSTANCE_ENTRY_POINT(vkGetPhysicalDeviceProperties2, false)
 
 #endif  // VULKAN_INSTANCE_ENTRY_POINT
 

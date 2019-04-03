@@ -100,6 +100,19 @@ VkInstance VulkanContext::CreateVulkanInstance(WindowSystemType wstype, bool ena
   app_info.engineVersion = VK_MAKE_VERSION(5, 0, 0);
   app_info.apiVersion = VK_MAKE_VERSION(1, 0, 0);
 
+  // Try for Vulkan 1.1 if the loader supports it.
+  if (vkEnumerateInstanceVersion)
+  {
+    u32 supported_api_version = 0;
+    VkResult res = vkEnumerateInstanceVersion(&supported_api_version);
+    if (res == VK_SUCCESS && (VK_VERSION_MAJOR(supported_api_version) > 1 ||
+                              VK_VERSION_MINOR(supported_api_version) >= 1))
+    {
+      // The device itself may not support 1.1, so we check that before using any 1.1 functionality.
+      app_info.apiVersion = VK_MAKE_VERSION(1, 1, 0);
+    }
+  }
+
   VkInstanceCreateInfo instance_create_info = {};
   instance_create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
   instance_create_info.pNext = nullptr;
@@ -384,6 +397,7 @@ std::unique_ptr<VulkanContext> VulkanContext::Create(VkInstance instance, VkPhys
 
   // Initialize DriverDetails so that we can check for bugs to disable features if needed.
   context->InitDriverDetails();
+  context->PopulateShaderSubgroupSupport();
 
   // Enable debug reports if the "Host GPU" log category is enabled.
   if (enable_debug_reports)
@@ -863,5 +877,36 @@ void VulkanContext::InitDriverDetails()
   DriverDetails::Init(DriverDetails::API_VULKAN, vendor, driver,
                       static_cast<double>(m_device_properties.driverVersion),
                       DriverDetails::Family::UNKNOWN);
+}
+
+void VulkanContext::PopulateShaderSubgroupSupport()
+{
+  // Vulkan 1.1 support is required for vkGetPhysicalDeviceProperties2(), but we can't rely on the
+  // function pointer alone.
+  if (!vkGetPhysicalDeviceProperties2 || (VK_VERSION_MAJOR(m_device_properties.apiVersion) == 1 &&
+                                          VK_VERSION_MINOR(m_device_properties.apiVersion) < 1))
+  {
+    return;
+  }
+
+  VkPhysicalDeviceProperties2 device_properties_2 = {};
+  device_properties_2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+
+  VkPhysicalDeviceSubgroupProperties subgroup_properties = {};
+  subgroup_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES;
+  device_properties_2.pNext = &subgroup_properties;
+
+  vkGetPhysicalDeviceProperties2(m_physical_device, &device_properties_2);
+
+  m_shader_subgroup_size = subgroup_properties.subgroupSize;
+
+  // We require basic ops (for gl_SubgroupInvocationID), ballot (for subgroupBallot,
+  // subgroupBallotFindLSB), and arithmetic (for subgroupMin/subgroupMax).
+  constexpr VkSubgroupFeatureFlags required_operations = VK_SUBGROUP_FEATURE_BASIC_BIT |
+                                                         VK_SUBGROUP_FEATURE_ARITHMETIC_BIT |
+                                                         VK_SUBGROUP_FEATURE_BALLOT_BIT;
+  m_supports_shader_subgroup_operations =
+      (subgroup_properties.supportedOperations & required_operations) == required_operations &&
+      subgroup_properties.supportedStages & VK_SHADER_STAGE_FRAGMENT_BIT;
 }
 }  // namespace Vulkan

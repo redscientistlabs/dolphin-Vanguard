@@ -120,6 +120,7 @@
     <QtMoc Include="FIFO\FIFOPlayerWindow.h" />
     <QtMoc Include="TAS\GCTASInputWindow.h" />
     <QtMoc Include="TAS\WiiTASInputWindow.h" />
+    <QtMoc Include="TAS\TASCheckBox.h" />
     <QtMoc Include="TAS\TASInputWindow.h" />
     <QtMoc Include="TAS\StickWidget.h" />
     <QtMoc Include="TAS\IRWidget.h" />
@@ -268,6 +269,7 @@
     <ClCompile Include="$(QtMocOutPrefix)SettingsWindow.cpp" />
     <ClCompile Include="$(QtMocOutPrefix)SoftwareRendererWidget.cpp" />
     <ClCompile Include="$(QtMocOutPrefix)StickWidget.cpp" />
+    <ClCompile Include="$(QtMocOutPrefix)TASCheckBox.cpp" />
     <ClCompile Include="$(QtMocOutPrefix)TASInputWindow.cpp" />
     <ClCompile Include="$(QtMocOutPrefix)ToolBar.cpp" />
     <ClCompile Include="$(QtMocOutPrefix)USBDeviceAddToWhitelistDialog.cpp" />
@@ -396,6 +398,7 @@
     <ClCompile Include="ResourcePackManager.cpp" />
     <ClCompile Include="TAS\GCTASInputWindow.cpp" />
     <ClCompile Include="TAS\WiiTASInputWindow.cpp" />
+    <ClCompile Include="TAS\TASCheckBox.cpp" />
     <ClCompile Include="TAS\TASInputWindow.cpp" />
     <ClCompile Include="TAS\StickWidget.cpp" />
     <ClCompile Include="TAS\IRWidget.cpp" />
@@ -545,6 +548,9 @@
     </ProjectReference>
     <ProjectReference Include="..\..\..\Externals\imgui\imgui.vcxproj">
       <Project>{4c3b2264-ea73-4a7b-9cfe-65b0fd635ebb}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\VideoBackends\D3D12\D3D12.vcxproj">
+      <Project>{570215b7-e32f-4438-95ae-c8d955f9fca3}</Project>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

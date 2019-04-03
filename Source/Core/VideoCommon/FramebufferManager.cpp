@@ -231,7 +231,6 @@ AbstractTexture* FramebufferManager::ResolveEFBColorTexture(const MathUtil::Rect
   // It's not valid to resolve an out-of-range rectangle.
   MathUtil::Rectangle<int> clamped_region = region;
   clamped_region.ClampUL(0, 0, GetEFBWidth(), GetEFBHeight());
-  clamped_region = g_renderer->ConvertFramebufferRectangle(clamped_region, m_efb_framebuffer.get());
 
   // Resolve to our already-created texture.
   for (u32 layer = 0; layer < GetEFBLayers(); layer++)
@@ -255,7 +254,6 @@ AbstractTexture* FramebufferManager::ResolveEFBDepthTexture(const MathUtil::Rect
   // It's not valid to resolve an out-of-range rectangle.
   MathUtil::Rectangle<int> clamped_region = region;
   clamped_region.ClampUL(0, 0, GetEFBWidth(), GetEFBHeight());
-  clamped_region = g_renderer->ConvertFramebufferRectangle(clamped_region, m_efb_framebuffer.get());
 
   m_efb_depth_texture->FinishedRendering();
   g_renderer->BeginUtilityDrawing();
@@ -277,9 +275,12 @@ bool FramebufferManager::ReinterpretPixelData(EFBReinterpretType convtype)
     return false;
 
   // Draw to the secondary framebuffer.
+  // We don't discard here because discarding the framebuffer also throws away the depth
+  // buffer, which we want to preserve. If we find this to be hindering performance in the
+  // future (e.g. on mobile/tilers), it may be worth discarding only the color buffer.
   m_efb_color_texture->FinishedRendering();
   g_renderer->BeginUtilityDrawing();
-  g_renderer->SetAndDiscardFramebuffer(m_efb_convert_framebuffer.get());
+  g_renderer->SetFramebuffer(m_efb_convert_framebuffer.get());
   g_renderer->SetViewportAndScissor(m_efb_framebuffer->GetRect());
   g_renderer->SetPipeline(m_format_conversion_pipelines[static_cast<u32>(convtype)].get());
   g_renderer->SetTexture(0, m_efb_color_texture.get());
@@ -573,8 +574,12 @@ void FramebufferManager::PopulateEFBCache(bool depth, u32 tile_index)
         {native_rect.left * rcp_src_width, native_rect.top * rcp_src_height,
          native_rect.GetWidth() * rcp_src_width, native_rect.GetHeight() * rcp_src_height}};
     g_vertex_manager->UploadUtilityUniforms(&uniforms, sizeof(uniforms));
+
+    // Viewport will not be TILE_SIZExTILE_SIZE for the last row of tiles, assuming a tile size of
+    // 64, because 528 is not evenly divisible by 64.
     g_renderer->SetAndDiscardFramebuffer(data.framebuffer.get());
-    g_renderer->SetViewportAndScissor(data.framebuffer->GetRect());
+    g_renderer->SetViewportAndScissor(
+        MathUtil::Rectangle<int>(0, 0, rect.GetWidth(), rect.GetHeight()));
     g_renderer->SetPipeline(data.copy_pipeline.get());
     g_renderer->SetTexture(0, src_texture);
     g_renderer->SetSamplerState(0, depth ? RenderState::GetPointSamplerState() :
@@ -743,7 +748,7 @@ void FramebufferManager::CreatePokeVertices(std::vector<EFBPokeVertex>* destinat
   const float x1 = static_cast<float>(x) * cs_pixel_width - 1.0f;
   const float y1 = 1.0f - static_cast<float>(y) * cs_pixel_height;
   const float x2 = x1 + cs_pixel_width;
-  const float y2 = y1 + cs_pixel_height;
+  const float y2 = y1 - cs_pixel_height;
   destination_list->push_back({{x1, y1, z, 1.0f}, color});
   destination_list->push_back({{x2, y1, z, 1.0f}, color});
   destination_list->push_back({{x1, y2, z, 1.0f}, color});
