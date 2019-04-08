@@ -131,7 +131,7 @@ bool AutoUpdateChecker::SystemSupportsAutoUpdates()
   return false;
 #endif
 }
-
+/*
 static std::string GetPlatformID()
 {
 #if defined _WIN32
@@ -141,13 +141,13 @@ static std::string GetPlatformID()
 #else
   return "unknown";
 #endif
-}
+}*/
 
 void AutoUpdateChecker::CheckForUpdate()
 {
   //Narrysmod-Hijack - Nuke updater
   return;
-
+  /*
   // Don't bother checking if updates are not supported or not enabled.
   if (!SystemSupportsAutoUpdates() || SConfig::GetInstance().m_auto_update_track.empty())
     return;
@@ -199,6 +199,7 @@ void AutoUpdateChecker::CheckForUpdate()
   nvi.changelog_html = GenerateChangelog(obj["changelog"].get<picojson::array>());
 
   OnUpdateAvailable(nvi);
+  */
 }
 
 void AutoUpdateChecker::TriggerUpdate(const AutoUpdateChecker::NewVersionInformation& info,
