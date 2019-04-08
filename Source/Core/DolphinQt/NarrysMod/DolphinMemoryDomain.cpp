@@ -7,6 +7,8 @@
 
 #include <msclr/marshal_cppstd.h>
 
+#include "DolphinMemoryDomain.h"
+
 using namespace cli;
 using namespace System;
 using namespace RTCV;
@@ -39,20 +41,6 @@ using namespace System::Runtime::InteropServices;
 // DSP::ReadARAM and DSP::WriteAram for ARAM
 
 
-public
-ref class SRAM : CorruptCore::IMemoryDomain
-{
-public:
-  property String ^ Name { virtual String ^ get(); } property long long Size
-  {
-    virtual long long get();
-  }
-  property int WordSize { virtual int get(); }
-  property bool BigEndian { virtual bool get(); }
-
-  virtual unsigned char PeekByte(long long addr);
-  virtual void PokeByte(long long addr, unsigned char val);
-};
 
 String ^ SRAM::Name::get()
 {
@@ -96,19 +84,6 @@ void SRAM::PokeByte(long long addr, unsigned char val)
 }
 
 
-public
-ref class EXRAM : CorruptCore::IMemoryDomain
-{
-public:
-  property String ^ Name { virtual String ^ get(); } 
-  property long long Size { virtual long long get();
-  }
-  property int WordSize { virtual int get(); }
-  property bool BigEndian { virtual bool get(); }
-
-  virtual unsigned char PeekByte(long long addr);
-  virtual void PokeByte(long long addr, unsigned char val);
-};
 
 String ^ EXRAM::Name::get()
 {
@@ -152,21 +127,6 @@ void EXRAM::PokeByte(long long addr, unsigned char val)
 }
 
 
-
-public
-ref class ARAM : CorruptCore::IMemoryDomain
-{
-public:
-  property String ^ Name { virtual String ^ get(); }
-  property long long Size  {virtual long long get(); }
-  property int WordSize { virtual int get(); }
-  property bool BigEndian { virtual bool get(); }
-
-  virtual unsigned char PeekByte(long long addr);
-  virtual void PokeByte(long long addr, unsigned char val);
-
-private:
-};
 
 String ^ ARAM::Name::get()
 {

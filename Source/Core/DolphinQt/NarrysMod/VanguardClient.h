@@ -3,7 +3,7 @@ class VanguardClientInitializer
 {
 public:
   static void Initialize();
-  static void isWii();
+  static bool isWii();
 };
 
 class VanguardClientUnmanaged

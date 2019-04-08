@@ -17,6 +17,7 @@
 #include <iostream>
 
 #include "VanguardClient.h"
+#include "DolphinMemoryDomain.h"
 
 #include <msclr/marshal_cppstd.h>
 
@@ -110,6 +111,20 @@ static void RegisterEmuhawkSpec()
   LocalNetCoreRouter::Route(NetcoreCommands::UI, NetcoreCommands::REMOTE_PUSHVANGUARDSPEC,
                            emuSpecTemplate, true);
 
+  ManagedGlobals::VanguardSpec->SpecUpdated += gcnew EventHandler<SpecUpdateEventArgs^>(SpecUpdated);
+
+}
+bool RefreshDomains()
+{
+  List<MemoryDomainProxy ^> ^ interfaces = gcnew List<MemoryDomainProxy ^>();
+  interfaces->Add(gcnew MemoryDomainProxy(gcnew SRAM));
+  interfaces->Add(gcnew MemoryDomainProxy(gcnew ARAM));
+  interfaces->Add(gcnew MemoryDomainProxy(gcnew EXRAM));
+
+  AllSpec::VanguardSpec->Update(VSPEC::MEMORYDOMAINS_INTERFACES, interfaces->ToArray(), true, true);
+  LocalNetCoreRouter::Route(NetcoreCommands::CORRUPTCORE,
+                            NetcoreCommands::REMOTE_EVENT_DOMAINSUPDATED, true, true);
+  return true;
 }
 
 //Create our VanguardClient
@@ -133,7 +148,7 @@ int CPU_STEP_Count = 0;
 static void STEP_CORRUPT()  // errors trapped by CPU_STEP
 {
   StepActions::Execute();
-
+  CPU_STEP_Count++;
   bool autoCorrupt = RTCV::CorruptCore::CorruptCore::AutoCorrupt;
   long errorDelay = RTCV::CorruptCore::CorruptCore::ErrorDelay;
   if (autoCorrupt && CPU_STEP_Count >= errorDelay)
@@ -145,6 +160,8 @@ static void STEP_CORRUPT()  // errors trapped by CPU_STEP
       bl->Apply(false, true);
   }
 }
+
+
  
 void VanguardClientUnmanaged::CORE_STEP()
 {
@@ -152,12 +169,11 @@ void VanguardClientUnmanaged::CORE_STEP()
   STEP_CORRUPT();
 }
 
-void VanguardClientInitializer::isWii()
+bool VanguardClientInitializer::isWii()
 {
   if (SConfig::GetInstance().bWii)
-    VanguardClient::connector->SendSyncedMessage("WII");
-  else
-    VanguardClient::connector->SendSyncedMessage("GAMECUBE");
+    return true;
+  return false;
 }
 
 //Initialize it 
@@ -198,12 +214,17 @@ enum COMMANDS {
   PEEKBYTES,
   POKEADDRESSES,
   PEEKADDRESSES,
+  REMOTE_ALLSPECSSENT,
   UNKNOWN
 };
 
 inline COMMANDS CheckCommand(String^ inString) {
-  if (inString == "LOADSTATE") return LOADSTATE;
-  if (inString == "SAVESTATE") return SAVESTATE;
+  if (inString == "LOADSTATE")
+    return LOADSTATE;
+  if (inString == "SAVESTATE")
+    return SAVESTATE;
+  if (inString == "REMOTE_ALLSPECSSENT")
+    return REMOTE_ALLSPECSSENT;
   return UNKNOWN;
 }
 
@@ -230,11 +251,17 @@ void VanguardClient::OnMessageReceived(Object^ sender, NetCoreEventArgs^ e)
     
     break;
 
-  case SAVESTATE: {
+  case SAVESTATE:
+  {
     if (Core::GetState() == Core::State::Running)
       SaveState((advancedMessage->objectValue)->ToString(), 0);
   }
-    break;
+  break;
+  case REMOTE_ALLSPECSSENT:
+  {
+    RefreshDomains();
+  }
+  break;
 
 
   default:
