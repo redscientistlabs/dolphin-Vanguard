@@ -61,8 +61,8 @@ public:
   void StartClient();
   void RestartClient();
 
-  void LoadState(String ^ filename);
-  void SaveState(String ^ filename, bool wait);
+  void LoadState(String ^ filename, StashKeySavestateLocation ^ location);
+  void SaveState(String ^ filename, StashKeySavestateLocation ^ location, bool wait);
 
   static Mutex ^ mutex = gcnew Mutex(false, "VanguardMutex");
 };
@@ -192,13 +192,14 @@ void VanguardClient::RestartClient()
 }
 
 /* IMPLEMENT YOUR COMMANDS HERE */
-void VanguardClient::LoadState(String^ filename) {
+void VanguardClient::LoadState(String^ filename, StashKeySavestateLocation ^ location) {
 
   std::string converted_filename = msclr::interop::marshal_as< std::string >(filename);
   State::LoadAs(converted_filename);
 
 }
-void VanguardClient::SaveState(String^ filename, bool wait) {
+void VanguardClient::SaveState(String ^ filename, StashKeySavestateLocation ^ location, bool wait)
+{
 
   std::string converted_filename = msclr::interop::marshal_as< std::string >(filename);
   State::SaveAs(converted_filename, wait);
@@ -206,36 +207,60 @@ void VanguardClient::SaveState(String^ filename, bool wait) {
 
 /*ENUMS FOR THE SWITCH STATEMENT*/
 enum COMMANDS {
-  LOADSTATE,
-  SAVESTATE,
-  POKEBYTE,
-  PEEKBYTE,
-  POKEBYTES,
-  PEEKBYTES,
-  POKEADDRESSES,
-  PEEKADDRESSES,
+  SAVESAVESTATE,
+  LOADSAVESTATE,
+  REMOTE_LOADROM,
+  REMOTE_CLOSEGAME,
+  REMOTE_DOMAIN_GETDOMAINS,
+  REMOTE_KEY_SETSYNCSETTINGS,
+  REMOTE_KEY_SETSYSTEMCORE,
+  REMOTE_EVENT_EMU_MAINFORM_CLOSE,
+  REMOTE_EVENT_EMUSTARTED,
+  REMOTE_ISNORMALADVANCE,
+  REMOTE_EVENT_CLOSEEMULATOR,
   REMOTE_ALLSPECSSENT,
   UNKNOWN
 };
 
 inline COMMANDS CheckCommand(String^ inString) {
-  if (inString == "LOADSTATE")
-    return LOADSTATE;
-  if (inString == "SAVESTATE")
-    return SAVESTATE;
+  if (inString == "LOADSAVESTATE")
+    return LOADSAVESTATE;
+  if (inString == "SAVESAVESTATE")
+    return SAVESAVESTATE;
+  if (inString == "REMOTE_LOADROM")
+    return REMOTE_LOADROM;
+  if (inString == "REMOTE_CLOSEGAME")
+    return REMOTE_CLOSEGAME;
+  if (inString == "REMOTE_ALLSPECSSENT")
+    return REMOTE_DOMAIN_GETDOMAINS;
+  if (inString == "REMOTE_DOMAIN_GETDOMAINS")
+    return REMOTE_KEY_SETSYNCSETTINGS;
+  if (inString == "REMOTE_KEY_SETSYNCSETTINGS")
+    return REMOTE_KEY_SETSYSTEMCORE;
+  if (inString == "REMOTE_KEY_SETSYSTEMCORE")
+    return REMOTE_EVENT_EMU_MAINFORM_CLOSE;
+  if (inString == "REMOTE_EVENT_EMU_MAINFORM_CLOSE")
+    return REMOTE_EVENT_EMUSTARTED;
+  if (inString == "REMOTE_EVENT_EMUSTARTED")
+    return REMOTE_ISNORMALADVANCE;
+  if (inString == "REMOTE_ISNORMALADVANCE")
+    return REMOTE_ALLSPECSSENT;
+  if (inString == "REMOTE_EVENT_CLOSEEMULATOR")
+    return REMOTE_EVENT_CLOSEEMULATOR;
   if (inString == "REMOTE_ALLSPECSSENT")
     return REMOTE_ALLSPECSSENT;
   return UNKNOWN;
+}
+
+ LOADSTATE_NET(System::Object^ o, NetCoreEventArgs^ e)
+{
+  e->setReturnValue(VanguardCore.LoadSavestate_NET(path, location));
 }
 
 
 /* THIS IS WHERE YOU HANDLE ANY RECEIVED MESSAGES */
 void VanguardClient::OnMessageReceived(Object^ sender, NetCoreEventArgs^ e)
 {
-
-  Trace::Listeners->Insert(0, gcnew TextWriterTraceListener(Console::Out));
-  Trace::AutoFlush = true;
-
   NetCoreMessage ^ message = e->message;
 
   //Can't define this unless it's used as SLN is set to treat warnings as errors.
@@ -244,14 +269,21 @@ void VanguardClient::OnMessageReceived(Object^ sender, NetCoreEventArgs^ e)
   NetCoreAdvancedMessage ^ advancedMessage = (NetCoreAdvancedMessage^)message;
 
   switch (CheckCommand(message->Type)) {
-  case LOADSTATE: {
+  case LOADSAVESTATE: {
     if (Core::GetState() == Core::State::Running)
+    {
+      array<System::Object ^> ^ cmd = static_cast<array<System::Object ^> ^>(advancedMessage->objectValue);
+      System::String ^ path = static_cast<System::String^>(cmd[0]);
+      StashKeySavestateLocation ^ location = safe_cast<StashKeySavestateLocation ^>(cmd[1]);
+      SyncObjectSingleton::FormExecute();
+      break;
+    }
       LoadState((advancedMessage->objectValue)->ToString());
   }
     
     break;
 
-  case SAVESTATE:
+  case SAVESAVESTATE:
   {
     if (Core::GetState() == Core::State::Running)
       SaveState((advancedMessage->objectValue)->ToString(), 0);
