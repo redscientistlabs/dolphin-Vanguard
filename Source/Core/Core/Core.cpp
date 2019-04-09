@@ -75,6 +75,7 @@
 #include "VideoCommon/RenderBase.h"
 #include "VideoCommon/VideoBackendBase.h"
 #include "VideoCommon/VideoConfig.h"
+#include "DolphinQt/NarrysMod/VanguardClient.h"
 
 namespace Core
 {
@@ -211,7 +212,7 @@ bool Init(std::unique_ptr<BootParameters> boot, const WindowSystemInfo& wsi)
 
   INFO_LOG(BOOT, "Starting core = %s mode", SConfig::GetInstance().bWii ? "Wii" : "GameCube");
   INFO_LOG(BOOT, "CPU Thread separate = %s", SConfig::GetInstance().bCPUThread ? "Yes" : "No");
-
+  
   Host_UpdateMainFrame();  // Disable any menus or buttons at boot
 
   // Issue any API calls which must occur on the main thread for the graphics backend.
@@ -388,6 +389,14 @@ static void FifoPlayerThread(const std::optional<std::string>& savestate_path,
   }
 }
 
+static std::string GetRomName(const BootParameters& boot)
+{
+  if (std::holds_alternative<BootParameters::Disc>(boot.parameters))
+    return std::get<BootParameters::Disc>(boot.parameters).path;
+  return "";
+}
+
+
 // Initialize and create emulation thread
 // Call browser: Init():s_emu_thread().
 // See the BootManager.cpp file description for a complete call schedule.
@@ -410,6 +419,7 @@ static void EmuThread(std::unique_ptr<BootParameters> boot, WindowSystemInfo wsi
   }};
 
   Common::SetCurrentThreadName("Emuthread - Starting");
+  VanguardClientUnmanaged::LOAD_GAME_START();
 
   // For a time this acts as the CPU thread...
   DeclareAsCPUThread();
@@ -419,6 +429,8 @@ static void EmuThread(std::unique_ptr<BootParameters> boot, WindowSystemInfo wsi
   Common::ScopeGuard movie_guard{Movie::Shutdown};
 
   HW::Init();
+
+  VanguardClientUnmanaged::LOAD_GAME_DONE(GetRomName(*boot));
   Common::ScopeGuard hw_guard{[] {
     // We must set up this flag before executing HW::Shutdown()
     s_hardware_initialized = false;

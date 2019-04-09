@@ -17,6 +17,7 @@ using namespace RTCV::Vanguard;
 using namespace System::Runtime::InteropServices;
 
 #using < system.dll>
+#using <System.Diagnostics.Debug.dll>
 
 #define SRAM_SIZE 25165824
 #define ARAM_SIZE 16777216
