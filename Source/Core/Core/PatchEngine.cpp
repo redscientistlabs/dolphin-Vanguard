@@ -257,8 +257,6 @@ bool ApplyFramePatches()
   Gecko::RunCodeHandler();
   ActionReplay::RunAllActive();
 
-  //NARRYSMOD_HIJACK - Corruptcore Step is called here
-  VanguardClientUnmanaged::CORE_STEP();
   
 
   return true;

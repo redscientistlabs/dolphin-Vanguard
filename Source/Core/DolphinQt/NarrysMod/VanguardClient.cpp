@@ -24,17 +24,17 @@
 using namespace cli;
 using namespace System;
 using namespace RTCV;
-using namespace RTCV::NetCore;
-using namespace RTCV::CorruptCore;
-using namespace RTCV::Vanguard;
-using namespace System::Runtime::InteropServices;
-using namespace System::Threading;
-using namespace System::Collections::Generic;
+using namespace NetCore;
+using namespace CorruptCore;
+using namespace Vanguard;
+using namespace Runtime::InteropServices;
+using namespace Threading;
+using namespace Collections::Generic;
 
 #using < system.dll>
 #using < system.reflection.dll>
 #using < system.windows.forms.dll>
-using namespace System::Diagnostics;
+using namespace Diagnostics;
 
 #define SRAM_SIZE 25165824
 #define ARAM_SIZE 16777216
@@ -46,17 +46,18 @@ Trace::AutoFlush = true;
 Trace::WriteLine(filename);
 */
 
-delegate void MessageDelegate(Object ^);
+bool gameChanged;
+
 // Define this in here as it's managed and it can't be in VanguardClient.h as that's included in
 // unmanaged code. Could probably move this to a header
 public
 ref class VanguardClient
 {
 public:
-  static RTCV::NetCore::NetCoreReceiver ^ receiver;
-  static RTCV::Vanguard::VanguardConnector ^ connector;
+  static NetCoreReceiver ^ receiver;
+  static VanguardConnector ^ connector;
 
-  void OnMessageReceived(Object ^ sender, RTCV::NetCore::NetCoreEventArgs ^ e);
+  void OnMessageReceived(Object ^ sender, NetCoreEventArgs ^ e);
   void SpecUpdated(Object ^ sender, SpecUpdateEventArgs ^ e);
   void RegisterVanguardSpec();
 
@@ -74,7 +75,6 @@ ref class ManagedGlobals
 public:
   static VanguardClient ^ client = nullptr;
 };
-
 
 static PartialSpec ^
     getDefaultPartial() {
@@ -111,7 +111,7 @@ void VanguardClient::RegisterVanguardSpec()
   LocalNetCoreRouter::Route(NetcoreCommands::UI, NetcoreCommands::REMOTE_PUSHVANGUARDSPEC,
                             emuSpecTemplate, true);
   AllSpec::VanguardSpec->SpecUpdated +=
-      gcnew EventHandler<NetCore::SpecUpdateEventArgs ^>(this, &VanguardClient::SpecUpdated);
+      gcnew EventHandler<SpecUpdateEventArgs ^>(this, &VanguardClient::SpecUpdated);
 }
 
 bool isWii()
@@ -157,6 +157,7 @@ void VanguardClientInitializer::Initialize()
 }
 
 int CPU_STEP_Count = 0;
+
 static void STEP_CORRUPT()  // errors trapped by CPU_STEP
 {
   StepActions::Execute();
@@ -165,8 +166,7 @@ static void STEP_CORRUPT()  // errors trapped by CPU_STEP
   long errorDelay = RTCV::CorruptCore::CorruptCore::ErrorDelay;
   if (autoCorrupt && CPU_STEP_Count >= errorDelay)
   {
-    array<System::String ^> ^ domains =
-        AllSpec::UISpec->Get<array<System::String ^> ^>("SELECTEDDOMAINS");
+    array<String ^> ^ domains = AllSpec::UISpec->Get<array<String ^> ^>("SELECTEDDOMAINS");
 
     BlastLayer ^ bl = RTCV::CorruptCore::CorruptCore::GenerateBlastLayer(domains);
     if (bl != nullptr)
@@ -176,9 +176,12 @@ static void STEP_CORRUPT()  // errors trapped by CPU_STEP
 
 void VanguardClientUnmanaged::CORE_STEP()
 {
+  ActionDistributor::Execute("ACTION");
+
   // Any step hook for corruption
   STEP_CORRUPT();
 }
+
 void VanguardClientUnmanaged::LOAD_GAME_START()
 {
   StepActions::ClearStepBlastUnits();
@@ -187,6 +190,7 @@ void VanguardClientUnmanaged::LOAD_GAME_START()
 
 void VanguardClientUnmanaged::LOAD_GAME_DONE(std::string romPath)
 {
+  gameChanged = true;
   std::string s_current_file_name = "";
 
   PartialSpec ^ gameDone = gcnew PartialSpec("VanguardSpec");
@@ -196,7 +200,7 @@ void VanguardClientUnmanaged::LOAD_GAME_DONE(std::string romPath)
 
   gameDone->Set(VSPEC::SYSTEMCORE, isWii() ? "WII" : "GAMECUBE");
 
-  System::String ^ gameName = gcnew String(romPath.c_str());
+  String ^ gameName = gcnew String(romPath.c_str());
   gameDone->Set(VSPEC::SYNCSETTINGS, "");
   gameDone->Set(VSPEC::OPENROMFILENAME, gameName);
   gameDone->Set(VSPEC::MEMORYDOMAINS_BLACKLISTEDDOMAINS, "");
@@ -208,19 +212,20 @@ void VanguardClientUnmanaged::LOAD_GAME_DONE(std::string romPath)
   LocalNetCoreRouter::Route(NetcoreCommands::CORRUPTCORE,
                             NetcoreCommands::REMOTE_EVENT_DOMAINSUPDATED, true, true);
 }
+
 // Initialize it
 void VanguardClient::StartClient()
 {
-  VanguardClient::receiver = gcnew RTCV::NetCore::NetCoreReceiver();
-  VanguardClient::receiver->MessageReceived +=
-      gcnew EventHandler<NetCore::NetCoreEventArgs ^>(this, &VanguardClient::OnMessageReceived);
-  VanguardClient::connector = gcnew RTCV::Vanguard::VanguardConnector(receiver);
+  receiver = gcnew NetCoreReceiver();
+  receiver->MessageReceived +=
+      gcnew EventHandler<NetCoreEventArgs ^>(this, &VanguardClient::OnMessageReceived);
+  connector = gcnew VanguardConnector(receiver);
 }
 
 void VanguardClient::RestartClient()
 {
-  VanguardClient::connector->Kill();
-  VanguardClient::connector = nullptr;
+  connector->Kill();
+  connector = nullptr;
   StartClient();
 }
 
@@ -287,6 +292,7 @@ bool VanguardClient::LoadState(String ^ filename, StashKeySavestateLocation ^ lo
   State::LoadAs(converted_filename);
   return true;
 }
+
 /*
 Action<Object ^, EventArgs ^> ^
     LOADSTATE_NET(System::Object ^ o, NetCoreEventArgs ^ e) {
@@ -331,9 +337,8 @@ void VanguardClient::OnMessageReceived(Object ^ sender, NetCoreEventArgs ^ e)
     if (Core::GetState() == Core::State::Running)
     {
       NetCoreAdvancedMessage ^ advancedMessage = (NetCoreAdvancedMessage ^) e->message;
-      array<System::Object ^> ^ cmd =
-          static_cast<array<System::Object ^> ^>(advancedMessage->objectValue);
-      System::String ^ path = static_cast<System::String ^>(cmd[0]);
+      array<Object ^> ^ cmd = static_cast<array<Object ^> ^>(advancedMessage->objectValue);
+      String ^ path = static_cast<String ^>(cmd[0]);
       StashKeySavestateLocation ^ location = safe_cast<StashKeySavestateLocation ^>(cmd[1]);
       e->setReturnValue(ManagedGlobals::client->LoadState(path, location));
       break;
@@ -344,18 +349,18 @@ void VanguardClient::OnMessageReceived(Object ^ sender, NetCoreEventArgs ^ e)
 
   case SAVESAVESTATE:
   {
-    System::String ^ Key = (System::String ^)(advancedMessage->objectValue);
+    String ^ Key = (String ^)(advancedMessage->objectValue);
     // Build the shortname
-    System::String ^ quickSlotName = Key + ".timejump";
+    String ^ quickSlotName = Key + ".timejump";
 
     // Get the prefix for the state
-    System::String ^ prefix = gcnew String(SConfig::GetInstance().GetGameID().c_str());
+    String ^ prefix = gcnew String(SConfig::GetInstance().GetGameID().c_str());
     prefix = prefix->Substring(prefix->LastIndexOf('\\') + 1);
 
     // Build up our path
-    System::String ^ path =
-        RTCV::CorruptCore::CorruptCore::workingDir + IO::Path::DirectorySeparatorChar + "SESSION" +
-        IO::Path::DirectorySeparatorChar + prefix + "." + quickSlotName + ".State";
+    String ^ path = RTCV::CorruptCore::CorruptCore::workingDir + IO::Path::DirectorySeparatorChar +
+                    "SESSION" + IO::Path::DirectorySeparatorChar + prefix + "." + quickSlotName +
+                    ".State";
 
     // If the path doesn't exist, make it
     IO::FileInfo ^ file = gcnew IO::FileInfo(path);
@@ -386,7 +391,7 @@ void VanguardClient::OnMessageReceived(Object ^ sender, NetCoreEventArgs ^ e)
   break;
   case REMOTE_EVENT_EMU_MAINFORM_CLOSE:
   {
-    System::Environment::Exit(0);
+    Environment::Exit(0);
   }
   break;
   case REMOTE_EVENT_EMUSTARTED:

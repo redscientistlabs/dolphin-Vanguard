@@ -430,7 +430,6 @@ static void EmuThread(std::unique_ptr<BootParameters> boot, WindowSystemInfo wsi
 
   HW::Init();
 
-  VanguardClientUnmanaged::LOAD_GAME_DONE(GetRomName(*boot));
   Common::ScopeGuard hw_guard{[] {
     // We must set up this flag before executing HW::Shutdown()
     s_hardware_initialized = false;
@@ -461,7 +460,8 @@ static void EmuThread(std::unique_ptr<BootParameters> boot, WindowSystemInfo wsi
     return;
   }
   Common::ScopeGuard video_guard{[] { g_video_backend->Shutdown(); }};
-
+  
+  
   if (cpu_info.HTT)
     SConfig::GetInstance().bDSPThread = cpu_info.num_cores > 4;
   else
@@ -532,6 +532,8 @@ static void EmuThread(std::unique_ptr<BootParameters> boot, WindowSystemInfo wsi
   // The hardware is initialized.
   s_hardware_initialized = true;
   s_is_booting.Clear();
+  VanguardClientUnmanaged::LOAD_GAME_DONE(GetRomName(*boot));
+
 
   // Set execution state to known values (CPU/FIFO/Audio Paused)
   CPU::Break();

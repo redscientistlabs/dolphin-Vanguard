@@ -5,8 +5,6 @@
 #include "Core/HW/DSP.h"
 #include "Core/HW/Memmap.h"
 
-#include <msclr/marshal_cppstd.h>
-
 #include "DolphinMemoryDomain.h"
 
 using namespace cli;
@@ -15,10 +13,9 @@ using namespace RTCV;
 using namespace RTCV::NetCore;
 using namespace RTCV::Vanguard;
 using namespace System::Runtime::InteropServices;
+using namespace Diagnostics;
 
-#using < system.dll>
-#using <System.Diagnostics.Debug.dll>
-
+#using <System.dll>
 #define SRAM_SIZE 25165824
 #define ARAM_SIZE 16777216
 #define EXRAM_SIZE 67108864
@@ -41,7 +38,7 @@ using namespace System::Runtime::InteropServices;
 // Memory::Write_U8 and Memory::Read_U8 for SRAM and EXRAM
 // DSP::ReadARAM and DSP::WriteAram for ARAM
 
-
+delegate void MessageDelegate(Object ^);
 
 String ^ SRAM::Name::get()
 {
@@ -68,7 +65,7 @@ unsigned char SRAM::PeekByte(long long addr)
   if (addr < SRAM_SIZE)
   {
     // Convert the address
-    addr += SRAM_OFFSET; 
+    addr += SRAM_OFFSET;
     return Memory::Read_U8(static_cast<u32>(addr));
   }
   return 0;
@@ -83,8 +80,6 @@ void SRAM::PokeByte(long long addr, unsigned char val)
     Memory::Write_U8(val, static_cast<u32>(addr));
   }
 }
-
-
 
 String ^ EXRAM::Name::get()
 {
@@ -127,8 +122,6 @@ void EXRAM::PokeByte(long long addr, unsigned char val)
   }
 }
 
-
-
 String ^ ARAM::Name::get()
 {
   return "ARAM";
@@ -169,3 +162,4 @@ void ARAM::PokeByte(long long addr, unsigned char val)
     Memory::Write_U8(val, static_cast<u32>(addr));
   }
 }
+

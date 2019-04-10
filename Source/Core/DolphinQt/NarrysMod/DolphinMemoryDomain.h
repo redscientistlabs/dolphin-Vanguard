@@ -1,5 +1,5 @@
 #pragma once
-ref class SRAM : RTCV::CorruptCore::IMemoryDomain
+public ref class SRAM : RTCV::CorruptCore::IMemoryDomain
 {
 public:
   property System::String^ Name { virtual System::String^ get(); }
@@ -10,7 +10,7 @@ public:
   virtual void PokeByte(long long addr, unsigned char val);
 };
 
-ref class EXRAM : RTCV::CorruptCore::IMemoryDomain
+public ref class EXRAM : RTCV::CorruptCore::IMemoryDomain
 {
 public:
   property System::String ^ Name { virtual System::String ^ get(); }
@@ -22,7 +22,7 @@ public:
   virtual void PokeByte(long long addr, unsigned char val);
 };
 
-ref class ARAM : RTCV::CorruptCore::IMemoryDomain
+public ref class ARAM : RTCV::CorruptCore::IMemoryDomain
 {
 public:
   property System::String ^ Name { virtual System::String ^ get(); } 
@@ -33,3 +33,4 @@ public:
   virtual unsigned char PeekByte(long long addr);
   virtual void PokeByte(long long addr, unsigned char val);
 };
+
