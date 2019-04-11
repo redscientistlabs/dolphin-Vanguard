@@ -200,7 +200,9 @@ void VanguardClientUnmanaged::LOAD_GAME_DONE() {
 
   PartialSpec^ gameDone = gcnew PartialSpec("VanguardSpec");
   gameDone->Set(VSPEC::SYSTEM, "Dolphin");
-  gameDone->Set(VSPEC::GAMENAME, gcnew String(SConfig::GetInstance().GetTitleDescription().c_str()));
+  String^ gameName = gcnew String(SConfig::GetInstance().GetTitleDescription().c_str());
+  char replaceChar = L'-';
+  gameDone->Set(VSPEC::GAMENAME, CorruptCore_Extensions::MakeSafeFilename(gameName, replaceChar));
   gameDone->Set(VSPEC::SYSTEMPREFIX, "Dolphin");
 
   gameDone->Set(VSPEC::SYSTEMCORE, isWii() ? "Wii" : "Gamecube");
@@ -362,7 +364,9 @@ void VanguardClient::OnMessageReceived(Object^ sender, NetCoreEventArgs^ e) {
     String^ quickSlotName = Key + ".timejump";
 
     // Get the prefix for the state
-    String ^ prefix = gcnew String(SConfig::GetInstance().GetTitleDescription().c_str());
+    String ^ gameName = gcnew String(SConfig::GetInstance().GetTitleDescription().c_str());
+    char replaceChar = L'-';
+    String ^ prefix = CorruptCore_Extensions::MakeSafeFilename(gameName, replaceChar);
     prefix = prefix->Substring(prefix->LastIndexOf('\\') + 1);
 
     // Build up our path
