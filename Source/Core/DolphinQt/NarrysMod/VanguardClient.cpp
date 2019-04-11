@@ -77,7 +77,6 @@ public:
   static VanguardClient^ client = nullptr;
 };
 
-
 static void EmuThreadExecute(Action^ callback) {
   IntPtr callbackPtr = Marshal::GetFunctionPointerForDelegate(callback);
   std::function<void(void)> nativeCallback =
@@ -152,8 +151,8 @@ void VanguardClientInitializer::Initialize() {
   IntPtr Handle = dummy->Handle;
   SyncObjectSingleton::SyncObject = dummy;
 
-  SyncObjectSingleton::EmuInvokeDelegate = gcnew SyncObjectSingleton::ActionDelegate
-    (&EmuThreadExecute);
+  SyncObjectSingleton::EmuInvokeDelegate =
+    gcnew SyncObjectSingleton::ActionDelegate(&EmuThreadExecute);
 
   // Start everything
   ManagedGlobals::client = gcnew VanguardClient;
@@ -196,11 +195,10 @@ void VanguardClientUnmanaged::LOAD_GAME_START(std::string romPath) {
   AllSpec::VanguardSpec->Update(VSPEC::OPENROMFILENAME, gameName, true, true);
 }
 
-void VanguardClientUnmanaged::LOAD_GAME_DONE()
-{
+void VanguardClientUnmanaged::LOAD_GAME_DONE() {
   gameChanged = true;
 
-  PartialSpec ^ gameDone = gcnew PartialSpec("VanguardSpec");
+  PartialSpec^ gameDone = gcnew PartialSpec("VanguardSpec");
   gameDone->Set(VSPEC::SYSTEM, "DOLPHIN");
   gameDone->Set(VSPEC::GAMENAME, gcnew String(SConfig::GetInstance().GetGameID().c_str()));
   gameDone->Set(VSPEC::SYSTEMPREFIX, "DOLPHIN");
@@ -217,8 +215,7 @@ void VanguardClientUnmanaged::LOAD_GAME_DONE()
   ManagedGlobals::client->loading = false;
 }
 
-void VanguardClientUnmanaged::GAME_CLOSED()
-{
+void VanguardClientUnmanaged::GAME_CLOSED() {
   AllSpec::VanguardSpec->Update(VSPEC::OPENROMFILENAME, "", true, true);
 }
 
@@ -274,11 +271,9 @@ inline COMMANDS CheckCommand(String^ inString) {
   if (inString == "REMOTE_CLOSEGAME")
     return REMOTE_CLOSEGAME;
   if (inString == "REMOTE_ALLSPECSSENT")
-    return REMOTE_DOMAIN_GETDOMAINS;
+    return REMOTE_ALLSPECSSENT;
   if (inString == "REMOTE_DOMAIN_GETDOMAINS")
-    return REMOTE_KEY_SETSYNCSETTINGS;
-  if (inString == "REMOTE_KEY_SETSYNCSETTINGS")
-    return REMOTE_KEY_SETSYSTEMCORE;
+    return REMOTE_DOMAIN_GETDOMAINS;
   if (inString == "REMOTE_KEY_SETSYSTEMCORE")
     return REMOTE_KEY_SETSYSTEMCORE;
   if (inString == "REMOTE_EVENT_EMU_MAINFORM_CLOSE")
@@ -296,7 +291,6 @@ inline COMMANDS CheckCommand(String^ inString) {
 
 /* IMPLEMENT YOUR COMMANDS HERE */
 bool VanguardClient::LoadRom(String^ filename) {
-
   String^ currentOpenRom = "";
   if (AllSpec::VanguardSpec->Get<String ^>(VSPEC::OPENROMFILENAME) != "")
     currentOpenRom = AllSpec::VanguardSpec->Get<String ^>(VSPEC::OPENROMFILENAME);
@@ -325,7 +319,10 @@ void StopGame()
 {
   Core::Stop();
 }
-
+void AllSpecsSent()
+{
+  VanguardClientInitializer::win->Show();
+}
 template <class T, class U>
 Boolean isinst(U u) {
   return dynamic_cast<T>(u) != nullptr;
@@ -378,8 +375,7 @@ void VanguardClient::OnMessageReceived(Object^ sender, NetCoreEventArgs^ e) {
     if (file->Directory != nullptr && file->Directory->Exists == false)
       file->Directory->Create();
 
-    if (Core::GetState() == Core::State::Running)
-      ManagedGlobals::client->SaveState(path, true);
+    ManagedGlobals::client->SaveState(path, false);
     e->setReturnValue(path);
   }
   break;
@@ -388,13 +384,18 @@ void VanguardClient::OnMessageReceived(Object^ sender, NetCoreEventArgs^ e) {
     ManagedGlobals::client->LoadRom(filename);
   }
   break;
-  case REMOTE_CLOSEGAME:
-  {
-    SyncObjectSingleton::GenericDelegate ^ g = gcnew SyncObjectSingleton::GenericDelegate(&StopGame); 
+  case REMOTE_CLOSEGAME: {
+    SyncObjectSingleton::GenericDelegate^ g =
+      gcnew SyncObjectSingleton::GenericDelegate(&StopGame);
     SyncObjectSingleton::FormExecute(g);
   }
   break;
-  case REMOTE_ALLSPECSSENT: {
+  case REMOTE_ALLSPECSSENT:
+  {
+    SyncObjectSingleton::GenericDelegate ^ g =
+        gcnew SyncObjectSingleton::GenericDelegate(&AllSpecsSent);
+    SyncObjectSingleton::FormExecute(g);
+    
   }
   break;
   case REMOTE_DOMAIN_GETDOMAINS: {
@@ -402,9 +403,11 @@ void VanguardClient::OnMessageReceived(Object^ sender, NetCoreEventArgs^ e) {
   }
   break;
   case REMOTE_KEY_SETSYNCSETTINGS: {
+    // Do nothing
   }
   break;
   case REMOTE_KEY_SETSYSTEMCORE: {
+    //Do nothing
   }
   break;
   case REMOTE_EVENT_EMU_MAINFORM_CLOSE: {
@@ -415,10 +418,12 @@ void VanguardClient::OnMessageReceived(Object^ sender, NetCoreEventArgs^ e) {
   }
   break;
   case REMOTE_ISNORMALADVANCE: {
+    //Todo - Dig out fast forward?
+    e->setReturnValue(true);
   }
   break;
-  case REMOTE_EVENT_CLOSEEMULATOR:
-  {
+  case REMOTE_EVENT_CLOSEEMULATOR: {
+    Environment::Exit(0);
   }
   break;
 

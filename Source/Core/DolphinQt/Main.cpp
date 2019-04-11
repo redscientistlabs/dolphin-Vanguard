@@ -185,7 +185,7 @@ int main(int argc, char* argv[])
       Settings::Instance().SetDebugModeEnabled(true);
     // NARRYSMOD_HIJACK
     VanguardClientInitializer::Initialize();
-    win.Show();
+    //win.Show();
 
 
 
