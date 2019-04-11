@@ -199,11 +199,11 @@ void VanguardClientUnmanaged::LOAD_GAME_DONE() {
   gameChanged = true;
 
   PartialSpec^ gameDone = gcnew PartialSpec("VanguardSpec");
-  gameDone->Set(VSPEC::SYSTEM, "DOLPHIN");
-  gameDone->Set(VSPEC::GAMENAME, gcnew String(SConfig::GetInstance().GetGameID().c_str()));
-  gameDone->Set(VSPEC::SYSTEMPREFIX, "DOLPHIN");
+  gameDone->Set(VSPEC::SYSTEM, "Dolphin");
+  gameDone->Set(VSPEC::GAMENAME, gcnew String(SConfig::GetInstance().GetTitleDescription().c_str()));
+  gameDone->Set(VSPEC::SYSTEMPREFIX, "Dolphin");
 
-  gameDone->Set(VSPEC::SYSTEMCORE, isWii() ? "WII" : "GAMECUBE");
+  gameDone->Set(VSPEC::SYSTEMCORE, isWii() ? "Wii" : "Gamecube");
   gameDone->Set(VSPEC::SYNCSETTINGS, "");
   gameDone->Set(VSPEC::MEMORYDOMAINS_BLACKLISTEDDOMAINS, "");
   gameDone->Set(VSPEC::MEMORYDOMAINS_INTERFACES, GetInterfaces());
@@ -362,7 +362,7 @@ void VanguardClient::OnMessageReceived(Object^ sender, NetCoreEventArgs^ e) {
     String^ quickSlotName = Key + ".timejump";
 
     // Get the prefix for the state
-    String^ prefix = gcnew String(SConfig::GetInstance().GetGameID().c_str());
+    String ^ prefix = gcnew String(SConfig::GetInstance().GetTitleDescription().c_str());
     prefix = prefix->Substring(prefix->LastIndexOf('\\') + 1);
 
     // Build up our path
