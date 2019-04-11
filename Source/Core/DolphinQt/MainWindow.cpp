@@ -913,8 +913,12 @@ void MainWindow::StartGame(std::unique_ptr<BootParameters>&& parameters)
   // If we're running, only start a new game once we've stopped the last.
   if (Core::GetState() != Core::State::Uninitialized)
   {
-    if (!RequestStop())
+    //Narrysmod - Replace RequestStop with plain old Stop
+    ForceStop();
+    /*
+    if(!RequestStop())
       return;
+    */
 
     // As long as the shutdown isn't complete, we can't boot, so let's boot later
     m_pending_boot = std::move(parameters);

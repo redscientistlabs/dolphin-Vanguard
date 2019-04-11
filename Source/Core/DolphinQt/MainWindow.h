@@ -71,8 +71,11 @@ public:
 
   bool eventFilter(QObject* object, QEvent* event) override;
 
-  // Narrysmod_Hijack - Add a startgame that doesn't need any extra stuff
+  // Narrysmod_Hijacks
+  //Add a startgame that doesn't need any extra stuff
   void StartGame(const std::string& path);
+  //Make public
+  void ForceStop();
 
 signals:
   void ReadOnlyModeChanged(bool read_only);
@@ -87,7 +90,6 @@ private:
 
   // May ask for confirmation. Returns whether or not it actually stopped.
   bool RequestStop();
-  void ForceStop();
   void Reset();
   void FrameAdvance();
   void StateLoad();

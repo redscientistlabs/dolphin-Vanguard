@@ -349,7 +349,7 @@ static void CpuThread(const std::optional<std::string>& savestate_path, bool del
 
   // Enter CPU run loop. When we leave it - we are done.
   CPU::Run();
-
+  VanguardClientUnmanaged::GAME_CLOSED();
   s_is_started = false;
 
   if (_CoreParameter.bFastmem)
