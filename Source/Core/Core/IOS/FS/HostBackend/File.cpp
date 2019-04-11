@@ -46,12 +46,15 @@ std::shared_ptr<File::IOFile> HostFileSystem::OpenHostFile(const std::string& ho
   File::IOFile file;
   while (!file.Open(host_path, "r+b"))
   {
+    //Narrysmod
+    const bool try_again = false;
+    /*
     const bool try_again =
         PanicYesNo("File \"%s\" could not be opened!\n"
                    "This may happen with improper permissions or use by another process.\n"
                    "Press \"Yes\" to make another attempt.",
                    host_path.c_str());
-
+                   */
     if (!try_again)
     {
       // We've failed to open the file:

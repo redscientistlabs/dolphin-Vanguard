@@ -152,13 +152,8 @@ static std::string DoState(PointerWrap& p)
   std::string version_created_by;
   if (!DoStateVersion(p, &version_created_by))
   {
-	
-	  //NARRYSMOD_HIJACK
-	  //Hardcode compatible versions
-	  if (version_created_by != "0.1.7") {
-		  p.SetMode(PointerWrap::MODE_MEASURE);
-		  return version_created_by;
-	  }
+    p.SetMode(PointerWrap::MODE_MEASURE);
+    return version_created_by;
   }
 
   bool is_wii = SConfig::GetInstance().bWii || SConfig::GetInstance().m_is_mios;

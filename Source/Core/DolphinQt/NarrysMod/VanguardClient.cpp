@@ -68,6 +68,9 @@ public:
   bool LoadRom(String^ filename);
   bool LoadState(String^ filename, StashKeySavestateLocation^ location);
   bool SaveState(String^ filename, bool wait);
+
+  ManualResetEvent^ gameLoadedEvent = gcnew ManualResetEvent(false);
+
   const std::string GetFilePath(String^);
   volatile bool loading = false;
 };
@@ -213,8 +216,8 @@ void VanguardClientUnmanaged::LOAD_GAME_DONE() {
   AllSpec::VanguardSpec->Update(gameDone, true, false);
   // This is local. If the domains changed it propgates over netcore
   LocalNetCoreRouter::Route(NetcoreCommands::CORRUPTCORE,
-                            NetcoreCommands::REMOTE_EVENT_DOMAINSUPDATED, true, true);
-  ManagedGlobals::client->loading = false;
+                            NetcoreCommands::REMOTE_EVENT_DOMAINSUPDATED, true, false);
+  ManagedGlobals::client->gameLoadedEvent->Set();
 }
 
 void VanguardClientUnmanaged::GAME_CLOSED() {
@@ -237,8 +240,12 @@ void VanguardClient::RestartClient() {
 
 bool VanguardClient::SaveState(String^ filename, bool wait) {
   std::string converted_filename = msclr::interop::marshal_as<std::string>(filename);
-  State::SaveAs(converted_filename, wait);
-  return true;
+  if (Core::IsRunningAndStarted())
+  {
+    State::SaveAs(converted_filename, wait);
+    return true;
+  }
+  return false;
 }
 
 const std::string VanguardClient::GetFilePath(String^ filename) {
@@ -302,10 +309,8 @@ bool VanguardClient::LoadRom(String^ filename) {
     const std::string& path = GetFilePath(filename);
     ManagedGlobals::client->loading = true;
     VanguardClientInitializer::win->StartGame(path);
-    while (ManagedGlobals::client->loading) {
-      System::Windows::Forms::Application::DoEvents();
-      Thread::Sleep(10);
-    }
+    gameLoadedEvent->WaitOne();  // This thread will block here until the reset event is sent.
+    gameLoadedEvent->Reset();
   }
   return true;
 }
@@ -368,19 +373,19 @@ void VanguardClient::OnMessageReceived(Object^ sender, NetCoreEventArgs^ e) {
     char replaceChar = L'-';
     String ^ prefix = CorruptCore_Extensions::MakeSafeFilename(gameName, replaceChar);
     prefix = prefix->Substring(prefix->LastIndexOf('\\') + 1);
+    String ^ path = nullptr;
+      // Build up our path
+      path = RTCV::CorruptCore::CorruptCore::workingDir + IO::Path::DirectorySeparatorChar +
+                     "SESSION" + IO::Path::DirectorySeparatorChar + prefix + "." + quickSlotName +
+                     ".State";
 
-    // Build up our path
-    String^ path = RTCV::CorruptCore::CorruptCore::workingDir + IO::Path::DirectorySeparatorChar +
-                   "SESSION" + IO::Path::DirectorySeparatorChar + prefix + "." + quickSlotName +
-                   ".State";
+      // If the path doesn't exist, make it
+      IO::FileInfo^ file = gcnew IO::FileInfo(path);
+      if (file->Directory != nullptr && file->Directory->Exists == false)
+        file->Directory->Create();
 
-    // If the path doesn't exist, make it
-    IO::FileInfo^ file = gcnew IO::FileInfo(path);
-    if (file->Directory != nullptr && file->Directory->Exists == false)
-      file->Directory->Create();
-
-    ManagedGlobals::client->SaveState(path, false);
-    e->setReturnValue(path);
+      if(ManagedGlobals::client->SaveState(path, false) && Core::IsRunningAndStarted())
+        e->setReturnValue(path);
   }
   break;
   case REMOTE_LOADROM: {
