@@ -472,6 +472,7 @@
     <ClInclude Include="Debugger\RegisterColumn.h" />
     <ClInclude Include="NarrysMod\DolphinMemoryDomain.h" />
     <ClInclude Include="NarrysMod\VanguardClient.h" />
+    <ClInclude Include="NarrysMod\VanguardClientInitializer.h" />
     <ClInclude Include="QtUtils\ActionHelper.h" />
     <ClInclude Include="QtUtils\ImageConverter.h" />
     <ClInclude Include="QtUtils\QueueOnObject.h" />

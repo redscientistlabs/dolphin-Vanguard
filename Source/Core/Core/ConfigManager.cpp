@@ -427,7 +427,8 @@ void SConfig::LoadInterfaceSettings(IniFile& ini)
 {
   IniFile::Section* interface = ini.GetOrCreateSection("Interface");
 
-  interface->Get("ConfirmStop", &bConfirmStop, true);
+  // Narrysmod_hijack
+  interface->Get("ConfirmStop", &bConfirmStop, false);
   //Narrysmod_hijack
   interface->Get("UsePanicHandlers", &bUsePanicHandlers, false);
   interface->Get("OnScreenDisplayMessages", &bOnScreenDisplayMessages, true);

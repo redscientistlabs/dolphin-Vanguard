@@ -28,8 +28,6 @@
 #include "Core/PowerPC/MMU.h"
 #include "Core/PowerPC/PowerPC.h"
 
-#include "DolphinQt//NarrysMod/VanguardClient.h"
-
 namespace PatchEngine
 {
 constexpr std::array<const char*, 3> s_patch_type_strings{{

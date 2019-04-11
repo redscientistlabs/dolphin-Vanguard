@@ -17,7 +17,9 @@
 #include <string>
 
 #include "DolphinMemoryDomain.h"
+#include "DolphinQT/MainWindow.h"
 #include "VanguardClient.h"
+#include "VanguardClientInitializer.h"
 
 #include <msclr/marshal_cppstd.h>
 
@@ -48,8 +50,7 @@ Trace::WriteLine(filename);
 
 bool gameChanged;
 
-// Define this in here as it's managed and it can't be in VanguardClient.h as that's included in
-// unmanaged code. Could probably move this to a header
+// Define this in here as it's managed and weird stuff happens if it's in a header
 public
 ref class VanguardClient
 {
@@ -64,10 +65,11 @@ public:
   void StartClient();
   void RestartClient();
 
+  bool LoadRom(String ^ filename);
   bool LoadState(String ^ filename, StashKeySavestateLocation ^ location);
   bool SaveState(String ^ filename, bool wait);
-
-  static Mutex ^ mutex = gcnew Mutex(false, "VanguardMutex");
+  const std::string GetFilePath(System::String ^);
+  volatile bool loading = false;
 };
 
 ref class ManagedGlobals
@@ -182,16 +184,19 @@ void VanguardClientUnmanaged::CORE_STEP()
   STEP_CORRUPT();
 }
 
-void VanguardClientUnmanaged::LOAD_GAME_START()
+// This is on the main thread not the emu thread
+void VanguardClientUnmanaged::LOAD_GAME_START(std::string romPath)
 {
   StepActions::ClearStepBlastUnits();
   CPU_STEP_Count = 0;
+
+  String ^ gameName = gcnew String(romPath.c_str());
+  AllSpec::VanguardSpec->Update(VSPEC::OPENROMFILENAME, gameName, true, true);
 }
 
-void VanguardClientUnmanaged::LOAD_GAME_DONE(std::string romPath)
+void VanguardClientUnmanaged::LOAD_GAME_DONE()
 {
   gameChanged = true;
-  std::string s_current_file_name = "";
 
   PartialSpec ^ gameDone = gcnew PartialSpec("VanguardSpec");
   gameDone->Set(VSPEC::SYSTEM, "DOLPHIN");
@@ -199,18 +204,15 @@ void VanguardClientUnmanaged::LOAD_GAME_DONE(std::string romPath)
   gameDone->Set(VSPEC::SYSTEMPREFIX, "DOLPHIN");
 
   gameDone->Set(VSPEC::SYSTEMCORE, isWii() ? "WII" : "GAMECUBE");
-
-  String ^ gameName = gcnew String(romPath.c_str());
   gameDone->Set(VSPEC::SYNCSETTINGS, "");
-  gameDone->Set(VSPEC::OPENROMFILENAME, gameName);
   gameDone->Set(VSPEC::MEMORYDOMAINS_BLACKLISTEDDOMAINS, "");
   gameDone->Set(VSPEC::MEMORYDOMAINS_INTERFACES, GetInterfaces());
   gameDone->Set(VSPEC::CORE_DISKBASED, true);
-  AllSpec::VanguardSpec->Update(gameDone, true, true);
-
+  AllSpec::VanguardSpec->Update(gameDone, true, false);
   // This is local. If the domains changed it propgates over netcore
   LocalNetCoreRouter::Route(NetcoreCommands::CORRUPTCORE,
                             NetcoreCommands::REMOTE_EVENT_DOMAINSUPDATED, true, true);
+  ManagedGlobals::client->loading = false;
 }
 
 // Initialize it
@@ -234,6 +236,12 @@ bool VanguardClient::SaveState(String ^ filename, bool wait)
   std::string converted_filename = msclr::interop::marshal_as<std::string>(filename);
   State::SaveAs(converted_filename, wait);
   return true;
+}
+
+const std::string VanguardClient::GetFilePath(System::String ^ filename)
+{
+  std::string converted_filename = msclr::interop::marshal_as<std::string>(filename);
+  return converted_filename;
 }
 
 /*ENUMS FOR THE SWITCH STATEMENT*/
@@ -286,24 +294,31 @@ inline COMMANDS CheckCommand(String ^ inString)
 }
 
 /* IMPLEMENT YOUR COMMANDS HERE */
+bool VanguardClient::LoadRom(String ^ filename)
+{
+  String ^ currentOpenRom = AllSpec::VanguardSpec->Get<System::String ^>(VSPEC::OPENROMFILENAME);
+  // Game is not running
+  if (!currentOpenRom->Equals(filename))
+  {
+    const std::string& path = GetFilePath(filename);
+    ManagedGlobals::client->loading = true;
+    VanguardClientInitializer::win->StartGame(path);
+    while (ManagedGlobals::client->loading)
+    {
+      System::Windows::Forms::Application::DoEvents();
+      Thread::Sleep(10);
+    }
+  }
+  return true;
+}
+
+/* IMPLEMENT YOUR COMMANDS HERE */
 bool VanguardClient::LoadState(String ^ filename, StashKeySavestateLocation ^ location)
 {
   std::string converted_filename = msclr::interop::marshal_as<std::string>(filename);
   State::LoadAs(converted_filename);
   return true;
 }
-
-/*
-Action<Object ^, EventArgs ^> ^
-    LOADSTATE_NET(System::Object ^ o, NetCoreEventArgs ^ e) {
-      NetCoreAdvancedMessage ^ advancedMessage = (NetCoreAdvancedMessage ^) e->message;
-      array<System::Object ^> ^ cmd =
-          static_cast<array<System::Object ^> ^>(advancedMessage->objectValue);
-      System::String ^ path = static_cast<System::String ^>(cmd[0]);
-      StashKeySavestateLocation ^ location = safe_cast<StashKeySavestateLocation ^>(cmd[1]);
-      e->setReturnValue(ManagedGlobals::client->LoadState(path, location));
-      return nullptr;
-    }*/
 
 template <class T, class U>
 Boolean isinst(U u)
@@ -334,15 +349,12 @@ void VanguardClient::OnMessageReceived(Object ^ sender, NetCoreEventArgs ^ e)
   {
   case LOADSAVESTATE:
   {
-    if (Core::GetState() == Core::State::Running)
-    {
-      NetCoreAdvancedMessage ^ advancedMessage = (NetCoreAdvancedMessage ^) e->message;
-      array<Object ^> ^ cmd = static_cast<array<Object ^> ^>(advancedMessage->objectValue);
-      String ^ path = static_cast<String ^>(cmd[0]);
-      StashKeySavestateLocation ^ location = safe_cast<StashKeySavestateLocation ^>(cmd[1]);
-      e->setReturnValue(ManagedGlobals::client->LoadState(path, location));
-      break;
-    }
+    NetCoreAdvancedMessage ^ advancedMessage = (NetCoreAdvancedMessage ^) e->message;
+    array<Object ^> ^ cmd = static_cast<array<Object ^> ^>(advancedMessage->objectValue);
+    String ^ path = static_cast<String ^>(cmd[0]);
+    StashKeySavestateLocation ^ location = safe_cast<StashKeySavestateLocation ^>(cmd[1]);
+    e->setReturnValue(ManagedGlobals::client->LoadState(path, location));
+    break;
   }
 
   break;
@@ -368,10 +380,15 @@ void VanguardClient::OnMessageReceived(Object ^ sender, NetCoreEventArgs ^ e)
       file->Directory->Create();
 
     if (Core::GetState() == Core::State::Running)
-      SaveState(path, true);
+      ManagedGlobals::client->SaveState(path, true);
     e->setReturnValue(path);
   }
   break;
+  case REMOTE_LOADROM:
+  {
+    String ^ filename = (String ^) advancedMessage->objectValue;
+    ManagedGlobals::client->LoadRom(filename);
+  }
   case REMOTE_ALLSPECSSENT:
   {
   }

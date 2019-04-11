@@ -35,7 +35,7 @@
 #include "UICommon/CommandLineParse.h"
 #include "UICommon/UICommon.h"
 
-#include "NarrysMod/VanguardClient.h"
+#include "NarrysMod/VanguardClientInitializer.h"
 
 static bool QtMsgAlertHandler(const char* caption, const char* text, bool yes_no, MsgType style)
 {

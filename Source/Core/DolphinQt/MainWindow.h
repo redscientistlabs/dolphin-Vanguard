@@ -71,6 +71,9 @@ public:
 
   bool eventFilter(QObject* object, QEvent* event) override;
 
+  // Narrysmod_Hijack - Add a startgame that doesn't need any extra stuff
+  void StartGame(const std::string& path);
+
 signals:
   void ReadOnlyModeChanged(bool read_only);
   void RecordingStatusChanged(bool recording);

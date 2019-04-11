@@ -326,7 +326,7 @@ static void CpuThread(const std::optional<std::string>& savestate_path, bool del
     if (delete_savestate)
       File::Delete(*savestate_path);
   }
-
+  VanguardClientUnmanaged::LOAD_GAME_DONE();
   s_is_started = true;
   CPUSetInitialExecutionState();
 
@@ -389,14 +389,6 @@ static void FifoPlayerThread(const std::optional<std::string>& savestate_path,
   }
 }
 
-static std::string GetRomName(const BootParameters& boot)
-{
-  if (std::holds_alternative<BootParameters::Disc>(boot.parameters))
-    return std::get<BootParameters::Disc>(boot.parameters).path;
-  return "";
-}
-
-
 // Initialize and create emulation thread
 // Call browser: Init():s_emu_thread().
 // See the BootManager.cpp file description for a complete call schedule.
@@ -419,7 +411,15 @@ static void EmuThread(std::unique_ptr<BootParameters> boot, WindowSystemInfo wsi
   }};
 
   Common::SetCurrentThreadName("Emuthread - Starting");
-  VanguardClientUnmanaged::LOAD_GAME_START();
+
+  
+
+  // NARRYSMOD_HIJACK - Snag the boot path
+  std::string romPath = "";
+  if (std::holds_alternative<BootParameters::Disc>(boot->parameters))
+    romPath = std::get<BootParameters::Disc>(boot->parameters).path;
+
+  VanguardClientUnmanaged::LOAD_GAME_START(romPath);
 
   // For a time this acts as the CPU thread...
   DeclareAsCPUThread();
@@ -532,7 +532,6 @@ static void EmuThread(std::unique_ptr<BootParameters> boot, WindowSystemInfo wsi
   // The hardware is initialized.
   s_hardware_initialized = true;
   s_is_booting.Clear();
-  VanguardClientUnmanaged::LOAD_GAME_DONE(GetRomName(*boot));
 
 
   // Set execution state to known values (CPU/FIFO/Audio Paused)

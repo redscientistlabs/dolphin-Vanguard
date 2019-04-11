@@ -109,6 +109,9 @@
 #include "VideoCommon/NetPlayChatUI.h"
 #include "VideoCommon/VideoConfig.h"
 
+#include "NarrysMod/VanguardClientInitializer.h"
+#include "NarrysMod/VanguardClient.h"
+
 #if defined(HAVE_XRANDR) && HAVE_XRANDR
 #include "UICommon/X11Utils.h"
 #endif
@@ -202,6 +205,7 @@ MainWindow::MainWindow(std::unique_ptr<BootParameters> boot_parameters,
   ConnectStack();
   ConnectMenuBar();
   ConnectHotkeys();
+  VanguardClientInitializer::win = this;
 
   InitCoreCallbacks();
 
@@ -893,6 +897,10 @@ void MainWindow::StartGame(const std::string& path, ScanForSecondDisc scan,
 
   StartGame(BootParameters::GenerateFromFile(path, savestate_path));
 }
+void MainWindow::StartGame(const std::string& path)
+{
+  StartGame(BootParameters::GenerateFromFile(path));
+}
 
 void MainWindow::StartGame(const std::vector<std::string>& paths,
                            const std::optional<std::string>& savestate_path)
@@ -912,7 +920,6 @@ void MainWindow::StartGame(std::unique_ptr<BootParameters>&& parameters)
     m_pending_boot = std::move(parameters);
     return;
   }
-
   // We need the render widget before booting.
   ShowRenderWidget();
 
