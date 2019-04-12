@@ -317,6 +317,7 @@ bool VanguardClient::LoadRom(String^ filename) {
 
 /* IMPLEMENT YOUR COMMANDS HERE */
 bool VanguardClient::LoadState(String^ filename, StashKeySavestateLocation^ location) {
+  StepActions::ClearStepBlastUnits();
   std::string converted_filename = msclr::interop::marshal_as<std::string>(filename);
   State::LoadAs(converted_filename);
   return true;
