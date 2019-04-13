@@ -356,6 +356,7 @@ void StopGame()
 }
 void AllSpecsSent()
 {
+  AllSpec::VanguardSpec->Update("EMUDIR", System::Reflection::Assembly::GetExecutingAssembly()->Location, true, true);
   VanguardClientInitializer::win->Show();
 }
 template <class T, class U>
