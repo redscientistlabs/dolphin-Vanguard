@@ -57,7 +57,8 @@
       <AdditionalManifestFiles>DolphinQt.manifest;%(AdditionalManifestFiles)</AdditionalManifestFiles>
     </Manifest>
     <PostBuildEvent>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">echo f | xcopy /y /c "..\..\..\Binary\x64" "..\..\..\..\RTCV\Build\"</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+      </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <!--
