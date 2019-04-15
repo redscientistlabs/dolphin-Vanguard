@@ -1,4 +1,5 @@
 #pragma once
+#include "VideoCommon/VideoConfig.h"
 struct VanguardSettingsUnmanaged;
 
 namespace NetPlay {
@@ -9,6 +10,7 @@ public
 ref class VanguardSettingsWrapper
 {
 public:
+  AspectMode m_AspectRatio;
   bool m_EnableCheats;
   int m_SelectedLanguage;
   bool m_OverrideGCLanguage;

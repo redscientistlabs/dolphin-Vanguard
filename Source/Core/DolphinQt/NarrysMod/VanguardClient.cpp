@@ -393,7 +393,6 @@ const VanguardSettingsUnmanaged& GetVanguardSettings()
 {
   return vanguardSettingsUnmanaged;
 }
-static NetPlay::NetSettings v{};
 
 /* THIS IS WHERE YOU HANDLE ANY RECEIVED MESSAGES */
 void VanguardClient::OnMessageReceived(Object^ sender, NetCoreEventArgs^ e)
@@ -433,9 +432,8 @@ void VanguardClient::OnMessageReceived(Object^ sender, NetCoreEventArgs^ e)
       VanguardSettingsWrapper ^ settings = GetConfigFromJson(settingStr);
       if (settings != nullptr)
       {
-       // v = VanguardSettings::GetVanguardSettingFromVanguardSettingsWrapper(settings);
-        auto a = std::make_unique<Config::Layer>( std::move(ConfigLoaders::GenerateNetPlayConfigLoader(v)));
-        //Config::AddLayer(ConfigLoaders::GenerateVanguardConfigLoader(&v));
+        
+        Config::AddLayer(ConfigLoaders::GenerateVanguardConfigLoader(&VanguardSettings::GetVanguardSettingFromVanguardSettingsWrapper(settings)));
       }
     }
 

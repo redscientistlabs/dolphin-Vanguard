@@ -1,6 +1,7 @@
 #pragma once
 #include "Core/NetPlayProto.h"
 #include <string>
+#include "VideoCommon/VideoConfig.h"
 
 
 namespace ConfigLoaders {
@@ -9,6 +10,7 @@ class VanguardConfigLayerLoader;
 
 struct VanguardSettingsUnmanaged
 {
+  AspectMode m_AspectRatio;
   bool m_EnableCheats;
   int m_SelectedLanguage;
   bool m_OverrideGCLanguage;

@@ -46,15 +46,14 @@ static void LoadFromVanguardSettings(Config::Layer* layer, VanguardSettingsUnman
   layer->Set(Config::GFX_HACK_DEFER_EFB_COPIES, m_settings->m_DeferEFBCopies);
   layer->Set(Config::GFX_HACK_EFB_ACCESS_TILE_SIZE, m_settings->m_EFBAccessTileSize);
   layer->Set(Config::GFX_HACK_EFB_DEFER_INVALIDATION, m_settings->m_EFBAccessDeferInvalidation);
+  layer->Set(Config::GFX_ASPECT_RATIO, m_settings->m_AspectRatio);
 
   layer->Set(Config::GFX_HACK_VERTEX_ROUDING, m_settings->m_VertexRounding);
-  layer->Set(Config::GFX_EFB_SCALE, m_settings->m_InternalResolution);
   layer->Set(Config::GFX_HACK_COPY_EFB_SCALED, m_settings->m_EFBScaledCopy);
   layer->Set(Config::GFX_FAST_DEPTH_CALC, m_settings->m_FastDepthCalc);
   layer->Set(Config::GFX_ENABLE_PIXEL_LIGHTING, m_settings->m_EnablePixelLighting);
   layer->Set(Config::GFX_WIDESCREEN_HACK, m_settings->m_WidescreenHack);
   layer->Set(Config::GFX_ENHANCE_FORCE_FILTERING, m_settings->m_ForceFiltering);
-  layer->Set(Config::GFX_ENHANCE_MAX_ANISOTROPY, m_settings->m_MaxAnisotropy);
   layer->Set(Config::GFX_ENHANCE_FORCE_TRUE_COLOR, m_settings->m_ForceTrueColor);
   layer->Set(Config::GFX_ENHANCE_DISABLE_COPY_FILTER, m_settings->m_DisableCopyFilter);
   layer->Set(Config::GFX_DISABLE_FOG, m_settings->m_DisableFog);

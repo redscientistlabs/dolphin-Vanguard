@@ -69,8 +69,9 @@ VanguardSettingsUnmanaged VanguardSettings::GetVanguardSettingFromVanguardSettin
   VanguardSettingsWrapper^ vSettings)
 {
   // Copy all relevant settings
-  nSettings.m_EnableCheats = true;
- /* nSettings.m_SelectedLanguage = vSettings->m_SelectedLanguage;
+  nSettings.m_AspectRatio = vSettings->m_AspectRatio;
+  nSettings.m_EnableCheats = vSettings->m_EnableCheats;
+  nSettings.m_SelectedLanguage = vSettings->m_SelectedLanguage;
   nSettings.m_OverrideGCLanguage = vSettings->m_OverrideGCLanguage;
   nSettings.m_ProgressiveScan = vSettings->m_ProgressiveScan;
   nSettings.m_PAL60 = vSettings->m_PAL60;
@@ -115,6 +116,6 @@ VanguardSettingsUnmanaged VanguardSettings::GetVanguardSettingFromVanguardSettin
   nSettings.m_EnableGPUTextureDecoding =      vSettings->m_EnableGPUTextureDecoding;
   nSettings.m_DeferEFBCopies = vSettings->m_DeferEFBCopies;
   nSettings.m_EFBAccessTileSize =      vSettings->m_EFBAccessTileSize;
-  nSettings.m_EFBAccessDeferInvalidation =      vSettings->m_EFBAccessDeferInvalidation;*/
+  nSettings.m_EFBAccessDeferInvalidation =      vSettings->m_EFBAccessDeferInvalidation;
   return nSettings;
 }
