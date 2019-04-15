@@ -51,8 +51,9 @@ void AudioPane::CreateWidgets()
 
   dsp_layout->addStretch(1);
   dsp_layout->addWidget(m_dsp_hle);
-  dsp_layout->addWidget(m_dsp_lle);
-  dsp_layout->addWidget(m_dsp_interpreter);
+  //Narrysmod - Disable LLE and interpreter
+  //dsp_layout->addWidget(m_dsp_lle);
+  //dsp_layout->addWidget(m_dsp_interpreter);
   dsp_layout->addStretch(1);
 
   auto* volume_box = new QGroupBox(tr("Volume"));

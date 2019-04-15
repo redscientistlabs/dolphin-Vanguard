@@ -228,7 +228,9 @@ void SetUserDirectory(const std::string& custom_path)
     RegCloseKey(hkey);
   }
 
-  local = local || File::Exists(File::GetExeDirectory() + DIR_SEP "portable.txt");
+  //local = local || File::Exists(File::GetExeDirectory() + DIR_SEP "portable.txt");
+  //Narrysmod - Always use local mode
+  local = true;
 
   // Get Program Files path in case we need it.
   TCHAR my_documents[MAX_PATH];
