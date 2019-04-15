@@ -455,6 +455,8 @@ void RestoreConfig()
   Config::RemoveLayer(Config::LayerType::Netplay);
   Config::RemoveLayer(Config::LayerType::GlobalGame);
   Config::RemoveLayer(Config::LayerType::LocalGame);
+  //Narrysmod - Add vanguard
+  Config::RemoveLayer(Config::LayerType::Vanguard);
   SConfig::GetInstance().ResetRunningGameMetadata();
   config_cache.RestoreConfig(&SConfig::GetInstance());
 }

@@ -17,6 +17,8 @@ enum class LayerType
   Netplay,
   CommandLine,
   CurrentRun,
+  //Narrysmod - Add vanguard
+  Vanguard,
   Meta,
 };
 
@@ -32,7 +34,9 @@ enum class System
   Debugger,
 };
 
-constexpr std::array<LayerType, 7> SEARCH_ORDER{{
+constexpr std::array<LayerType, 8> SEARCH_ORDER{{
+  //Narrysmod - Add vanguard
+    LayerType::Vanguard,
     LayerType::CurrentRun,
     LayerType::CommandLine,
     LayerType::Movie,

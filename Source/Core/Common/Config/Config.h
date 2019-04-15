@@ -38,6 +38,9 @@ void Init();
 void Shutdown();
 void ClearCurrentRunLayer();
 
+  //Narrysmod - Add define
+void ClearCurrentVanguardLayer();
+
 const std::string& GetSystemName(System system);
 std::optional<System> GetSystemFromName(const std::string& system);
 const std::string& GetLayerName(LayerType layer);

@@ -1,14 +1,14 @@
 #pragma once
-#include "Core/NetPlayProto.h"
-#include <string>
+struct VanguardSettingsUnmanaged;
 
-
-namespace ConfigLoaders {
-class VanguardConfigLayerLoader;
+namespace NetPlay {
+struct NetSettings;
 }
 
-struct VanguardSettingsUnmanaged
+public
+ref class VanguardSettingsWrapper
 {
+public:
   bool m_EnableCheats;
   int m_SelectedLanguage;
   bool m_OverrideGCLanguage;
@@ -42,6 +42,8 @@ struct VanguardSettingsUnmanaged
   bool m_FastDiscSpeed;
   bool m_MMU;
   bool m_Fastmem;
+  bool m_SkipIPL;
+  bool m_LoadIPLDump;
   bool m_VertexRounding;
   int m_InternalResolution;
   bool m_EFBScaledCopy;
@@ -66,15 +68,11 @@ struct VanguardSettingsUnmanaged
   bool m_IsHosting;
   bool m_HostInputAuthority;
 };
-
-class VanguardClientUnmanaged
+public
+ref class VanguardSettings
 {
 public:
-  static void CORE_STEP();
-  VanguardSettingsUnmanaged& GetVanguardSettings();
-  static void LOAD_GAME_START(std::string romPath);
-  static void LOAD_GAME_DONE();
-  static void GAME_CLOSED();
-  static void CLOSE_GAME();
-  static void InvokeEmuThread();
+  static VanguardSettingsWrapper^ GetVanguardSettingsFromDolphin();
+  static VanguardSettingsUnmanaged GetVanguardSettingFromVanguardSettingsWrapper(
+    VanguardSettingsWrapper^ vSettings);
 };

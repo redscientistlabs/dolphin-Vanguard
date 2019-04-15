@@ -93,6 +93,12 @@ void ClearCurrentRunLayer()
   s_layers[LayerType::CurrentRun] = std::make_unique<Layer>(LayerType::CurrentRun);
 }
 
+  //Narrysmod - Add this 
+void ClearCurrentVanguardLayer()
+{
+  s_layers[LayerType::Vanguard] = std::make_unique<Layer>(LayerType::Vanguard);
+}
+
 static const std::map<System, std::string> system_to_name = {
     {System::Main, "Dolphin"},          {System::GCPad, "GCPad"},    {System::WiiPad, "Wiimote"},
     {System::GCKeyboard, "GCKeyboard"}, {System::GFX, "Graphics"},   {System::Logger, "Logger"},
@@ -123,6 +129,8 @@ const std::string& GetLayerName(LayerType layer)
       {LayerType::Movie, "Movie"},
       {LayerType::CommandLine, "Command Line"},
       {LayerType::CurrentRun, "Current Run"},
+      //Narrysmod - Add the vangaurd layer
+      {LayerType::Vanguard, "Vanguard"},
   };
   return layer_to_name.at(layer);
 }
