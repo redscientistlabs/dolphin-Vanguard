@@ -255,8 +255,6 @@ bool ApplyFramePatches()
   Gecko::RunCodeHandler();
   ActionReplay::RunAllActive();
 
-  
-
   return true;
 }
 

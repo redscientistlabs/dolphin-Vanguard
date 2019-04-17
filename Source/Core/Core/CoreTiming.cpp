@@ -24,7 +24,6 @@
 
 #include "VideoCommon/Fifo.h"
 #include "VideoCommon/VideoBackendBase.h"
-#include "DolphinQt/NarrysMod/VanguardClient.h"
 
 namespace CoreTiming
 {
@@ -315,9 +314,6 @@ void MoveEvents()
 
 void Advance()
 {
-  // NARRYSMOD_HIJACK - Corruptcore Step is called here
-  VanguardClientUnmanaged::CORE_STEP();
-
   MoveEvents();
 
   int cyclesExecuted = g.slice_length - DowncountToCycles(PowerPC::ppcState.downcount);

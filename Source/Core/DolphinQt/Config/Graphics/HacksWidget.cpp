@@ -87,7 +87,8 @@ void HacksWidget::CreateWidgets()
                                         Config::GFX_HACK_SKIP_XFB_COPY_TO_RAM);
   m_immediate_xfb = new GraphicsBool(tr("Immediately Present XFB"), Config::GFX_HACK_IMMEDIATE_XFB);
 
-  xfb_layout->addWidget(m_store_xfb_copies);
+  //Narrysmod - Disable the XFB to ram widget as we always force it
+  //xfb_layout->addWidget(m_store_xfb_copies);
   xfb_layout->addWidget(m_immediate_xfb);
 
   // Other

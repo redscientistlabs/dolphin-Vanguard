@@ -67,6 +67,7 @@ IPC_HLE_PERIOD: For the Wii Remote this is the call schedule:
 #include "Core/PatchEngine.h"
 #include "Core/PowerPC/PowerPC.h"
 #include "VideoCommon/Fifo.h"
+#include "DolphinQt/NarrysMod/VanguardClient.h"
 
 namespace SystemTimers
 {
@@ -149,6 +150,13 @@ void PatchEngineCallback(u64 userdata, s64 cycles_late)
   u32 vi_interval = VideoInterface::GetTicksPerField();
   s64 cycles_pruned = (userdata + cycles_late) % vi_interval;
   s64 next_schedule = 0;
+
+  //Narrysmod - We're directly accessing memory and don't care about the state of the cpu like Dolphin does (since it uses CPU writes).
+  //Because of this, we call our code here and if it's a re-scheduled event, ignore it.
+  //We want it to be consistent 
+  if (cycles_pruned == 0)
+    VanguardClientUnmanaged::CORE_STEP();
+
 
   // Try to patch mem and run the Action Replay
   if (PatchEngine::ApplyFramePatches())
