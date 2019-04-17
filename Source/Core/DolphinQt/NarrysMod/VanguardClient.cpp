@@ -75,6 +75,9 @@ public:
   String^ GetConfigAsJson(VanguardSettingsWrapper^ settings);
   VanguardSettingsWrapper^ GetConfigFromJson(String^ json);
 
+  String ^ emuDir = System::IO::Path::GetDirectoryName(System::Reflection::Assembly::GetExecutingAssembly()->Location);
+  array<String ^> ^ configPaths;
+
   const std::string GetFilePath(String^);
   volatile bool loading = false;
 };
@@ -95,10 +98,15 @@ static void EmuThreadExecute(Action^ callback)
   Core::RunAsCPUThread(nativeCallback);
 }
 
+
 static PartialSpec^ getDefaultPartial()
 {
   PartialSpec^ partial = gcnew PartialSpec("RTCSpec");
-
+	partial->Set(VSPEC::SUPPORTS_RENDERING, false);
+  partial->Set(VSPEC::SUPPORTS_CONFIG_MANAGEMENT, true);
+  partial->Set(VSPEC::SUPPORTS_CONFIG_HANDOFF, true);
+  partial->Set(VSPEC::CONFIG_PATHS, ManagedGlobals::client->configPaths);
+  partial->Set(VSPEC::SYSTEM, String::Empty);
   partial->Set(VSPEC::SYSTEM, String::Empty);
   return partial;
 }
@@ -171,10 +179,23 @@ void VanguardClientInitializer::Initialize()
   SyncObjectSingleton::EmuInvokeDelegate =
       gcnew SyncObjectSingleton::ActionDelegate(&EmuThreadExecute);
 
+
   // Start everything
   ManagedGlobals::client = gcnew VanguardClient;
+
+  ManagedGlobals::client->configPaths = gcnew array<String ^>{
+      System::IO::Path::Combine(ManagedGlobals::client->emuDir, "User", "Config", "Dolphin.ini"),
+                        System::IO::Path::Combine(ManagedGlobals::client->emuDir, "User", "Config", "GFX.ini"),
+                        System::IO::Path::Combine(ManagedGlobals::client->emuDir, "User", "Config", "UI.ini"),
+                        System::IO::Path::Combine(ManagedGlobals::client->emuDir, "User", "Config", "WiimoteNew.ini"),
+                        System::IO::Path::Combine(ManagedGlobals::client->emuDir, "User", "Config", "GCKeyNew.ini"),
+                        System::IO::Path::Combine(ManagedGlobals::client->emuDir, "User", "Config", "GCPadNew.ini")};
+
   ManagedGlobals::client->StartClient();
   ManagedGlobals::client->RegisterVanguardSpec();
+
+
+
   RTCV::CorruptCore::CorruptCore::StartEmuSide();
 }
 
@@ -377,9 +398,7 @@ void StopGame()
 
 void AllSpecsSent()
 {
-  AllSpec::CorruptCoreSpec->Update(
-    "EMUDIR", IO::Path::GetDirectoryName(Reflection::Assembly::GetExecutingAssembly()->Location),
-    true, true);
+  AllSpec::VanguardSpec->Update(VSPEC::EMUDIR, ManagedGlobals::client->emuDir, true, true);
   VanguardClientInitializer::win->Show();
 }
 
