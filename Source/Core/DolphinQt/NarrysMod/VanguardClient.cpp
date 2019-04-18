@@ -247,24 +247,34 @@ static void STEP_CORRUPT()  // errors trapped by CPU_STEP
   {
     PartialSpec ^ gameDone = gcnew PartialSpec("VanguardSpec");
 
-    gameDone->Set(VSPEC::SYSTEM, "Dolphin");
-    gameDone->Set(VSPEC::SYSTEMPREFIX, "Dolphin");
-    gameDone->Set(VSPEC::SYSTEMCORE, isWii() ? "Wii" : "Gamecube");
-    gameDone->Set(VSPEC::SYNCSETTINGS, "");
-    gameDone->Set(VSPEC::MEMORYDOMAINS_BLACKLISTEDDOMAINS, "");
-    gameDone->Set(VSPEC::MEMORYDOMAINS_INTERFACES, GetInterfaces());
-    gameDone->Set(VSPEC::CORE_DISKBASED, true);
+    try
+    {
+      gameDone->Set(VSPEC::SYSTEM, "Dolphin");
+      gameDone->Set(VSPEC::SYSTEMPREFIX, "Dolphin");
+      gameDone->Set(VSPEC::SYSTEMCORE, isWii() ? "Wii" : "Gamecube");
+      gameDone->Set(VSPEC::SYNCSETTINGS, "");
+      gameDone->Set(VSPEC::MEMORYDOMAINS_BLACKLISTEDDOMAINS, "");
+      gameDone->Set(VSPEC::MEMORYDOMAINS_INTERFACES, GetInterfaces());
+      gameDone->Set(VSPEC::CORE_DISKBASED, true);
 
-    String ^ gameName = gcnew String(SConfig::GetInstance().GetTitleDescription().c_str());
-    char replaceChar = L'-';
-    gameDone->Set(VSPEC::GAMENAME, CorruptCore_Extensions::MakeSafeFilename(gameName, replaceChar));
+      String ^ gameName = gcnew String(SConfig::GetInstance().GetTitleDescription().c_str());
+      char replaceChar = L'-';
+      gameDone->Set(VSPEC::GAMENAME,
+                    CorruptCore_Extensions::MakeSafeFilename(gameName, replaceChar));
 
-    String ^ syncsettings = ManagedGlobals::client->GetConfigAsJson(VanguardSettings::GetVanguardSettingsFromDolphin());
-    gameDone->Set(VSPEC::SYNCSETTINGS, syncsettings);
+      String ^ syncsettings = ManagedGlobals::client->GetConfigAsJson(
+          VanguardSettings::GetVanguardSettingsFromDolphin());
+      gameDone->Set(VSPEC::SYNCSETTINGS, syncsettings);
 
-    AllSpec::VanguardSpec->Update(gameDone, true, false);
-    // This is local. If the domains changed it propgates over netcore
-    LocalNetCoreRouter::Route(NetcoreCommands::CORRUPTCORE, NetcoreCommands::REMOTE_EVENT_DOMAINSUPDATED, true, true);
+      AllSpec::VanguardSpec->Update(gameDone, true, false);
+      // This is local. If the domains changed it propgates over netcore
+      LocalNetCoreRouter::Route(NetcoreCommands::CORRUPTCORE,
+                                NetcoreCommands::REMOTE_EVENT_DOMAINSUPDATED, true, true);
+    }
+    catch (Exception^ e)
+    {
+      Trace::WriteLine(e->ToString());
+    }
     ManagedGlobals::client->loading = false;
   }
 
@@ -474,6 +484,8 @@ void VanguardClient::OnMessageReceived(Object ^ sender, NetCoreEventArgs ^ e)
 
   case REMOTE_LOADROM:
   {
+    // Clear out any old settings
+    Config::ClearCurrentVanguardLayer();
     String ^ filename = (String ^) advancedMessage->objectValue;
     ManagedGlobals::client->LoadRom(filename);
   }
