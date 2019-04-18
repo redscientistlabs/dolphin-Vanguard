@@ -21,6 +21,7 @@
 #include <msclr/marshal_cppstd.h>
 #include "Core/ConfigLoaders/MovieConfigLoader.h"
 #include "Core/ConfigLoaders/NetPlayConfigLoader.h"
+#include "Core/Host.h"
 
 ref class VanguardSettingsWrapper;
 using namespace cli;
@@ -350,13 +351,14 @@ bool VanguardClient::LoadRom(String ^ filename)
   {
     const std::string& path = GetFilePath(filename);
     ManagedGlobals::client->loading = true;
-    VanguardClientInitializer::win->StartGame(path);
 
+    Core::SetState(Core::State::Paused);
+    VanguardClientInitializer::win->StartGame(path);
     // We have to do it this way to prevent deadlock due to synced calls. It sucks but it's required at the moment
     while (ManagedGlobals::client->loading)
     {
       Thread::Sleep(20);
-      System::Windows::Forms::Application::DoEvents();
+      Host_YieldToUI();
     }
   }
   return true;
