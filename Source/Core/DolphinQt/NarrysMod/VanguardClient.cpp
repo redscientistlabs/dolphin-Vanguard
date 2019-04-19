@@ -35,8 +35,6 @@ using namespace Threading;
 using namespace Collections::Generic;
 using namespace Diagnostics;
 
-#using <system.dll>
-#using <system.reflection.dll>
 #using <system.windows.forms.dll>
 
 #define SRAM_SIZE 25165824
@@ -250,6 +248,7 @@ static void STEP_CORRUPT()  // errors trapped by CPU_STEP
 
     try
     {
+
       gameDone->Set(VSPEC::SYSTEM, "Dolphin");
       gameDone->Set(VSPEC::SYSTEMPREFIX, "Dolphin");
       gameDone->Set(VSPEC::SYSTEMCORE, isWii() ? "Wii" : "Gamecube");
@@ -258,6 +257,8 @@ static void STEP_CORRUPT()  // errors trapped by CPU_STEP
       gameDone->Set(VSPEC::MEMORYDOMAINS_INTERFACES, GetInterfaces());
       gameDone->Set(VSPEC::CORE_DISKBASED, true);
 
+      
+      String ^ oldGame = AllSpec::VanguardSpec->Get<String^>(VSPEC::GAMENAME);
       String ^ gameName = gcnew String(SConfig::GetInstance().GetTitleDescription().c_str());
       char replaceChar = L'-';
       gameDone->Set(VSPEC::GAMENAME,
@@ -268,9 +269,16 @@ static void STEP_CORRUPT()  // errors trapped by CPU_STEP
       gameDone->Set(VSPEC::SYNCSETTINGS, syncsettings);
 
       AllSpec::VanguardSpec->Update(gameDone, true, false);
+
+
       // This is local. If the domains changed it propgates over netcore
       LocalNetCoreRouter::Route(NetcoreCommands::CORRUPTCORE,
                                 NetcoreCommands::REMOTE_EVENT_DOMAINSUPDATED, true, true);
+      if (oldGame != gameName)
+      {
+        LocalNetCoreRouter::Route(NetcoreCommands::UI,
+                                  NetcoreCommands::RESET_GAME_PROTECTION_IF_RUNNING, true);
+      }
     }
     catch (Exception^ e)
     {
