@@ -40,7 +40,8 @@ private:
   mbedtls_hmac_drbg_context m_context;
 };
 
-static thread_local CSPRNG s_csprng;
+//Narrysmod - Remove thread_local as it causes issues with c++/cli under Win7
+static CSPRNG s_csprng;
 
 void Generate(void* buffer, std::size_t size)
 {
