@@ -154,6 +154,7 @@ private:
   void ShowAboutDialog();
   void ShowHotkeyDialog();
   void ShowNetPlaySetupDialog();
+  void ShowNetPlayBrowser();
   void ShowFIFOPlayer();
   void ShowMemcardManager();
   void ShowResourcePackManager();
@@ -176,6 +177,7 @@ private:
   void OnStopRecording();
   void OnExportRecording();
   void OnActivateChat();
+  void OnRequestGolfControl();
   void ShowTASInput();
 
   void ChangeDisc();

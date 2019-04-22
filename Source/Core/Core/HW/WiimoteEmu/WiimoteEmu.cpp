@@ -17,7 +17,6 @@
 #include "Common/MsgHandler.h"
 
 #include "Core/Config/SYSCONFSettings.h"
-#include "Core/Config/WiimoteInputSettings.h"
 #include "Core/ConfigManager.h"
 #include "Core/Core.h"
 #include "Core/HW/Wiimote.h"
@@ -41,8 +40,6 @@
 #include "InputCommon/ControllerEmu/ControlGroup/Force.h"
 #include "InputCommon/ControllerEmu/ControlGroup/ModifySettingsButton.h"
 #include "InputCommon/ControllerEmu/ControlGroup/Tilt.h"
-#include "InputCommon/ControllerEmu/Setting/BooleanSetting.h"
-#include "InputCommon/ControllerEmu/Setting/NumericSetting.h"
 
 namespace WiimoteEmu
 {
@@ -132,11 +129,7 @@ void Wiimote::Reset()
   // Dynamics:
   m_swing_state = {};
   m_tilt_state = {};
-
-  m_shake_step = {};
-  m_shake_soft_step = {};
-  m_shake_hard_step = {};
-  m_shake_dynamic_data = {};
+  m_shake_state = {};
 }
 
 Wiimote::Wiimote(const unsigned int index) : m_index(index)
@@ -161,31 +154,7 @@ Wiimote::Wiimote(const unsigned int index) : m_index(index)
   groups.emplace_back(m_tilt = new ControllerEmu::Tilt(_trans("Tilt")));
 
   // shake
-  groups.emplace_back(m_shake = new ControllerEmu::Buttons(_trans("Shake")));
-  // i18n: Refers to a 3D axis (used when mapping motion controls)
-  m_shake->controls.emplace_back(new ControllerEmu::Input(ControllerEmu::Translate, _trans("X")));
-  // i18n: Refers to a 3D axis (used when mapping motion controls)
-  m_shake->controls.emplace_back(new ControllerEmu::Input(ControllerEmu::Translate, _trans("Y")));
-  // i18n: Refers to a 3D axis (used when mapping motion controls)
-  m_shake->controls.emplace_back(new ControllerEmu::Input(ControllerEmu::Translate, _trans("Z")));
-
-  groups.emplace_back(m_shake_soft = new ControllerEmu::Buttons("ShakeSoft"));
-  m_shake_soft->controls.emplace_back(new ControllerEmu::Input(ControllerEmu::DoNotTranslate, "X"));
-  m_shake_soft->controls.emplace_back(new ControllerEmu::Input(ControllerEmu::DoNotTranslate, "Y"));
-  m_shake_soft->controls.emplace_back(new ControllerEmu::Input(ControllerEmu::DoNotTranslate, "Z"));
-
-  groups.emplace_back(m_shake_hard = new ControllerEmu::Buttons("ShakeHard"));
-  m_shake_hard->controls.emplace_back(new ControllerEmu::Input(ControllerEmu::DoNotTranslate, "X"));
-  m_shake_hard->controls.emplace_back(new ControllerEmu::Input(ControllerEmu::DoNotTranslate, "Y"));
-  m_shake_hard->controls.emplace_back(new ControllerEmu::Input(ControllerEmu::DoNotTranslate, "Z"));
-
-  groups.emplace_back(m_shake_dynamic = new ControllerEmu::Buttons("Shake Dynamic"));
-  m_shake_dynamic->controls.emplace_back(
-      new ControllerEmu::Input(ControllerEmu::DoNotTranslate, "X"));
-  m_shake_dynamic->controls.emplace_back(
-      new ControllerEmu::Input(ControllerEmu::DoNotTranslate, "Y"));
-  m_shake_dynamic->controls.emplace_back(
-      new ControllerEmu::Input(ControllerEmu::DoNotTranslate, "Z"));
+  groups.emplace_back(m_shake = new ControllerEmu::Shake(_trans("Shake")));
 
   // extension
   groups.emplace_back(m_attachments = new ControllerEmu::Attachments(_trans("Extension")));
@@ -212,26 +181,28 @@ Wiimote::Wiimote(const unsigned int index) : m_index(index)
   // options
   groups.emplace_back(m_options = new ControllerEmu::ControlGroup(_trans("Options")));
 
-  // m_options->boolean_settings.emplace_back(
-  //    m_motion_plus_setting =
-  //        new ControllerEmu::BooleanSetting("Attach MotionPlus", _trans("Attach MotionPlus"),
-  //        true,
-  //                                          ControllerEmu::SettingType::NORMAL, false));
+  m_options->AddSetting(&m_speaker_pan_setting,
+                        {_trans("Speaker Pan"),
+                         // i18n: The percent symbol.
+                         _trans("%")},
+                        0, -100, 100);
 
-  m_options->boolean_settings.emplace_back(
-      new ControllerEmu::BooleanSetting("Forward Wiimote", _trans("Forward Wii Remote"), true,
-                                        ControllerEmu::SettingType::NORMAL, true));
-  m_options->boolean_settings.emplace_back(m_upright_setting = new ControllerEmu::BooleanSetting(
-                                               "Upright Wiimote", _trans("Upright Wii Remote"),
-                                               false, ControllerEmu::SettingType::NORMAL, true));
-  m_options->boolean_settings.emplace_back(m_sideways_setting = new ControllerEmu::BooleanSetting(
-                                               "Sideways Wiimote", _trans("Sideways Wii Remote"),
-                                               false, ControllerEmu::SettingType::NORMAL, true));
+  m_options->AddSetting(&m_battery_setting,
+                        {_trans("Battery"),
+                         // i18n: The percent symbol.
+                         _trans("%")},
+                        95, 0, 100);
 
-  m_options->numeric_settings.emplace_back(
-      std::make_unique<ControllerEmu::NumericSetting>(_trans("Speaker Pan"), 0, -100, 100));
-  m_options->numeric_settings.emplace_back(
-      m_battery_setting = new ControllerEmu::NumericSetting(_trans("Battery"), 95.0 / 100, 0, 100));
+  // m_options->AddSetting(&m_motion_plus_setting, {_trans("Attach MotionPlus")}, true);
+
+  // Note: "Upright" and "Sideways" options can be enabled at the same time which produces an
+  // orientation where the wiimote points towards the left with the buttons towards you.
+  m_options->AddSetting(&m_upright_setting,
+                        {"Upright Wiimote", nullptr, nullptr, _trans("Upright Wii Remote")}, false);
+
+  m_options->AddSetting(&m_sideways_setting,
+                        {"Sideways Wiimote", nullptr, nullptr, _trans("Sideways Wii Remote")},
+                        false);
 
   // hotkeys
   groups.emplace_back(m_hotkeys = new ControllerEmu::ModifySettingsButton(_trans("Hotkeys")));
@@ -667,14 +638,14 @@ bool Wiimote::IsSideways() const
 {
   const bool sideways_modifier_toggle = m_hotkeys->getSettingsModifier()[0];
   const bool sideways_modifier_switch = m_hotkeys->getSettingsModifier()[2];
-  return m_sideways_setting->GetValue() ^ sideways_modifier_toggle ^ sideways_modifier_switch;
+  return m_sideways_setting.GetValue() ^ sideways_modifier_toggle ^ sideways_modifier_switch;
 }
 
 bool Wiimote::IsUpright() const
 {
   const bool upright_modifier_toggle = m_hotkeys->getSettingsModifier()[1];
   const bool upright_modifier_switch = m_hotkeys->getSettingsModifier()[3];
-  return m_upright_setting->GetValue() ^ upright_modifier_toggle ^ upright_modifier_switch;
+  return m_upright_setting.GetValue() ^ upright_modifier_toggle ^ upright_modifier_switch;
 }
 
 void Wiimote::SetRumble(bool on)
@@ -687,6 +658,7 @@ void Wiimote::StepDynamics()
 {
   EmulateSwing(&m_swing_state, m_swing, 1.f / ::Wiimote::UPDATE_FREQ);
   EmulateTilt(&m_tilt_state, m_tilt, 1.f / ::Wiimote::UPDATE_FREQ);
+  EmulateShake(&m_shake_state, m_shake, 1.f / ::Wiimote::UPDATE_FREQ);
 
   // TODO: Move cursor state out of ControllerEmu::Cursor
   // const auto cursor_mtx = EmulateCursorMovement(m_ir);
@@ -710,24 +682,7 @@ Common::Vec3 Wiimote::GetAcceleration()
       GetTransformation().Transform(
           m_swing_state.acceleration + Common::Vec3(0, 0, float(GRAVITY_ACCELERATION)), 0);
 
-  DynamicConfiguration shake_config;
-  shake_config.low_intensity = Config::Get(Config::WIIMOTE_INPUT_SHAKE_INTENSITY_SOFT);
-  shake_config.med_intensity = Config::Get(Config::WIIMOTE_INPUT_SHAKE_INTENSITY_MEDIUM);
-  shake_config.high_intensity = Config::Get(Config::WIIMOTE_INPUT_SHAKE_INTENSITY_HARD);
-  shake_config.frames_needed_for_high_intensity =
-      Config::Get(Config::WIIMOTE_INPUT_SHAKE_DYNAMIC_FRAMES_HELD_HARD);
-  shake_config.frames_needed_for_low_intensity =
-      Config::Get(Config::WIIMOTE_INPUT_SHAKE_DYNAMIC_FRAMES_HELD_SOFT);
-  shake_config.frames_to_execute = Config::Get(Config::WIIMOTE_INPUT_SHAKE_DYNAMIC_FRAMES_LENGTH);
-
-  accel += EmulateShake(m_shake, Config::Get(Config::WIIMOTE_INPUT_SHAKE_INTENSITY_MEDIUM),
-                        m_shake_step.data());
-  accel += EmulateShake(m_shake_soft, Config::Get(Config::WIIMOTE_INPUT_SHAKE_INTENSITY_SOFT),
-                        m_shake_soft_step.data());
-  accel += EmulateShake(m_shake_hard, Config::Get(Config::WIIMOTE_INPUT_SHAKE_INTENSITY_HARD),
-                        m_shake_hard_step.data());
-  accel += EmulateDynamicShake(m_shake_dynamic_data, m_shake_dynamic, shake_config,
-                               m_shake_dynamic_step.data());
+  accel += m_shake_state.acceleration;
 
   return accel;
 }
@@ -735,9 +690,10 @@ Common::Vec3 Wiimote::GetAcceleration()
 Common::Matrix44 Wiimote::GetTransformation() const
 {
   // Includes positional and rotational effects of:
-  // IR, Swing, Tilt
+  // IR, Swing, Tilt, Shake
 
-  return Common::Matrix44::FromMatrix33(GetRotationalMatrix(-m_tilt_state.angle) *
+  return Common::Matrix44::Translate(-m_shake_state.position) *
+         Common::Matrix44::FromMatrix33(GetRotationalMatrix(-m_tilt_state.angle) *
                                         GetRotationalMatrix(-m_swing_state.angle)) *
          EmulateCursorMovement(m_ir) * Common::Matrix44::Translate(-m_swing_state.position);
 }

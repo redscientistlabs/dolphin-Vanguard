@@ -64,7 +64,6 @@ public:
   explicit SWShader(ShaderStage stage) : AbstractShader(stage) {}
   ~SWShader() = default;
 
-  bool HasBinary() const override { return false; }
   BinaryData GetBinary() const override { return {}; }
 };
 
@@ -87,13 +86,16 @@ public:
   ~SWPipeline() override = default;
 };
 
-std::unique_ptr<AbstractPipeline> SWRenderer::CreatePipeline(const AbstractPipelineConfig& config)
+std::unique_ptr<AbstractPipeline> SWRenderer::CreatePipeline(const AbstractPipelineConfig& config,
+                                                             const void* cache_data,
+                                                             size_t cache_data_length)
 {
   return std::make_unique<SWPipeline>();
 }
 
 // Called on the GPU thread
-void SWRenderer::RenderXFBToScreen(const AbstractTexture* texture, const EFBRectangle& xfb_region)
+void SWRenderer::RenderXFBToScreen(const AbstractTexture* texture,
+                                   const MathUtil::Rectangle<int>& xfb_region)
 {
   if (!IsHeadless())
     m_window->ShowImage(texture, xfb_region);
@@ -135,7 +137,7 @@ void SWRenderer::BBoxWrite(int index, u16 value)
   BoundingBox::coords[index] = value;
 }
 
-void SWRenderer::ClearScreen(const EFBRectangle& rc, bool colorEnable, bool alphaEnable,
+void SWRenderer::ClearScreen(const MathUtil::Rectangle<int>& rc, bool colorEnable, bool alphaEnable,
                              bool zEnable, u32 color, u32 z)
 {
   EfbCopy::ClearEfb();

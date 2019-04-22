@@ -63,12 +63,10 @@ add_executable(dolphin-emu
   Config/Mapping/HotkeyTAS.cpp
   Config/Mapping/HotkeyWii.cpp
   Config/Mapping/IOWindow.cpp
-  Config/Mapping/MappingBool.cpp
   Config/Mapping/MappingButton.cpp
   Config/Mapping/MappingCommon.cpp
   Config/Mapping/MappingIndicator.cpp
   Config/Mapping/MappingNumeric.cpp
-  Config/Mapping/MappingRadio.cpp
   Config/Mapping/MappingWidget.cpp
   Config/Mapping/MappingWindow.cpp
   Config/Mapping/WiimoteEmuExtension.cpp
@@ -78,6 +76,7 @@ add_executable(dolphin-emu
   Config/PatchesWidget.cpp
   Config/PropertiesDialog.cpp
   Config/SettingsWindow.cpp
+  Config/VerifyWidget.cpp
   Debugger/BreakpointWidget.cpp
   Debugger/CodeViewWidget.cpp
   Debugger/CodeWidget.cpp
@@ -98,6 +97,7 @@ add_executable(dolphin-emu
   NetPlay/ChunkedProgressDialog.cpp
   NetPlay/GameListDialog.cpp
   NetPlay/MD5Dialog.cpp
+  NetPlay/NetPlayBrowser.cpp
   NetPlay/NetPlayDialog.cpp
   NetPlay/NetPlaySetupDialog.cpp
   NetPlay/PadMappingDialog.cpp

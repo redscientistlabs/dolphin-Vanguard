@@ -378,7 +378,7 @@ void EnableScreenSaver(bool enable)
 // disable low-power states and/or screen dimming.
 
 #if defined(HAVE_X11) && HAVE_X11
-  if (SConfig::GetInstance().bDisableScreenSaver)
+  if (Config::Get(Config::MAIN_DISABLE_SCREENSAVER))
   {
     X11Utils::InhibitScreensaver(win, !enable);
   }
@@ -393,7 +393,7 @@ void EnableScreenSaver(bool enable)
   else
   {
     EXECUTION_STATE should_screen_save =
-        SConfig::GetInstance().bDisableScreenSaver ? ES_DISPLAY_REQUIRED : 0;
+        Config::Get(Config::MAIN_DISABLE_SCREENSAVER) ? ES_DISPLAY_REQUIRED : 0;
     SetThreadExecutionState(ES_CONTINUOUS | should_screen_save | ES_SYSTEM_REQUIRED);
   }
 #endif
@@ -401,7 +401,7 @@ void EnableScreenSaver(bool enable)
 #ifdef __APPLE__
   static IOPMAssertionID s_power_assertion = kIOPMNullAssertionID;
 
-  if (SConfig::GetInstance().bDisableScreenSaver)
+  if (Config::Get(Config::MAIN_DISABLE_SCREENSAVER))
   {
     if (enable)
     {

@@ -80,6 +80,7 @@
 #include "DolphinQt/HotkeyScheduler.h"
 #include "DolphinQt/MainWindow.h"
 #include "DolphinQt/MenuBar.h"
+#include "DolphinQt/NetPlay/NetPlayBrowser.h"
 #include "DolphinQt/NetPlay/NetPlayDialog.h"
 #include "DolphinQt/NetPlay/NetPlaySetupDialog.h"
 #include "DolphinQt/QtUtils/ModalMessageBox.h"
@@ -260,6 +261,10 @@ MainWindow::MainWindow(std::unique_ptr<BootParameters> boot_parameters,
 
 MainWindow::~MainWindow()
 {
+  // Shut down NetPlay first to avoid race condition segfault
+  Settings::Instance().ResetNetPlayClient();
+  Settings::Instance().ResetNetPlayServer();
+
   delete m_render_widget;
   delete m_netplay_dialog;
 
@@ -453,6 +458,7 @@ void MainWindow::ConnectMenuBar()
   connect(m_menu_bar, &MenuBar::PerformOnlineUpdate, this, &MainWindow::PerformOnlineUpdate);
   connect(m_menu_bar, &MenuBar::BootWiiSystemMenu, this, &MainWindow::BootWiiSystemMenu);
   connect(m_menu_bar, &MenuBar::StartNetPlay, this, &MainWindow::ShowNetPlaySetupDialog);
+  connect(m_menu_bar, &MenuBar::BrowseNetPlay, this, &MainWindow::ShowNetPlayBrowser);
   connect(m_menu_bar, &MenuBar::ShowFIFOPlayer, this, &MainWindow::ShowFIFOPlayer);
   connect(m_menu_bar, &MenuBar::ConnectWiiRemote, this, &MainWindow::OnConnectWiiRemote);
 
@@ -498,6 +504,8 @@ void MainWindow::ConnectHotkeys()
   connect(m_hotkey_scheduler, &HotkeyScheduler::ExitHotkey, this, &MainWindow::close);
   connect(m_hotkey_scheduler, &HotkeyScheduler::TogglePauseHotkey, this, &MainWindow::TogglePause);
   connect(m_hotkey_scheduler, &HotkeyScheduler::ActivateChat, this, &MainWindow::OnActivateChat);
+  connect(m_hotkey_scheduler, &HotkeyScheduler::RequestGolfControl, this,
+          &MainWindow::OnRequestGolfControl);
   connect(m_hotkey_scheduler, &HotkeyScheduler::RefreshGameListHotkey, this,
           &MainWindow::RefreshGameList);
   connect(m_hotkey_scheduler, &HotkeyScheduler::StopHotkey, this, &MainWindow::RequestStop);
@@ -941,20 +949,20 @@ void MainWindow::StartGame(std::unique_ptr<BootParameters>&& parameters)
     Discord::UpdateDiscordPresence();
 #endif
 
-  if (SConfig::GetInstance().bFullscreen)
+  if (Config::Get(Config::MAIN_FULLSCREEN))
     m_fullscreen_requested = true;
 
 #ifdef Q_OS_WIN
   // Prevents Windows from sleeping, turning off the display, or idling
   EXECUTION_STATE shouldScreenSave =
-      SConfig::GetInstance().bDisableScreenSaver ? ES_DISPLAY_REQUIRED : 0;
+      Config::Get(Config::MAIN_DISABLE_SCREENSAVER) ? ES_DISPLAY_REQUIRED : 0;
   SetThreadExecutionState(ES_CONTINUOUS | shouldScreenSave | ES_SYSTEM_REQUIRED);
 #endif
 }
 
 void MainWindow::SetFullScreenResolution(bool fullscreen)
 {
-  if (SConfig::GetInstance().strFullscreenResolution == "Auto")
+  if (Config::Get(Config::MAIN_FULLSCREEN_DISPLAY_RES) == "Auto")
     return;
 #ifdef _WIN32
 
@@ -967,7 +975,7 @@ void MainWindow::SetFullScreenResolution(bool fullscreen)
   DEVMODE screen_settings;
   memset(&screen_settings, 0, sizeof(screen_settings));
   screen_settings.dmSize = sizeof(screen_settings);
-  sscanf(SConfig::GetInstance().strFullscreenResolution.c_str(), "%dx%d",
+  sscanf(Config::Get(Config::MAIN_FULLSCREEN_DISPLAY_RES).c_str(), "%dx%d",
          &screen_settings.dmPelsWidth, &screen_settings.dmPelsHeight);
   screen_settings.dmBitsPerPel = 32;
   screen_settings.dmFields = DM_BITSPERPEL | DM_PELSWIDTH | DM_PELSHEIGHT;
@@ -985,7 +993,7 @@ void MainWindow::ShowRenderWidget()
   SetFullScreenResolution(false);
   Host::GetInstance()->SetRenderFullscreen(false);
 
-  if (SConfig::GetInstance().bRenderToMain)
+  if (Config::Get(Config::MAIN_RENDER_TO_MAIN))
   {
     // If we're rendering to main, add it to the stack and update our title when necessary.
     m_rendering_to_main = true;
@@ -1134,6 +1142,13 @@ void MainWindow::ShowNetPlaySetupDialog()
   m_netplay_setup_dialog->show();
   m_netplay_setup_dialog->raise();
   m_netplay_setup_dialog->activateWindow();
+}
+
+void MainWindow::ShowNetPlayBrowser()
+{
+  auto* browser = new NetPlayBrowser(this);
+  connect(browser, &NetPlayBrowser::Join, this, &MainWindow::NetPlayJoin);
+  browser->exec();
 }
 
 void MainWindow::ShowFIFOPlayer()
@@ -1295,8 +1310,7 @@ bool MainWindow::NetPlayJoin()
   if (server)
   {
     server->SetHostInputAuthority(host_input_authority);
-    if (!host_input_authority)
-      server->AdjustPadBufferSize(Config::Get(Config::NETPLAY_BUFFER_SIZE));
+    server->AdjustPadBufferSize(Config::Get(Config::NETPLAY_BUFFER_SIZE));
   }
 
   // Create Client
@@ -1614,6 +1628,13 @@ void MainWindow::OnActivateChat()
 {
   if (g_netplay_chat_ui)
     g_netplay_chat_ui->Activate();
+}
+
+void MainWindow::OnRequestGolfControl()
+{
+  auto client = Settings::Instance().GetNetPlayClient();
+  if (client)
+    client->RequestGolfControl();
 }
 
 void MainWindow::ShowTASInput()

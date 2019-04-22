@@ -99,9 +99,11 @@ Renderer::CreateNativeVertexFormat(const PortableVertexDeclaration& vtx_decl)
   return std::make_unique<DXVertexFormat>(vtx_decl);
 }
 
-std::unique_ptr<AbstractPipeline> Renderer::CreatePipeline(const AbstractPipelineConfig& config)
+std::unique_ptr<AbstractPipeline> Renderer::CreatePipeline(const AbstractPipelineConfig& config,
+                                                           const void* cache_data,
+                                                           size_t cache_data_length)
 {
-  return DXPipeline::Create(config);
+  return DXPipeline::Create(config, cache_data, cache_data_length);
 }
 
 u16 Renderer::BBoxRead(int index)
@@ -130,7 +132,7 @@ void Renderer::WaitForGPUIdle()
   ExecuteCommandList(true);
 }
 
-void Renderer::ClearScreen(const EFBRectangle& rc, bool color_enable, bool alpha_enable,
+void Renderer::ClearScreen(const MathUtil::Rectangle<int>& rc, bool color_enable, bool alpha_enable,
                            bool z_enable, u32 color, u32 z)
 {
   // Use a fast path without the shader if both color/alpha are enabled.

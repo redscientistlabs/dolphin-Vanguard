@@ -23,14 +23,12 @@ class PointerWrap;
 namespace ControllerEmu
 {
 class Attachments;
-class BooleanSetting;
 class Buttons;
 class ControlGroup;
 class Cursor;
 class Extension;
 class Force;
 class ModifySettingsButton;
-class NumericSetting;
 class Output;
 class Tilt;
 }  // namespace ControllerEmu
@@ -224,10 +222,7 @@ private:
   // Control groups for user input:
   ControllerEmu::Buttons* m_buttons;
   ControllerEmu::Buttons* m_dpad;
-  ControllerEmu::Buttons* m_shake;
-  ControllerEmu::Buttons* m_shake_soft;
-  ControllerEmu::Buttons* m_shake_hard;
-  ControllerEmu::Buttons* m_shake_dynamic;
+  ControllerEmu::Shake* m_shake;
   ControllerEmu::Cursor* m_ir;
   ControllerEmu::Tilt* m_tilt;
   ControllerEmu::Force* m_swing;
@@ -235,11 +230,13 @@ private:
   ControllerEmu::Output* m_motor;
   ControllerEmu::Attachments* m_attachments;
   ControllerEmu::ControlGroup* m_options;
-  ControllerEmu::BooleanSetting* m_sideways_setting;
-  ControllerEmu::BooleanSetting* m_upright_setting;
-  ControllerEmu::NumericSetting* m_battery_setting;
-  // ControllerEmu::BooleanSetting* m_motion_plus_setting;
   ControllerEmu::ModifySettingsButton* m_hotkeys;
+
+  ControllerEmu::SettingValue<bool> m_sideways_setting;
+  ControllerEmu::SettingValue<bool> m_upright_setting;
+  ControllerEmu::SettingValue<double> m_battery_setting;
+  ControllerEmu::SettingValue<double> m_speaker_pan_setting;
+  // ControllerEmu::SettingValue<bool> m_motion_plus_setting;
 
   SpeakerLogic m_speaker_logic;
   MotionPlus m_motion_plus;
@@ -270,12 +267,6 @@ private:
   // Dynamics:
   MotionState m_swing_state;
   RotationalState m_tilt_state;
-
-  // TODO: kill these:
-  std::array<u8, 3> m_shake_step{};
-  std::array<u8, 3> m_shake_soft_step{};
-  std::array<u8, 3> m_shake_hard_step{};
-  std::array<u8, 3> m_shake_dynamic_step{};
-  DynamicData m_shake_dynamic_data;
+  PositionalState m_shake_state;
 };
 }  // namespace WiimoteEmu

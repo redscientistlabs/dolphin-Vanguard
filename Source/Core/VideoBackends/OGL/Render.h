@@ -48,7 +48,6 @@ enum class EsFbFetchType
 struct VideoConfig
 {
   bool bIsES;
-  bool bSupportsGLSLCache;
   bool bSupportsGLPinnedMemory;
   bool bSupportsGLSync;
   bool bSupportsGLBaseVertex;
@@ -102,7 +101,9 @@ public:
                                                          size_t length) override;
   std::unique_ptr<NativeVertexFormat>
   CreateNativeVertexFormat(const PortableVertexDeclaration& vtx_decl) override;
-  std::unique_ptr<AbstractPipeline> CreatePipeline(const AbstractPipelineConfig& config) override;
+  std::unique_ptr<AbstractPipeline> CreatePipeline(const AbstractPipelineConfig& config,
+                                                   const void* cache_data = nullptr,
+                                                   size_t cache_data_length = 0) override;
   std::unique_ptr<AbstractFramebuffer>
   CreateFramebuffer(AbstractTexture* color_attachment, AbstractTexture* depth_attachment) override;
 
@@ -133,11 +134,12 @@ public:
 
   void Flush() override;
   void WaitForGPUIdle() override;
-  void RenderXFBToScreen(const AbstractTexture* texture, const EFBRectangle& rc) override;
+  void RenderXFBToScreen(const AbstractTexture* texture,
+                         const MathUtil::Rectangle<int>& rc) override;
   void OnConfigChanged(u32 bits) override;
 
-  void ClearScreen(const EFBRectangle& rc, bool colorEnable, bool alphaEnable, bool zEnable,
-                   u32 color, u32 z) override;
+  void ClearScreen(const MathUtil::Rectangle<int>& rc, bool colorEnable, bool alphaEnable,
+                   bool zEnable, u32 color, u32 z) override;
 
   std::unique_ptr<VideoCommon::AsyncShaderCompiler> CreateAsyncShaderCompiler() override;
 

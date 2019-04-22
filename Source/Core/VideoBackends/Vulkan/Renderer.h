@@ -48,7 +48,9 @@ public:
                                                          size_t length) override;
   std::unique_ptr<NativeVertexFormat>
   CreateNativeVertexFormat(const PortableVertexDeclaration& vtx_decl) override;
-  std::unique_ptr<AbstractPipeline> CreatePipeline(const AbstractPipelineConfig& config) override;
+  std::unique_ptr<AbstractPipeline> CreatePipeline(const AbstractPipelineConfig& config,
+                                                   const void* cache_data = nullptr,
+                                                   size_t cache_data_length = 0) override;
 
   SwapChain* GetSwapChain() const { return m_swap_chain.get(); }
   BoundingBox* GetBoundingBox() const { return m_bounding_box.get(); }
@@ -60,8 +62,8 @@ public:
   void WaitForGPUIdle() override;
   void OnConfigChanged(u32 bits) override;
 
-  void ClearScreen(const EFBRectangle& rc, bool color_enable, bool alpha_enable, bool z_enable,
-                   u32 color, u32 z) override;
+  void ClearScreen(const MathUtil::Rectangle<int>& rc, bool color_enable, bool alpha_enable,
+                   bool z_enable, u32 color, u32 z) override;
 
   void SetPipeline(const AbstractPipeline* pipeline) override;
   void SetFramebuffer(AbstractFramebuffer* framebuffer) override;
