@@ -17,6 +17,7 @@
 #include "NarrysMod/VanguardClientInitializer.h"
 #include "NarrysMod/VanguardConfigLoader.h"
 #include "NarrysMod/VanguardSettingsWrapper.h"
+#include "NarrysMod/Helpers.hpp"
 
 #include <msclr/marshal_cppstd.h>
 #include "Core/ConfigLoaders/MovieConfigLoader.h"
@@ -26,6 +27,7 @@
 ref class VanguardSettingsWrapper;
 using namespace cli;
 using namespace System;
+using namespace System::Text;
 using namespace RTCV;
 using namespace NetCore;
 using namespace CorruptCore;
@@ -60,7 +62,7 @@ public:
   void RestartClient();
 
   bool LoadRom(String ^ filename);
-  bool LoadState(String ^ filename, StashKeySavestateLocation ^ location);
+  bool LoadState(std::string filename);
   bool SaveState(String ^ filename, bool wait);
 
   String ^ GetConfigAsJson(VanguardSettingsWrapper ^ settings);
@@ -238,7 +240,7 @@ static void STEP_CORRUPT()  // errors trapped by CPU_STEP
     StepActions::ClearStepBlastUnits();
     CPU_STEP_Count = 0;
 
-    String ^ gameName = gcnew String(romPath.c_str());
+    String ^ gameName = Helpers::utf8StringToSystemString(romPath);
     AllSpec::VanguardSpec->Update(VSPEC::OPENROMFILENAME, gameName, true, true);
   }
 
@@ -258,8 +260,9 @@ static void STEP_CORRUPT()  // errors trapped by CPU_STEP
       gameDone->Set(VSPEC::CORE_DISKBASED, true);
 
       
-      String ^ oldGame = AllSpec::VanguardSpec->Get<String^>(VSPEC::GAMENAME);
-      String ^ gameName = gcnew String(SConfig::GetInstance().GetTitleDescription().c_str());
+      String ^ oldGame = AllSpec::VanguardSpec->Get<String ^>(VSPEC::GAMENAME);
+      String^ gameName = Helpers::utf8StringToSystemString(SConfig::GetInstance().GetTitleDescription());
+
       char replaceChar = L'-';
       gameDone->Set(VSPEC::GAMENAME,
                     CorruptCore_Extensions::MakeSafeFilename(gameName, replaceChar));
@@ -372,17 +375,17 @@ bool VanguardClient::LoadRom(String ^ filename)
   return true;
 }
 
-bool VanguardClient::LoadState(String ^ filename, StashKeySavestateLocation ^ location)
+bool VanguardClient::LoadState(std::string filename)
 {
   StepActions::ClearStepBlastUnits();
-  std::string converted_filename = msclr::interop::marshal_as<std::string>(filename);
-  State::LoadAs(converted_filename);
+  State::LoadAs(filename);
   return true;
 }
 
+
 bool VanguardClient::SaveState(String ^ filename, bool wait)
 {
-  std::string converted_filename = msclr::interop::marshal_as<std::string>(filename);
+  std::string converted_filename = Helpers::systemStringToUtf8String(filename);
   if (Core::IsRunningAndStarted())
   {
     State::SaveAs(converted_filename, wait);
@@ -447,6 +450,7 @@ void VanguardClient::OnMessageReceived(Object ^ sender, NetCoreEventArgs ^ e)
     NetCoreAdvancedMessage ^ advancedMessage = (NetCoreAdvancedMessage ^) e->message;
     array<Object ^> ^ cmd = static_cast<array<Object ^> ^>(advancedMessage->objectValue);
     String ^ path = static_cast<String ^>(cmd[0]);
+    std::string converted_path = Helpers::systemStringToUtf8String(path);
     StashKeySavestateLocation ^ location = safe_cast<StashKeySavestateLocation ^>(cmd[1]);
 
     // Clear out any old settings
@@ -460,7 +464,7 @@ void VanguardClient::OnMessageReceived(Object ^ sender, NetCoreEventArgs ^ e)
       if (settings != nullptr)
         Config::AddLayer(ConfigLoaders::GenerateVanguardConfigLoader(&VanguardSettings::GetVanguardSettingFromVanguardSettingsWrapper(settings)));
     }
-    e->setReturnValue(ManagedGlobals::client->LoadState(path, location));
+    e->setReturnValue(ManagedGlobals::client->LoadState(converted_path));
   }
   break;
 
@@ -471,7 +475,7 @@ void VanguardClient::OnMessageReceived(Object ^ sender, NetCoreEventArgs ^ e)
     String ^ quickSlotName = Key + ".timejump";
 
     // Get the prefix for the state
-    String ^ gameName = gcnew String(SConfig::GetInstance().GetTitleDescription().c_str());
+    String ^ gameName = Helpers::utf8StringToSystemString(SConfig::GetInstance().GetTitleDescription());
 
     char replaceChar = L'-';
     String ^ prefix = CorruptCore_Extensions::MakeSafeFilename(gameName, replaceChar);
