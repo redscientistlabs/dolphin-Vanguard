@@ -6,7 +6,8 @@
 #include "NarrysMod/VanguardClient.h"
 
 
-namespace NetPlay {
+namespace NetPlay
+{
 struct NetSettings;
 }
 
@@ -21,18 +22,20 @@ class VanguardConfigLayerLoader final : public Config::ConfigLayerLoader
 {
 public:
   explicit VanguardConfigLayerLoader(VanguardSettingsUnmanaged* settings)
-      : ConfigLayerLoader(Config::LayerType::Vanguard), m_settings(settings)
+    : ConfigLayerLoader(Config::LayerType::Vanguard), m_settings(settings)
   {
   }
 
   void Load(Config::Layer* config_layer) override;
   void Save(Config::Layer* config_layer) override;
 
-  std::unique_ptr<Config::ConfigLayerLoader>
-  GenerateVanguardConfigLoader(VanguardSettingsUnmanaged* settings);
+  std::unique_ptr<ConfigLayerLoader> GenerateVanguardConfigLoader(
+    VanguardSettingsUnmanaged* settings);
 
 private:
   VanguardSettingsUnmanaged* m_settings;
 };
-std::unique_ptr<Config::ConfigLayerLoader> GenerateVanguardConfigLoader(VanguardSettingsUnmanaged* settings);
-}  // namespace ConfigLoaders
+
+std::unique_ptr<Config::ConfigLayerLoader> GenerateVanguardConfigLoader(
+  VanguardSettingsUnmanaged* settings);
+} // namespace ConfigLoaders

@@ -10,9 +10,9 @@
 using namespace cli;
 using namespace System;
 using namespace RTCV;
-using namespace RTCV::NetCore;
-using namespace RTCV::Vanguard;
-using namespace System::Runtime::InteropServices;
+using namespace NetCore;
+using namespace Vanguard;
+using namespace Runtime::InteropServices;
 using namespace Diagnostics;
 
 #using <System.dll>
@@ -38,9 +38,9 @@ using namespace Diagnostics;
 // Memory::Write_U8 and Memory::Read_U8 for SRAM and EXRAM
 // DSP::ReadARAM and DSP::WriteAram for ARAM
 
-delegate void MessageDelegate(Object ^);
+delegate void MessageDelegate(Object^);
 
-String ^ SRAM::Name::get()
+String^ SRAM::Name::get()
 {
   return "SRAM";
 }
@@ -81,7 +81,7 @@ void SRAM::PokeByte(long long addr, unsigned char val)
   }
 }
 
-String ^ EXRAM::Name::get()
+String^ EXRAM::Name::get()
 {
   return "EXRAM";
 }
@@ -122,7 +122,7 @@ void EXRAM::PokeByte(long long addr, unsigned char val)
   }
 }
 
-String ^ ARAM::Name::get()
+String^ ARAM::Name::get()
 {
   return "ARAM";
 }
@@ -162,4 +162,3 @@ void ARAM::PokeByte(long long addr, unsigned char val)
     Memory::Write_U8(val, static_cast<u32>(addr));
   }
 }
-

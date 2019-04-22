@@ -62,21 +62,21 @@ static void LoadFromVanguardSettings(Config::Layer* layer, VanguardSettingsUnman
   layer->Set(Config::GFX_ENHANCE_ARBITRARY_MIPMAP_DETECTION_THRESHOLD,
              m_settings->m_ArbitraryMipmapDetectionThreshold);
   layer->Set(Config::GFX_ENABLE_GPU_TEXTURE_DECODING, m_settings->m_EnableGPUTextureDecoding);
-
 }
 
-  void VanguardConfigLayerLoader::Load(Config::Layer* layer)
-  {
-    LoadFromVanguardSettings(layer, m_settings);
-  }
-  void VanguardConfigLayerLoader::Save(Config::Layer* config_layer)
-  {
-    //Don't use this
-  };
+void VanguardConfigLayerLoader::Load(Config::Layer* layer)
+{
+  LoadFromVanguardSettings(layer, m_settings);
+}
 
-  std::unique_ptr<Config::ConfigLayerLoader> GenerateVanguardConfigLoader(VanguardSettingsUnmanaged* settings)
-  {
-    return std::make_unique<ConfigLoaders::VanguardConfigLayerLoader>(settings);
-  }
+void VanguardConfigLayerLoader::Save(Config::Layer* config_layer)
+{
+  //Don't use this
+};
 
+std::unique_ptr<Config::ConfigLayerLoader> GenerateVanguardConfigLoader(
+  VanguardSettingsUnmanaged* settings)
+{
+  return std::make_unique<VanguardConfigLayerLoader>(settings);
+}
 }

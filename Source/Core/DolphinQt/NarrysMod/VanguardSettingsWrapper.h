@@ -2,12 +2,13 @@
 #include "VideoCommon/VideoConfig.h"
 struct VanguardSettingsUnmanaged;
 
-namespace NetPlay {
+namespace NetPlay
+{
 struct NetSettings;
 }
 
 public
-ref class VanguardSettingsWrapper
+    ref class VanguardSettingsWrapper
 {
 public:
   AspectMode m_AspectRatio;
@@ -70,8 +71,9 @@ public:
   bool m_IsHosting;
   bool m_HostInputAuthority;
 };
+
 public
-ref class VanguardSettings
+    ref class VanguardSettings
 {
 public:
   static VanguardSettingsWrapper^ GetVanguardSettingsFromDolphin();

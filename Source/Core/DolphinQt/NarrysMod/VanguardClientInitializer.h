@@ -1,7 +1,7 @@
 #pragma once
 #include "DolphinQt/MainWindow.h"
 
-class VanguardClientInitializer 
+class VanguardClientInitializer
 {
 public:
   static void Initialize();

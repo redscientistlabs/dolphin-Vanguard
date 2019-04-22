@@ -1,10 +1,10 @@
 #pragma once
-#include "Core/NetPlayProto.h"
 #include <string>
 #include "VideoCommon/VideoConfig.h"
 
 
-namespace ConfigLoaders {
+namespace ConfigLoaders
+{
 class VanguardConfigLayerLoader;
 }
 
