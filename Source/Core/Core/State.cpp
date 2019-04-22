@@ -100,7 +100,8 @@ enum
 };
 
 //NARRYSMOD_HIJACK
-static bool g_use_compression = false;
+//static bool g_use_compression = false;
+static bool g_use_compression = true;
 
 void EnableCompression(bool compression)
 {
