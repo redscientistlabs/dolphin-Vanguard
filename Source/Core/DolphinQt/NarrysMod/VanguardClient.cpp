@@ -66,8 +66,10 @@ public:
   String^ GetConfigAsJson(VanguardSettingsWrapper^ settings);
   VanguardSettingsWrapper^ GetConfigFromJson(String^ json);
 
-  String^ emuDir = IO::Path::GetDirectoryName(
-    Reflection::Assembly::GetExecutingAssembly()->Location);
+  String ^ emuDir =
+      IO::Path::GetDirectoryName(Reflection::Assembly::GetExecutingAssembly()->Location);
+  String ^ logPath = IO::Path::Combine(emuDir, "EMU_LOG.txt");
+       
   array<String ^>^ configPaths;
 
   volatile bool loading = false;
@@ -137,6 +139,18 @@ void VanguardClient::StartClient()
   receiver = gcnew NetCoreReceiver();
   receiver->MessageReceived +=
       gcnew EventHandler<NetCoreEventArgs ^>(this, &VanguardClient::OnMessageReceived);
+
+  RTCV::NetCore::Extensions::ConsoleHelper::CreateConsole(ManagedGlobals::client->logPath);
+    RTCV::NetCore::Extensions::ConsoleHelper::HideConsole();
+  //Can't use contains
+  auto args = Environment::GetCommandLineArgs();
+  for (int i = 0; i < args->Length; i++)
+  {
+    if (args[i] == "-CONSOLE")
+    {
+      RTCV::NetCore::Extensions::ConsoleHelper::ShowConsole();
+    }
+  }
   connector = gcnew VanguardConnector(receiver);
 }
 
