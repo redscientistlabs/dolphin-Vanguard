@@ -8,6 +8,7 @@
 #include <mbedtls/hmac_drbg.h>
 
 #include "Common/Assert.h"
+#include "DolphinQt/NarrysMod/ThreadLocalHelper.h"
 
 namespace Common::Random
 {
@@ -40,10 +41,11 @@ private:
   mbedtls_hmac_drbg_context m_context;
 };
 
-static thread_local CSPRNG s_csprng;
+ //Narrysmod
+static ThreadLocal<CSPRNG> s_csprng;
 
 void Generate(void* buffer, std::size_t size)
 {
-  s_csprng.Generate(buffer, size);
+  s_csprng.GetValue().Generate(buffer, size);
 }
 }  // namespace Common::Random
