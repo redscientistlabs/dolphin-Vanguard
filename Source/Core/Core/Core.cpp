@@ -76,6 +76,7 @@
 #include "VideoCommon/VideoBackendBase.h"
 #include "VideoCommon/VideoConfig.h"
 #include "DolphinQt/NarrysMod/VanguardClient.h"
+#include "DolphinQt/NarrysMod/ThreadLocalHelper.h"
 
 namespace Core
 {
@@ -106,7 +107,8 @@ struct HostJob
 static std::mutex s_host_jobs_lock;
 static std::queue<HostJob> s_host_jobs_queue;
 
-static thread_local bool tls_is_cpu_thread = false;
+//Narrysmod - Swap Thread_Local to ThreadLocal helper
+static ThreadLocal<bool> tls_is_cpu_thread(false);
 
 static void EmuThread(std::unique_ptr<BootParameters> boot, WindowSystemInfo wsi);
 
@@ -168,7 +170,7 @@ bool IsRunningInCurrentThread()
 
 bool IsCPUThread()
 {
-  return tls_is_cpu_thread;
+  return tls_is_cpu_thread.GetValue();
 }
 
 bool IsGPUThread()
@@ -278,12 +280,12 @@ void Stop()  // - Hammertime!
 
 void DeclareAsCPUThread()
 {
-  tls_is_cpu_thread = true;
+  tls_is_cpu_thread.SetValue(true);
 }
 
 void UndeclareAsCPUThread()
 {
-  tls_is_cpu_thread = false;
+  tls_is_cpu_thread.SetValue(false);
 }
 
 // For the CPU Thread only.

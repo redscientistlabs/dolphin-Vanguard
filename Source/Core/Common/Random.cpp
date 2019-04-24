@@ -8,6 +8,7 @@
 #include <mbedtls/hmac_drbg.h>
 
 #include "Common/Assert.h"
+#include "DolphinQt/NarrysMod/ThreadLocalHelper.h"
 
 namespace Common::Random
 {
@@ -41,10 +42,11 @@ private:
 };
 
 //Narrysmod - Remove thread_local as it causes issues with c++/cli under Win7
-static CSPRNG s_csprng;
+static ThreadLocal<CSPRNG> s_csprng;
+
 
 void Generate(void* buffer, std::size_t size)
 {
-  s_csprng.Generate(buffer, size);
+  s_csprng.GetValue().Generate(buffer, size);
 }
 }  // namespace Common::Random
