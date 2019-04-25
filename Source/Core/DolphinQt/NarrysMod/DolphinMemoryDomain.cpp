@@ -159,6 +159,6 @@ void ARAM::PokeByte(long long addr, unsigned char val)
   {
     // Convert the address
     addr += ARAM_OFFSET;
-    Memory::Write_U8(val, static_cast<u32>(addr));
+    DSP::WriteARAM(val, static_cast<u32>(addr));
   }
 }
