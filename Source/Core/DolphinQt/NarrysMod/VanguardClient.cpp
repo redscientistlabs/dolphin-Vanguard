@@ -418,6 +418,10 @@ void StopGame()
 {
   Core::Stop();
 }
+void Quit()
+{
+  VanguardClientInitializer::win->close();
+}
 
 void AllSpecsSent()
 {
@@ -555,7 +559,9 @@ void VanguardClient::OnMessageReceived(Object^ sender, NetCoreEventArgs^ e)
     SyncObjectSingleton::GenericDelegate^ g = gcnew SyncObjectSingleton::GenericDelegate(&StopGame);
     SyncObjectSingleton::FormExecute(g);
     ManagedGlobals::client->StopClient();
-    VanguardClientInitializer::win->close();
+    g = gcnew SyncObjectSingleton::GenericDelegate(&Quit);
+    SyncObjectSingleton::FormExecute(g);
+
   }
     break;
 
