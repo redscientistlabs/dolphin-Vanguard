@@ -275,7 +275,7 @@ void VanguardClientUnmanaged::LOAD_GAME_DONE()
     gameDone->Set(VSPEC::SYSTEMPREFIX, "Dolphin");
     gameDone->Set(VSPEC::SYSTEMCORE, isWii() ? "Wii" : "Gamecube");
     gameDone->Set(VSPEC::SYNCSETTINGS, "");
-    gameDone->Set(VSPEC::MEMORYDOMAINS_BLACKLISTEDDOMAINS, "");
+    gameDone->Set(VSPEC::MEMORYDOMAINS_BLACKLISTEDDOMAINS, gcnew array<String^>{});
     gameDone->Set(VSPEC::MEMORYDOMAINS_INTERFACES, GetInterfaces());
     gameDone->Set(VSPEC::CORE_DISKBASED, true);
 
@@ -546,7 +546,9 @@ void VanguardClient::OnMessageReceived(Object^ sender, NetCoreEventArgs^ e)
   case REMOTE_EVENT_EMU_MAINFORM_CLOSE:
   case REMOTE_EVENT_CLOSEEMULATOR:
   {
-    Environment::Exit(0);
+    SyncObjectSingleton::GenericDelegate^ g = gcnew SyncObjectSingleton::GenericDelegate(&StopGame);
+    SyncObjectSingleton::FormExecute(g);
+    VanguardClientInitializer::win->close();
   }
     break;
 
