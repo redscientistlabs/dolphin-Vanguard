@@ -58,6 +58,7 @@ public:
 
   void StartClient();
   void RestartClient();
+  void StopClient();
 
   bool LoadRom(String^ filename);
   bool LoadState(std::string filename);
@@ -159,6 +160,11 @@ void VanguardClient::RestartClient()
   connector->Kill();
   connector = nullptr;
   StartClient();
+}
+void VanguardClient::StopClient()
+{
+  connector->Kill();
+  connector = nullptr;
 }
 
 // Create our VanguardClient
@@ -548,6 +554,7 @@ void VanguardClient::OnMessageReceived(Object^ sender, NetCoreEventArgs^ e)
   {
     SyncObjectSingleton::GenericDelegate^ g = gcnew SyncObjectSingleton::GenericDelegate(&StopGame);
     SyncObjectSingleton::FormExecute(g);
+    ManagedGlobals::client->StopClient();
     VanguardClientInitializer::win->close();
   }
     break;
