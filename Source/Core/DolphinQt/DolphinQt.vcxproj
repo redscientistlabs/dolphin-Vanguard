@@ -616,12 +616,15 @@
     </ProjectReference>
     <ProjectReference Include="..\..\..\..\RTCV\Source\Libraries\CorruptCore\CorruptCore.csproj">
       <Project>{b5633a86-dc66-4723-88eb-7dfc95458072}</Project>
+      <Private>true</Private>
     </ProjectReference>
     <ProjectReference Include="..\..\..\..\RTCV\Source\Libraries\NetCore\NetCore.csproj">
       <Project>{7e106aec-5614-4206-9e4d-25759c90e8ae}</Project>
+      <Private>true</Private>
     </ProjectReference>
     <ProjectReference Include="..\..\..\..\RTCV\Source\Libraries\Vanguard\Vanguard.csproj">
       <Project>{364c705e-b7ab-4a94-a59b-88899ce65958}</Project>
+      <Private>true</Private>
     </ProjectReference>
     <ProjectReference Include="..\..\..\Externals\imgui\imgui.vcxproj">
       <Project>{4c3b2264-ea73-4a7b-9cfe-65b0fd635ebb}</Project>
@@ -639,8 +642,8 @@
     <DataSysFiles Include="$(DolphinRootDir)Data\**\Sys\**\*.*" />
     <DataTxtFiles Include="$(DolphinRootDir)Data\license.txt" />
     <Executables Include="$(TargetDir)\*.exe" />
-    <Dlls Include="$(TargetDir)\*.dll" />
-    <Pdbs Include="$(TargetDir)\*.pdb" />
+    <Dlls Include="$(RTCDir)\*.dll" />
+    <Pdbs Include="$(RTCDir)\*.pdb" />
     <AllInputFiles Include="@(DataSysFiles);@(DataTxtFiles);@(Executables);@(Dlls);@(Pdbs)" />
   </ItemGroup>
   <Target Name="AfterBuild" Inputs="@(AllInputFiles)" Outputs="@(AllInputFiles -> '$(BinaryOutputDir)%(RecursiveDir)%(Filename)%(Extension)')">
