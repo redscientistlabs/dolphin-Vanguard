@@ -95,12 +95,20 @@ static void EmuThreadExecute(Action^ callback)
 static PartialSpec^ getDefaultPartial()
 {
   PartialSpec^ partial = gcnew PartialSpec("RTCSpec");
+  partial->Set(VSPEC::NAME, "Dolphin");
   partial->Set(VSPEC::SUPPORTS_RENDERING, false);
   partial->Set(VSPEC::SUPPORTS_CONFIG_MANAGEMENT, true);
   partial->Set(VSPEC::SUPPORTS_CONFIG_HANDOFF, true);
   partial->Set(VSPEC::CONFIG_PATHS, ManagedGlobals::client->configPaths);
   partial->Set(VSPEC::SYSTEM, String::Empty);
+  partial->Set(VSPEC::GAMENAME, String::Empty);
+  partial->Set(VSPEC::SYSTEMPREFIX, String::Empty);
+  partial->Set(VSPEC::OPENROMFILENAME, String::Empty);
+  partial->Set(VSPEC::SYNCSETTINGS, String::Empty);
+  partial->Set(VSPEC::MEMORYDOMAINS_BLACKLISTEDDOMAINS, gcnew array<String ^>{});
+  partial->Set(VSPEC::MEMORYDOMAINS_INTERFACES, gcnew array<MemoryDomainProxy ^>{});
   partial->Set(VSPEC::SYSTEM, String::Empty);
+  
   return partial;
 }
 
