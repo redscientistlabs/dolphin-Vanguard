@@ -7,4 +7,7 @@ public:
   static void Initialize();
   static bool isWii();
   static inline MainWindow* win = nullptr;
+
+private:
+  static void StartVanguardClient();
 };
