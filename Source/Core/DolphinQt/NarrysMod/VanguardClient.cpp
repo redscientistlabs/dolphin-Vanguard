@@ -94,7 +94,7 @@ static void EmuThreadExecute(Action^ callback)
 
 static PartialSpec^ getDefaultPartial()
 {
-  PartialSpec^ partial = gcnew PartialSpec("RTCSpec");
+  PartialSpec^ partial = gcnew PartialSpec("VanguardSpec");
   partial->Set(VSPEC::NAME, "Dolphin");
   partial->Set(VSPEC::SUPPORTS_RENDERING, false);
   partial->Set(VSPEC::SUPPORTS_CONFIG_MANAGEMENT, true);
