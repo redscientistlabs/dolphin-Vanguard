@@ -35,6 +35,6 @@ CMakeLists.txt.user
 # Ignore IDEA/Clion files/dirs
 /.idea/
 #Ignore Nuget packages
-Source/packages/*Source/packages/*
+Source/packages/
 # Ignore Visual Studio Code's working dir
 /.vscode/
