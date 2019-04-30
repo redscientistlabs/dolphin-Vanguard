@@ -454,7 +454,7 @@ bool VanguardClient::LoadRom(String^ filename)
     while (ManagedGlobals::client->loading)
     {
       Thread::Sleep(20);
-      Host_YieldToUI();
+      System::Windows::Forms::Application::DoEvents();
     }
   }
   return true;
