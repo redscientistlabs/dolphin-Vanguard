@@ -1282,10 +1282,9 @@ TextureCacheBase::GetXFBTexture(u32 address, u32 width, u32 height, u32 stride,
 
   if (g_ActiveConfig.bDumpXFBTarget)
   {
-    // While this isn't really an xfb copy, we can treat it as such
-    // for dumping purposes
+    // While this isn't really an xfb copy, we can treat it as such for dumping purposes
     static int xfb_count = 0;
-    entry->texture->Save(StringFromFormat("loaded_xfb_%i.png",
+    entry->texture->Save(StringFromFormat("%sxfb_loaded_%i.png",
                                           File::GetUserPath(D_DUMPTEXTURES_IDX).c_str(),
                                           xfb_count++),
                          0);
@@ -2186,6 +2185,7 @@ void TextureCacheBase::CopyEFBToCacheEntry(TCacheEntry* entry, bool is_depth_cop
       is_depth_copy ? g_framebuffer_manager->ResolveEFBDepthTexture(framebuffer_rect) :
                       g_framebuffer_manager->ResolveEFBColorTexture(framebuffer_rect);
 
+  src_texture->FinishedRendering();
   g_renderer->BeginUtilityDrawing();
 
   // Fill uniform buffer.
@@ -2253,6 +2253,7 @@ void TextureCacheBase::CopyEFB(AbstractStagingTexture* dst, const EFBCopyParams&
       params.depth ? g_framebuffer_manager->ResolveEFBDepthTexture(framebuffer_rect) :
                      g_framebuffer_manager->ResolveEFBColorTexture(framebuffer_rect);
 
+  src_texture->FinishedRendering();
   g_renderer->BeginUtilityDrawing();
 
   // Fill uniform buffer.

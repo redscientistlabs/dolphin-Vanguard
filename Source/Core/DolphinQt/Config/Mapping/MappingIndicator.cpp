@@ -97,7 +97,18 @@ QColor MappingIndicator::GetGateColor() const
 
 MappingIndicator::MappingIndicator(ControllerEmu::ControlGroup* group) : m_group(group)
 {
-  setMinimumHeight(128);
+  // TODO: Make these magic numbers less ugly.
+  int required_height = 106;
+
+  if (ControllerEmu::GroupType::MixedTriggers == group->type)
+    required_height = 64 + 1;
+
+  setFixedHeight(required_height);
+}
+
+double MappingIndicator::GetScale() const
+{
+  return height() / 2 - 2;
 }
 
 namespace
@@ -178,7 +189,7 @@ void MappingIndicator::DrawCursor(ControllerEmu::Cursor& cursor)
   UpdateCalibrationWidget({raw_coord.x, raw_coord.y});
 
   // Bounding box size:
-  const double scale = height() / 2.5;
+  const double scale = GetScale();
 
   QPainter p(this);
   p.translate(width() / 2, height() / 2);
@@ -217,7 +228,7 @@ void MappingIndicator::DrawCursor(ControllerEmu::Cursor& cursor)
       QRectF(-scale, raw_coord.z * scale - INPUT_DOT_RADIUS / 2, scale * 2, INPUT_DOT_RADIUS));
 
   // Adjusted Z (if not hidden):
-  if (adj_coord.z && adj_coord.x < 10000)
+  if (adj_coord.IsVisible())
   {
     p.setBrush(GetAdjustedInputColor());
     p.drawRect(
@@ -250,7 +261,7 @@ void MappingIndicator::DrawCursor(ControllerEmu::Cursor& cursor)
   p.drawEllipse(QPointF{raw_coord.x, raw_coord.y} * scale, INPUT_DOT_RADIUS, INPUT_DOT_RADIUS);
 
   // Adjusted cursor position (if not hidden):
-  if (adj_coord.x < 10000)
+  if (adj_coord.IsVisible())
   {
     p.setPen(Qt::NoPen);
     p.setBrush(GetAdjustedInputColor());
@@ -291,7 +302,7 @@ void MappingIndicator::DrawReshapableInput(ControllerEmu::ReshapableInput& stick
   UpdateCalibrationWidget(raw_coord);
 
   // Bounding box size:
-  const double scale = height() / 2.5;
+  const double scale = GetScale();
 
   QPainter p(this);
   p.translate(width() / 2, height() / 2);
@@ -453,7 +464,7 @@ void MappingIndicator::DrawForce(ControllerEmu::Force& force)
   UpdateCalibrationWidget({raw_coord.x, raw_coord.y});
 
   // Bounding box size:
-  const double scale = height() / 2.5;
+  const double scale = GetScale();
 
   QPainter p(this);
   p.translate(width() / 2, height() / 2);
@@ -492,11 +503,19 @@ void MappingIndicator::DrawForce(ControllerEmu::Force& force)
       QRectF(-scale, raw_coord.z * scale - INPUT_DOT_RADIUS / 2, scale * 2, INPUT_DOT_RADIUS));
 
   // Adjusted Z:
-  if (adj_coord.y)
+  const auto curve_point =
+      std::max(std::abs(m_motion_state.angle.x), std::abs(m_motion_state.angle.z)) / MathUtil::TAU;
+  if (adj_coord.y || curve_point)
   {
-    p.setBrush(GetAdjustedInputColor());
-    p.drawRect(
-        QRectF(-scale, adj_coord.y * -scale - INPUT_DOT_RADIUS / 2, scale * 2, INPUT_DOT_RADIUS));
+    // Show off the angle somewhat with a curved line.
+    QPainterPath path;
+    path.moveTo(-scale, (adj_coord.y + curve_point) * -scale);
+    path.quadTo({0, (adj_coord.y - curve_point) * -scale},
+                {scale, (adj_coord.y + curve_point) * -scale});
+
+    p.setBrush(Qt::NoBrush);
+    p.setPen(QPen(GetAdjustedInputColor(), INPUT_DOT_RADIUS));
+    p.drawPath(path);
   }
 
   // Draw "gate" shape.
@@ -584,7 +603,7 @@ void ShakeMappingIndicator::DrawShake()
     m_position_samples.pop_back();
 
   // Bounding box size:
-  const double scale = height() / 2.5;
+  const double scale = GetScale();
 
   QPainter p(this);
   p.translate(width() / 2, height() / 2);
@@ -649,8 +668,8 @@ void ShakeMappingIndicator::DrawShake()
 
 void MappingIndicator::DrawCalibration(QPainter& p, Common::DVec2 point)
 {
-  // TODO: Ugly magic number used in a few places in this file.
-  const double scale = height() / 2.5;
+  // Bounding box size:
+  const double scale = GetScale();
 
   // Input shape.
   p.setPen(GetInputShapePen());

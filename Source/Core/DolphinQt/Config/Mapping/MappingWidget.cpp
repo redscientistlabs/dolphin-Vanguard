@@ -46,29 +46,6 @@ MappingWindow* MappingWidget::GetParent() const
   return m_parent;
 }
 
-bool MappingWidget::IsIterativeInput() const
-{
-  return m_parent->IsIterativeInput();
-}
-
-void MappingWidget::NextButton(MappingButton* button)
-{
-  auto iterator = std::find(m_buttons.begin(), m_buttons.end(), button);
-
-  if (iterator == m_buttons.end())
-    return;
-
-  if (++iterator == m_buttons.end())
-    return;
-
-  MappingButton* next = *iterator;
-
-  if (next->IsInput() && next->isVisible())
-    next->Detect();
-  else
-    NextButton(next);
-}
-
 int MappingWidget::GetPort() const
 {
   return m_parent->GetPort();
@@ -92,6 +69,34 @@ QGroupBox* MappingWidget::CreateGroupBox(const QString& name, ControllerEmu::Con
                                 group->type == ControllerEmu::GroupType::Stick ||
                                 group->type == ControllerEmu::GroupType::Tilt ||
                                 group->type == ControllerEmu::GroupType::Force;
+
+  if (need_indicator)
+  {
+    MappingIndicator* indicator;
+
+    switch (group->type)
+    {
+    case ControllerEmu::GroupType::Shake:
+      indicator = new ShakeMappingIndicator(static_cast<ControllerEmu::Shake*>(group));
+      break;
+
+    default:
+      indicator = new MappingIndicator(group);
+      break;
+    }
+
+    form_layout->addRow(indicator);
+
+    connect(this, &MappingWidget::Update, indicator, QOverload<>::of(&MappingIndicator::update));
+
+    if (need_calibration)
+    {
+      const auto calibrate =
+          new CalibrationWidget(*static_cast<ControllerEmu::ReshapableInput*>(group), *indicator);
+
+      form_layout->addRow(calibrate);
+    }
+  }
 
   for (auto& control : group->controls)
   {
@@ -126,34 +131,6 @@ QGroupBox* MappingWidget::CreateGroupBox(const QString& name, ControllerEmu::Con
 
     if (setting_widget)
       form_layout->addRow(tr(setting->GetUIName()), setting_widget);
-  }
-
-  if (need_indicator)
-  {
-    MappingIndicator* indicator;
-
-    switch (group->type)
-    {
-    case ControllerEmu::GroupType::Shake:
-      indicator = new ShakeMappingIndicator(static_cast<ControllerEmu::Shake*>(group));
-      break;
-
-    default:
-      indicator = new MappingIndicator(group);
-      break;
-    }
-
-    connect(this, &MappingWidget::Update, indicator, QOverload<>::of(&MappingIndicator::update));
-
-    if (need_calibration)
-    {
-      const auto calibrate =
-          new CalibrationWidget(*static_cast<ControllerEmu::ReshapableInput*>(group), *indicator);
-
-      form_layout->addRow(calibrate);
-    }
-
-    form_layout->addRow(indicator);
   }
 
   return group_box;
