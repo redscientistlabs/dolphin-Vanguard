@@ -493,7 +493,7 @@ void Quit()
 void AllSpecsSent()
 {
   AllSpec::VanguardSpec->Update(VSPEC::EMUDIR, ManagedGlobals::client->emuDir, true, true);
-  VanguardClientInitializer::win->Show();
+  //VanguardClientInitializer::win->Show();
 }
 #pragma endregion
 
