@@ -473,7 +473,8 @@ static void LoadFileStateData(const std::string& filename, std::vector<u8>& ret_
 
   if (header.size != 0)  // non-zero size means the state is compressed
   {
-    Core::DisplayMessage("Decompressing State...", 500);
+    //Narrysmod - Don't show this message
+    //Core::DisplayMessage("Decompressing State...", 500);
 
     buffer.resize(header.size);
 
