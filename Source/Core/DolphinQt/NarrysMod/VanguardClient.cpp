@@ -444,6 +444,9 @@ bool VanguardClient::LoadRom(String^ filename)
   // Game is not running
   if (currentOpenRom != filename)
   {
+    // Clear out any old settings
+    Config::ClearCurrentVanguardLayer();
+
     const std::string& path = Helpers::systemStringToUtf8String(filename);
     ManagedGlobals::client->loading = true;
 
@@ -456,6 +459,8 @@ bool VanguardClient::LoadRom(String^ filename)
       Thread::Sleep(20);
       System::Windows::Forms::Application::DoEvents();
     }
+
+    Thread::Sleep(100);  // Give the emu thread a chance to recover 
   }
   return true;
 }
@@ -574,8 +579,6 @@ void VanguardClient::OnMessageReceived(Object^ sender, NetCoreEventArgs^ e)
 
   case REMOTE_LOADROM:
   {
-    // Clear out any old settings
-    Config::ClearCurrentVanguardLayer();
     String^ filename = (String ^)advancedMessage->objectValue;
     ManagedGlobals::client->LoadRom(filename);
   }
