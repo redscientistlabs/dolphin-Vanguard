@@ -1,6 +1,7 @@
 add_library(videod3d12
   BoundingBox.cpp
   BoundingBox.h
+  Common.h
   DescriptorAllocator.cpp
   DescriptorAllocator.h
   DescriptorHeapManager.cpp
@@ -34,4 +35,9 @@ PUBLIC
   common
   videocommon
   videod3dcommon
+)
+
+set_target_properties(videod3d12 PROPERTIES
+  FOLDER "Dolphin Core/Video Backends"
+  PROJECT_LABEL "D3D12"
 )

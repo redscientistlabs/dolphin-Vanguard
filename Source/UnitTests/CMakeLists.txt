@@ -1,8 +1,18 @@
 enable_testing()
 add_custom_target(unittests)
-add_custom_command(TARGET unittests POST_BUILD COMMAND ${CMAKE_CTEST_COMMAND})
+
+if (WIN32)
+  add_custom_command(TARGET unittests POST_BUILD COMMAND ${CMAKE_CTEST_COMMAND} -C ${CMAKE_BUILD_TYPE})
+else()
+  add_custom_command(TARGET unittests POST_BUILD COMMAND ${CMAKE_CTEST_COMMAND})
+endif()
 
 string(APPEND CMAKE_RUNTIME_OUTPUT_DIRECTORY "/Tests")
+
+if (MSVC)
+  string(APPEND CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE "/Tests")
+  string(APPEND CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG "/Tests")
+endif()
 
 # Since this is a Core dependency, it can't be linked as a normal library.
 # Otherwise CMake inserts the library after core, but before other core
@@ -20,6 +30,16 @@ macro(add_dolphin_test target)
   add_dependencies(unittests ${target})
   add_test(NAME ${target} COMMAND ${target})
 endmacro()
+
+set_target_properties(unittests PROPERTIES
+  FOLDER "Tests"
+  PROJECT_LABEL "UnitTests"
+)
+
+set_target_properties(unittests_stubhost PROPERTIES
+  FOLDER "Tests"
+  PROJECT_LABEL "UnitTests_StubHost"
+)
 
 add_subdirectory(Common)
 add_subdirectory(Core)

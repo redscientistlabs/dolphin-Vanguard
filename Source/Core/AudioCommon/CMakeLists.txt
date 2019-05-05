@@ -1,18 +1,37 @@
 add_library(audiocommon
+  AudioCommon.h
   AudioCommon.cpp
+  AudioStretcher.h
   AudioStretcher.cpp
+  CubebStream.h
   CubebStream.cpp
+  CubebUtils.h
   CubebUtils.cpp
+  Mixer.h
   Mixer.cpp
+  SurroundDecoder.h
   SurroundDecoder.cpp
+  NullSoundStream.h
   NullSoundStream.cpp
+  WaveFile.h
   WaveFile.cpp
 )
+
+set_target_properties(audiocommon PROPERTIES
+  FOLDER "Dolphin Core"
+  PROJECT_LABEL "AudioCommon"
+)
+
+include(SourceGroupByFolder)
+source_group_by_folder(audiocommon)
 
 find_package(OpenSLES)
 if(OPENSLES_FOUND)
   message(STATUS "OpenSLES found, enabling OpenSLES sound backend")
-  target_sources(audiocommon PRIVATE OpenSLESStream.cpp)
+  target_sources(audiocommon PRIVATE
+    OpenSLESStream.h
+    OpenSLESStream.cpp
+  )
   target_link_libraries(audiocommon PRIVATE OpenSLES::OpenSLES)
 endif()
 
@@ -20,7 +39,10 @@ if(ENABLE_ALSA)
   find_package(ALSA)
   if(ALSA_FOUND)
     message(STATUS "ALSA found, enabling ALSA sound backend")
-    target_sources(audiocommon PRIVATE AlsaSoundStream.cpp)
+    target_sources(audiocommon PRIVATE
+      AlsaSoundStream.h
+      AlsaSoundStream.cpp
+    )
     target_link_libraries(audiocommon PRIVATE ALSA::ALSA)
     target_compile_definitions(audiocommon PRIVATE HAVE_ALSA=1)
   else()
@@ -47,26 +69,31 @@ else()
 endif()
 
 if(WIN32)
-  target_sources(audiocommon PRIVATE WASAPIStream.cpp)
-  target_sources(audiocommon PRIVATE XAudio2Stream.cpp)
+  target_sources(audiocommon PRIVATE
+    OpenALStream.h
+    OpenALStream.cpp
+    WASAPIStream.h
+    WASAPIStream.cpp
+    XAudio2Stream.h
+    XAudio2Stream.cpp
+  )
+  target_sources(audiocommon PRIVATE OpenALStream.cpp)
 
-  add_library(audiocommon_xaudio27 "XAudio2_7Stream.cpp")
+  add_library(audiocommon_xaudio27
+    XAudio2_7Stream.h
+    XAudio2_7Stream.cpp
+  )
   target_include_directories(audiocommon_xaudio27 PRIVATE
     ${PROJECT_SOURCE_DIR}/Externals
     ${PROJECT_SOURCE_DIR}/Externals/XAudio2_7
   )
+
   target_link_libraries(audiocommon PRIVATE audiocommon_xaudio27)
 
-  set(ENV{OPENALDIR} ${PROJECT_SOURCE_DIR}/Externals/OpenAL)
-  # Dolphin loads openal32.dll at runtime
-  find_package(OpenAL)
-  if(OPENAL_FOUND)
-    message(STATUS "OpenAL found, enabling OpenAL sound backend")
-    target_sources(audiocommon PRIVATE OpenALStream.cpp)
-    target_link_libraries(audiocommon PRIVATE OpenAL::OpenAL)
-  else()
-    message(STATUS "OpenAL NOT found in Externals")
-  endif()
+  set_target_properties(audiocommon_xaudio27 PROPERTIES
+    FOLDER "Dolphin Core/Audio Backends"
+    PROJECT_LABEL "XAudio2_7"
+  )
 endif()
 
 target_link_libraries(audiocommon PRIVATE cubeb SoundTouch FreeSurround)

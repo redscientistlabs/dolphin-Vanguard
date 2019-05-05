@@ -1,4 +1,5 @@
 add_executable(dolphin-nogui
+  Platform.h
   Platform.cpp
   PlatformHeadless.cpp
   MainNoGUI.cpp
@@ -17,6 +18,8 @@ PRIVATE
   cpp-optparse
 )
 
+set_target_properties(dolphin-nogui PROPERTIES PROJECT_LABEL "DolphinNoGUI")
+
 if(USE_DISCORD_PRESENCE)
   target_compile_definitions(dolphin-nogui PRIVATE -DUSE_DISCORD_PRESENCE)
 endif()
@@ -24,3 +27,6 @@ endif()
 set(CPACK_PACKAGE_EXECUTABLES ${CPACK_PACKAGE_EXECUTABLES} dolphin-nogui)
 install(TARGETS dolphin-nogui RUNTIME DESTINATION ${bindir})
 
+
+include(SourceGroupByFolder)
+source_group_by_folder(dolphin-nogui)

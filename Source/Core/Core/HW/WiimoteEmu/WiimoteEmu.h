@@ -55,6 +55,8 @@ enum class ClassicGroup;
 enum class GuitarGroup;
 enum class DrumsGroup;
 enum class TurntableGroup;
+enum class UDrawTabletGroup;
+enum class TaTaConGroup;
 
 template <typename T>
 void UpdateCalibrationDataChecksum(T& data, int cksum_bytes)
@@ -113,6 +115,8 @@ public:
   ControllerEmu::ControlGroup* GetGuitarGroup(GuitarGroup group);
   ControllerEmu::ControlGroup* GetDrumsGroup(DrumsGroup group);
   ControllerEmu::ControlGroup* GetTurntableGroup(TurntableGroup group);
+  ControllerEmu::ControlGroup* GetUDrawTabletGroup(UDrawTabletGroup group);
+  ControllerEmu::ControlGroup* GetTaTaConGroup(TaTaConGroup group);
 
   void Update();
   void StepDynamics();
