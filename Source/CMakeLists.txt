@@ -25,6 +25,7 @@ if(CMAKE_C_COMPILER_ID MATCHES "MSVC")
   # Fix LNK4098 warnings
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /NODEFAULTLIB:libcmt")
 endif()
+set(CMAKE_DOTNET_TARGET_FRAMEWORK_VERSION "4.7.1")
 
 # These aren't actually needed for C11/C++11
 # but some dependencies require them (LLVM, libav).
