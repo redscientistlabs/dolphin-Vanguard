@@ -1,5 +1,3 @@
-#include "stdafx.h"
-
 #include "Common/SPSCQueue.h"
 #include "Core/Core.h"
 #include "Core/HW/DSP.h"
@@ -7,6 +5,7 @@
 
 #include "DolphinMemoryDomain.h"
 
+#using < System.dll>
 using namespace cli;
 using namespace System;
 using namespace RTCV;
@@ -15,7 +14,6 @@ using namespace Vanguard;
 using namespace Runtime::InteropServices;
 using namespace Diagnostics;
 
-#using <System.dll>
 #define SRAM_SIZE 25165824
 #define ARAM_SIZE 16777216
 #define EXRAM_SIZE 67108864

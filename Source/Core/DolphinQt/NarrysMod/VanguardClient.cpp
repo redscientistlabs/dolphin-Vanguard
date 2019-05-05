@@ -2,8 +2,6 @@
 
 #pragma warning(disable : 4564)
 
-#include "stdafx.h"
-
 #include "Core/ConfigManager.h"
 #include "Core/Core.h"
 #include "Core/State.h"
@@ -12,11 +10,11 @@
 
 #include "DolphinMemoryDomain.h"
 #include "DolphinQT/MainWindow.h"
-#include "NarrysMod/Helpers.hpp"
-#include "NarrysMod/VanguardClient.h"
-#include "NarrysMod/VanguardClientInitializer.h"
-#include "NarrysMod/VanguardConfigLoader.h"
-#include "NarrysMod/VanguardSettingsWrapper.h"
+#include "Helpers.hpp"
+#include "VanguardClient.h"
+#include "VanguardClientInitializer.h"
+#include "VanguardConfigLoader.h"
+#include "VanguardSettingsWrapper.h"
 
 #include <msclr/marshal_cppstd.h>
 #include "Core/Host.h"

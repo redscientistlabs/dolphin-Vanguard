@@ -10,6 +10,8 @@ message(STATUS "Found Qt version ${Qt5Core_VERSION}")
 
 set(CMAKE_AUTOMOC ON)
 
+add_subdirectory(NarrysMod)
+
 add_executable(dolphin-emu
   AboutDialog.h
   AboutDialog.cpp
@@ -272,6 +274,7 @@ PRIVATE
   Qt5::Widgets
   uicommon
   imgui
+	narrysmod
 )
 
 set_target_properties(dolphin-emu PROPERTIES PROJECT_LABEL "Dolphin")

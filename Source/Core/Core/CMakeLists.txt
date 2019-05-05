@@ -531,6 +531,7 @@ PUBLIC
   videoogl
   videosoftware
   videovulkan
+	narrysmod
 
 PRIVATE
   ${LZO}

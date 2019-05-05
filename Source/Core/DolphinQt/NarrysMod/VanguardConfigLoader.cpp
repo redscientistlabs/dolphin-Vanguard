@@ -1,5 +1,5 @@
 #include "Common/Config/Config.h"
-#include "NarrysMod/VanguardConfigLoader.h"
+#include "VanguardConfigLoader.h"
 
 #include "Core/Config/GraphicsSettings.h"
 #include "Core/Config/MainSettings.h"
