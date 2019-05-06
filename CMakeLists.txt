@@ -37,7 +37,7 @@ option(ENABLE_HEADLESS "Enables running Dolphin as a headless variant" OFF)
 option(ENABLE_ALSA "Enables ALSA sound backend" ON)
 option(ENABLE_PULSEAUDIO "Enables PulseAudio sound backend" ON)
 option(ENABLE_LLVM "Enables LLVM support, for disassembly" ON)
-option(ENABLE_TESTS "Enables building the unit tests" ON)
+option(ENABLE_TESTS "Enables building the unit tests" OFF)
 option(USE_DISCORD_PRESENCE "Enables Discord Rich Presence, show the current game on Discord" ON)
 
 # Maintainers: if you consider blanket disabling this for your users, please
@@ -264,7 +264,7 @@ if(CMAKE_C_COMPILER_ID MATCHES "MSVC")
   )
 
   # Treat all warnings as errors
-  add_compile_options(/WX)
+  #add_compile_options(/WX)
 
   string(APPEND CMAKE_EXE_LINKER_FLAGS " /NXCOMPAT")
 else()
