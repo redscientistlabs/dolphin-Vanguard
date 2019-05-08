@@ -109,6 +109,7 @@
     <ClCompile Include="HLE\HLE_OS.cpp" />
     <ClCompile Include="HLE\HLE_VarArgs.cpp" />
     <ClCompile Include="HotkeyManager.cpp" />
+    <ClCompile Include="HW\AddressSpace.cpp" />
     <ClCompile Include="HW\AudioInterface.cpp" />
     <ClCompile Include="HW\CPU.cpp" />
     <ClCompile Include="HW\DSP.cpp" />
@@ -177,11 +178,14 @@
     <ClCompile Include="HW\WiimoteEmu\Encryption.cpp" />
     <ClCompile Include="HW\WiimoteEmu\ExtensionPort.cpp" />
     <ClCompile Include="HW\WiimoteEmu\Extension\Classic.cpp" />
+    <ClCompile Include="HW\WiimoteEmu\Extension\DrawsomeTablet.cpp" />
     <ClCompile Include="HW\WiimoteEmu\Extension\Drums.cpp" />
     <ClCompile Include="HW\WiimoteEmu\Extension\Extension.cpp" />
     <ClCompile Include="HW\WiimoteEmu\Extension\Guitar.cpp" />
     <ClCompile Include="HW\WiimoteEmu\Extension\Nunchuk.cpp" />
+    <ClCompile Include="HW\WiimoteEmu\Extension\TaTaCon.cpp" />
     <ClCompile Include="HW\WiimoteEmu\Extension\Turntable.cpp" />
+    <ClCompile Include="HW\WiimoteEmu\Extension\UDrawTablet.cpp" />
     <ClCompile Include="HW\WiimoteEmu\I2CBus.cpp" />
     <ClCompile Include="HW\WiimoteEmu\MotionPlus.cpp" />
     <ClCompile Include="HW\WiimoteEmu\Speaker.cpp" />
@@ -372,6 +376,7 @@
     <ClInclude Include="HLE\HLE_VarArgs.h" />
     <ClInclude Include="Host.h" />
     <ClInclude Include="HotkeyManager.h" />
+    <ClInclude Include="HW\AddressSpace.h" />
     <ClInclude Include="HW\AudioInterface.h" />
     <ClInclude Include="HW\CPU.h" />
     <ClInclude Include="HW\DSP.h" />
@@ -444,11 +449,14 @@
     <ClInclude Include="HW\WiimoteEmu\Encryption.h" />
     <ClInclude Include="HW\WiimoteEmu\ExtensionPort.h" />
     <ClInclude Include="HW\WiimoteEmu\Extension\Classic.h" />
+    <ClInclude Include="HW\WiimoteEmu\Extension\DrawsomeTablet.h" />
     <ClInclude Include="HW\WiimoteEmu\Extension\Drums.h" />
     <ClInclude Include="HW\WiimoteEmu\Extension\Extension.h" />
     <ClInclude Include="HW\WiimoteEmu\Extension\Guitar.h" />
     <ClInclude Include="HW\WiimoteEmu\Extension\Nunchuk.h" />
+    <ClInclude Include="HW\WiimoteEmu\Extension\TaTaCon.h" />
     <ClInclude Include="HW\WiimoteEmu\Extension\Turntable.h" />
+    <ClInclude Include="HW\WiimoteEmu\Extension\UDrawTablet.h" />
     <ClInclude Include="HW\WiimoteEmu\I2CBus.h" />
     <ClInclude Include="HW\WiimoteEmu\MotionPlus.h" />
     <ClInclude Include="HW\WiimoteEmu\Speaker.h" />

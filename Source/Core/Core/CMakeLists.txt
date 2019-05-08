@@ -71,6 +71,7 @@ add_library(core
   HLE/HLE_Misc.cpp
   HLE/HLE_OS.cpp
   HLE/HLE_VarArgs.cpp
+  HW/AddressSpace.cpp
   HW/AudioInterface.cpp
   HW/CPU.cpp
   HW/DSP.cpp
@@ -143,11 +144,14 @@ add_library(core
   HW/WiimoteEmu/MotionPlus.cpp
   HW/WiimoteEmu/Speaker.cpp
   HW/WiimoteEmu/Extension/Classic.cpp
+  HW/WiimoteEmu/Extension/DrawsomeTablet.cpp
   HW/WiimoteEmu/Extension/Extension.cpp
   HW/WiimoteEmu/Extension/Nunchuk.cpp
   HW/WiimoteEmu/Extension/Drums.cpp
   HW/WiimoteEmu/Extension/Guitar.cpp
+  HW/WiimoteEmu/Extension/TaTaCon.cpp
   HW/WiimoteEmu/Extension/Turntable.cpp
+  HW/WiimoteEmu/Extension/UDrawTablet.cpp
   HW/WiimoteReal/WiimoteReal.cpp
   HW/WiiSave.cpp
   IOS/Device.cpp
@@ -339,6 +343,7 @@ if(WIN32)
     setupapi.lib
     iphlpapi.lib
   )
+  target_compile_definitions(core PRIVATE /D _WINSOCK_DEPRECATED_NO_WARNINGS) 
 elseif(APPLE)
   target_sources(core PRIVATE
     HW/EXI/BBA-TAP/TAP_Apple.cpp

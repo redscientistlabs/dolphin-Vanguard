@@ -26,10 +26,13 @@
 #include "Core/HW/WiimoteCommon/WiimoteConstants.h"
 #include "Core/HW/WiimoteCommon/WiimoteHid.h"
 #include "Core/HW/WiimoteEmu/Extension/Classic.h"
+#include "Core/HW/WiimoteEmu/Extension/DrawsomeTablet.h"
 #include "Core/HW/WiimoteEmu/Extension/Drums.h"
 #include "Core/HW/WiimoteEmu/Extension/Guitar.h"
 #include "Core/HW/WiimoteEmu/Extension/Nunchuk.h"
+#include "Core/HW/WiimoteEmu/Extension/TaTaCon.h"
 #include "Core/HW/WiimoteEmu/Extension/Turntable.h"
+#include "Core/HW/WiimoteEmu/Extension/UDrawTablet.h"
 
 #include "InputCommon/ControllerEmu/Control/Input.h"
 #include "InputCommon/ControllerEmu/Control/Output.h"
@@ -165,6 +168,9 @@ Wiimote::Wiimote(const unsigned int index) : m_index(index)
   m_attachments->AddAttachment(std::make_unique<WiimoteEmu::Guitar>());
   m_attachments->AddAttachment(std::make_unique<WiimoteEmu::Drums>());
   m_attachments->AddAttachment(std::make_unique<WiimoteEmu::Turntable>());
+  m_attachments->AddAttachment(std::make_unique<WiimoteEmu::UDrawTablet>());
+  m_attachments->AddAttachment(std::make_unique<WiimoteEmu::DrawsomeTablet>());
+  m_attachments->AddAttachment(std::make_unique<WiimoteEmu::TaTaCon>());
 
   m_attachments->AddSetting(&m_motion_plus_setting, {_trans("Attach MotionPlus")}, true);
 
@@ -281,6 +287,26 @@ ControllerEmu::ControlGroup* Wiimote::GetTurntableGroup(TurntableGroup group)
 {
   return static_cast<Turntable*>(
              m_attachments->GetAttachmentList()[ExtensionNumber::TURNTABLE].get())
+      ->GetGroup(group);
+}
+
+ControllerEmu::ControlGroup* Wiimote::GetUDrawTabletGroup(UDrawTabletGroup group)
+{
+  return static_cast<UDrawTablet*>(
+             m_attachments->GetAttachmentList()[ExtensionNumber::UDRAW_TABLET].get())
+      ->GetGroup(group);
+}
+
+ControllerEmu::ControlGroup* Wiimote::GetDrawsomeTabletGroup(DrawsomeTabletGroup group)
+{
+  return static_cast<DrawsomeTablet*>(
+             m_attachments->GetAttachmentList()[ExtensionNumber::DRAWSOME_TABLET].get())
+      ->GetGroup(group);
+}
+
+ControllerEmu::ControlGroup* Wiimote::GetTaTaConGroup(TaTaConGroup group)
+{
+  return static_cast<TaTaCon*>(m_attachments->GetAttachmentList()[ExtensionNumber::TATACON].get())
       ->GetGroup(group);
 }
 

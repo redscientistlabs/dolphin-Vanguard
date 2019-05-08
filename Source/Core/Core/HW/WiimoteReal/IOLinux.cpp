@@ -106,7 +106,7 @@ void WiimoteScannerLinux::FindWiimotes(std::vector<Wiimote*>& found_wiimotes, Wi
   }
 }
 
-WiimoteLinux::WiimoteLinux(bdaddr_t bdaddr) : Wiimote(), m_bdaddr(bdaddr)
+WiimoteLinux::WiimoteLinux(bdaddr_t bdaddr) : m_bdaddr(bdaddr)
 {
   m_really_disconnect = true;
 
@@ -275,4 +275,4 @@ int WiimoteLinux::IOWrite(u8 const* buf, size_t len)
   return write(m_int_sock, buf, (int)len);
 }
 
-};  // WiimoteReal
+};  // namespace WiimoteReal
