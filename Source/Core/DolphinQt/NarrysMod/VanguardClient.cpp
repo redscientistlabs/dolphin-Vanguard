@@ -2,8 +2,6 @@
 
 #pragma warning(disable : 4564)
 
-#include "stdafx.h"
-
 #include "Core/ConfigManager.h"
 #include "Core/Core.h"
 #include "Core/State.h"
@@ -12,14 +10,22 @@
 
 #include "DolphinMemoryDomain.h"
 #include "DolphinQT/MainWindow.h"
-#include "NarrysMod/Helpers.hpp"
-#include "NarrysMod/VanguardClient.h"
-#include "NarrysMod/VanguardClientInitializer.h"
-#include "NarrysMod/VanguardConfigLoader.h"
-#include "NarrysMod/VanguardSettingsWrapper.h"
+#include "Helpers.hpp"
+#include "VanguardClient.h"
+#include "VanguardClientInitializer.h"
+#include "VanguardConfigLoader.h"
+#include "VanguardSettingsWrapper.h"
 
 #include <msclr/marshal_cppstd.h>
 #include "Core/Host.h"
+
+#using < system.dll>
+#using < system.windows.forms.dll>
+
+//If we provide just the dll name and then compile with /AI it works, but intellisense doesn't pick up on it, so we use a full relative path
+#using <../RTCV/Build/NetCore.dll>
+#using <../RTCV/Build/Vanguard.dll>
+#using <../RTCV/Build/CorruptCore.dll>
 
 ref class VanguardSettingsWrapper;
 using namespace cli;
@@ -34,9 +40,6 @@ using namespace Threading;
 using namespace Collections::Generic;
 using namespace System::Reflection;
 using namespace Diagnostics;
-
-#using < system.dll>
-#using < system.windows.forms.dll>
 
 #define SRAM_SIZE 25165824
 #define ARAM_SIZE 16777216
@@ -290,7 +293,6 @@ static bool RefreshDomains()
                             NetcoreCommands::REMOTE_EVENT_DOMAINSUPDATED, true, true);
   return true;
 }
-
 #pragma endregion
 
 #pragma region Settings
@@ -526,11 +528,10 @@ void VanguardClient::OnMessageReceived(Object^ sender, NetCoreEventArgs^ e)
 
   case LOADSAVESTATE:
   {
-    NetCoreAdvancedMessage^ advancedMessage = (NetCoreAdvancedMessage ^)e->message;
     array<Object ^>^ cmd = static_cast<array<Object ^> ^>(advancedMessage->objectValue);
     String^ path = static_cast<String ^>(cmd[0]);
     std::string converted_path = Helpers::systemStringToUtf8String(path);
-    StashKeySavestateLocation^ location = safe_cast<StashKeySavestateLocation ^>(cmd[1]);
+    //StashKeySavestateLocation^ location = safe_cast<StashKeySavestateLocation ^>(cmd[1]);
 
     // Clear out any old settings
     Config::ClearCurrentVanguardLayer();
@@ -541,8 +542,11 @@ void VanguardClient::OnMessageReceived(Object^ sender, NetCoreEventArgs^ e)
     {
       VanguardSettingsWrapper^ settings = GetConfigFromJson(settingStr);
       if (settings != nullptr)
-        AddLayer(ConfigLoaders::GenerateVanguardConfigLoader(
-          &VanguardSettings::GetVanguardSettingFromVanguardSettingsWrapper(settings)));
+      {
+        VanguardSettingsUnmanaged s = VanguardSettings::GetVanguardSettingFromVanguardSettingsWrapper(settings);
+        VanguardSettingsUnmanaged* sp = &s;
+        AddLayer(ConfigLoaders::GenerateVanguardConfigLoader(sp));
+      }
     }
     e->setReturnValue(ManagedGlobals::client->LoadState(converted_path));
   }

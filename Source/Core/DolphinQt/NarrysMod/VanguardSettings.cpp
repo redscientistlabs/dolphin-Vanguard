@@ -1,10 +1,10 @@
-#include "NarrysMod/VanguardSettingsWrapper.h"
+#include "VanguardSettingsWrapper.h"
 
 #include "Core/Config/SYSCONFSettings.h"
 #include "Core/Config/GraphicsSettings.h"
 #include "Core/Config/MainSettings.h"
-#include "NarrysMod/VanguardClient.h"
-#include "NarrysMod/VanguardSettingsWrapper.h"
+#include "VanguardClient.h"
+#include "VanguardSettingsWrapper.h"
 
 VanguardSettingsWrapper^ VanguardSettings::GetVanguardSettingsFromDolphin()
 {

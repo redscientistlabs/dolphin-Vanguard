@@ -1,4 +1,5 @@
 #pragma once
+#pragma warning(disable : 4267)
 namespace Helpers
 {
   static System::String^ utf8StringToSystemString(std::string utf8String)

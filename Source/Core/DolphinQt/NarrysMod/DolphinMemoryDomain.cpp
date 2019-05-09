@@ -1,5 +1,3 @@
-#include "stdafx.h"
-
 #include "Common/SPSCQueue.h"
 #include "Core/Core.h"
 #include "Core/HW/DSP.h"

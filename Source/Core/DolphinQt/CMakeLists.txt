@@ -5,6 +5,10 @@ message(STATUS "Found Qt version ${Qt5Core_VERSION}")
 
 set(CMAKE_AUTOMOC ON)
 
+#Narrysmod - Goes before add_executable
+add_compile_options("/AI\"${PROJECT_SOURCE_DIR}/\"")
+#---------
+
 add_executable(dolphin-emu
   AboutDialog.cpp
   CheatsManager.cpp
@@ -127,7 +131,58 @@ add_executable(dolphin-emu
   TAS/StickWidget.cpp
   TAS/IRWidget.cpp
   Updater.cpp
+	NarrysMod/VanguardClient.cpp
+  NarrysMod/Helpers.hpp
+  NarrysMod/DolphinMemoryDomain.h
+  NarrysMod/DolphinMemoryDomain.cpp
+  NarrysMod/ThreadLocalHelper.h
+  NarrysMod/VanguardClientInitializer.h
+  NarrysMod/VanguardConfigLoader.cpp
+	NarrysMod/VanguardConfigLoader.h
+	NarrysMod/VanguardSettings.cpp
+	NarrysMod/VanguardSettingsWrapper.h
 )
+
+
+#Narrysmod
+file(GLOB CLR_FILES
+				"NarrysMod/Helpers.hpp"
+				"NarrysMod/VanguardClient.cpp"
+        "NarrysMod/DolphinMemoryDomain.h"
+				"NarrysMod/DolphinMemoryDomain.cpp"
+				"NarrysMod/VanguardSettings.cpp"
+				"NarrysMod/VanguardSettingsWrapper.h"
+        )
+include_external_msproject(
+    CorruptCore ${PROJECT_SOURCE_DIR}/../RTCV/Source/Libraries/CorruptCore/CorruptCore.csproj
+    TYPE B5633A86-DC66-4723-88EB-7DFC95458072)
+include_external_msproject(
+    NetCore ${PROJECT_SOURCE_DIR}/../RTCV/Source/Libraries/NetCore/NetCore.csproj
+    TYPE 7E106AEC-5614-4206-9E4D-25759C90E8AE)
+include_external_msproject(
+    Vanguard ${PROJECT_SOURCE_DIR}/../RTCV/Source/Libraries/Vanguard/Vanguard.csproj
+    TYPE 364C705E-B7AB-4A94-A59B-88899CE65958)
+
+file(GLOB CLR_FILES
+				"NarrysMod/Helpers.hpp"
+				"NarrysMod/VanguardClient.cpp"
+        "NarrysMod/DolphinMemoryDomain.h"
+				"NarrysMod/DolphinMemoryDomain.cpp"
+				"NarrysMod/VanguardSettings.cpp"
+				"NarrysMod/VanguardSettingsWrapper.h"
+        )
+
+set_source_files_properties(${CLR_FILES} PROPERTIES COMPILE_FLAGS "/clr /EHa /Zc:twoPhase-")
+set_target_properties(${PROJECT_NAME} PROPERTIES VS_DOTNET_REFERENCES_COPY_LOCAL ON )
+set_target_properties(${PROJECT_NAME} PROPERTIES DOTNET_TARGET_FRAMEWORK_VERSION "v4.7.1")
+set_target_properties(${PROJECT_NAME} PROPERTIES VS_DOTNET_REFERENCE_CorruptCore "${PROJECT_SOURCE_DIR}/../RTCV/Build/CorruptCore.dll")
+set_target_properties(${PROJECT_NAME} PROPERTIES VS_DOTNET_REFERENCE_NetCore "${PROJECT_SOURCE_DIR}/../RTCV/Build/NetCore.dll")
+set_target_properties(${PROJECT_NAME} PROPERTIES VS_DOTNET_REFERENCE_Vanguard "${PROJECT_SOURCE_DIR}/../RTCV/Build/Vanguard.dll")
+set_target_properties(${PROJECT_NAME} PROPERTIES VS_DOTNET_REFERENCES "System;System.Windows.Forms")
+
+string(REGEX REPLACE "/RTC(su|[1su])" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+string(REGEX REPLACE "/RTC(su|[1su])" "" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
+#-----------------------------------------------
 
 if (NOT WIN32)
   target_sources(dolphin-emu PRIVATE QtUtils/SignalDaemon.cpp)
@@ -153,6 +208,7 @@ PRIVATE
   uicommon
   imgui
 )
+
 
 if(WIN32)
   target_sources(dolphin-emu PRIVATE DolphinQt.manifest DolphinQt.rc)
@@ -208,6 +264,21 @@ if(WIN32)
 
   foreach(dll ${dlls})
     configure_file("${Qt5_DLL_DIR}/${dll}" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${dll}" COPYONLY)
+  endforeach()
+
+
+	# Narrysmod
+	# Copy RTCV dlls and pdbs for easier dev purposes
+  set (RTC_DLL_DIR "${PROJECT_SOURCE_DIR}/../RTCV/Build/")
+  file(GLOB rtcdlls RELATIVE "${RTC_DLL_DIR}" "${RTC_DLL_DIR}/*.dll")
+  file(GLOB rtcpdbs RELATIVE "${RTC_DLL_DIR}" "${RTC_DLL_DIR}/*.pdb")
+	
+  foreach(dll ${rtcdlls})
+    configure_file("${RTC_DLL_DIR}/${dll}" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${dll}" COPYONLY)
+  endforeach()
+
+  foreach(pdb ${rtcpdbs})
+    configure_file("${RTC_DLL_DIR}/${pdb}" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${pdb}" COPYONLY)
   endforeach()
 
 endif()
