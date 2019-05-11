@@ -29,6 +29,7 @@
 #include "VideoCommon/VertexLoaderManager.h"
 #include "VideoCommon/VideoCommon.h"
 #include "VideoCommon/XFMemory.h"
+#include "Common/StringUtil.h"
 
 bool g_bRecordFifoData = false;
 
@@ -91,6 +92,17 @@ u8* Run(DataReader src, u32* cycles, bool in_display_list)
 
     if (!src.size())
       goto end;
+
+    //Narrysmod - Horrible hack to try preventing crashes.
+    //No actual game should be giving us 10MB+ of data.
+    //This won't solve every crash here, but should catch a good chunk
+    if (src.size() > 10000000)
+    {
+      std::string log_message = StringFromFormat("Src.size() giant %zu", src.size());
+      GENERIC_LOG(LogTypes::COMMON, LogTypes::LERROR, "%s", log_message.c_str());
+      totalCycles += 1;
+      goto end;
+    }
 
     u8 cmd_byte = src.Read<u8>();
     int refarray;

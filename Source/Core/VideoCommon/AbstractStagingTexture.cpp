@@ -6,7 +6,9 @@
 #include <cstring>
 
 #include "Common/Assert.h"
+#include "Common/Logging/Log.h"
 #include "Common/MsgHandler.h"
+#include "Common/StringUtil.h"
 #include "VideoCommon/AbstractStagingTexture.h"
 #include "VideoCommon/AbstractTexture.h"
 
@@ -39,8 +41,14 @@ void AbstractStagingTexture::ReadTexels(const MathUtil::Rectangle<int>& rect, vo
   if (!PrepareForAccess())
     return;
 
-  ASSERT(rect.left >= 0 && static_cast<u32>(rect.right) <= m_config.width && rect.top >= 0 &&
-         static_cast<u32>(rect.bottom) <= m_config.height);
+  // Narrysmod - Assert to return
+  if (!(rect.left >= 0 && static_cast<u32>(rect.right) <= m_config.width && rect.top >= 0 &&
+      static_cast<u32>(rect.bottom) <= m_config.height))
+  {
+    std::string log_message = StringFromFormat("BAD READTEXELS");
+    GENERIC_LOG(LogTypes::COMMON, LogTypes::LERROR, "%s", log_message.c_str());
+    return;
+  }
 
   // Offset pointer to point to start of region being copied out.
   const char* current_ptr = m_map_pointer;
@@ -72,7 +80,10 @@ void AbstractStagingTexture::ReadTexel(u32 x, u32 y, void* out_ptr)
   if (!PrepareForAccess())
     return;
 
-  ASSERT(x < m_config.width && y < m_config.height);
+  // Narrysmod - Assert to return
+  if (!(x < m_config.width && y < m_config.height))
+    return;
+
   const char* src_ptr = m_map_pointer + y * m_map_stride + x * m_texel_size;
   std::memcpy(out_ptr, src_ptr, m_texel_size);
 }
@@ -84,8 +95,14 @@ void AbstractStagingTexture::WriteTexels(const MathUtil::Rectangle<int>& rect, c
   if (!PrepareForAccess())
     return;
 
-  ASSERT(rect.left >= 0 && static_cast<u32>(rect.right) <= m_config.width && rect.top >= 0 &&
-         static_cast<u32>(rect.bottom) <= m_config.height);
+  // Narrysmod - Assert to return
+  if (!(rect.left >= 0 && static_cast<u32>(rect.right) <= m_config.width && rect.top >= 0 &&
+      static_cast<u32>(rect.bottom) <= m_config.height))
+  {
+    std::string log_message = StringFromFormat("BAD WRITETEXELS");
+    GENERIC_LOG(LogTypes::COMMON, LogTypes::LERROR, "%s", log_message.c_str());
+    return;
+  }
 
   // Offset pointer to point to start of region being copied to.
   char* current_ptr = m_map_pointer;
@@ -116,7 +133,10 @@ void AbstractStagingTexture::WriteTexel(u32 x, u32 y, const void* in_ptr)
   if (!PrepareForAccess())
     return;
 
-  ASSERT(x < m_config.width && y < m_config.height);
+  //Narrysmod - Assert to return
+  if (!(x < m_config.width && y < m_config.height))
+    return;
+
   char* dest_ptr = m_map_pointer + y * m_map_stride + x * m_texel_size;
   std::memcpy(dest_ptr, in_ptr, m_texel_size);
 }

@@ -21,8 +21,13 @@ VertexShaderUid GetVertexShaderUid()
   vertex_shader_uid_data* uid_data = out.GetUidData<vertex_shader_uid_data>();
   memset(uid_data, 0, sizeof(*uid_data));
 
-  ASSERT(bpmem.genMode.numtexgens == xfmem.numTexGen.numTexGens);
-  ASSERT(bpmem.genMode.numcolchans == xfmem.numChan.numColorChans);
+  //Narrysmod - Assert to return
+  if (bpmem.genMode.numtexgens != xfmem.numTexGen.numTexGens ||
+      bpmem.genMode.numcolchans != xfmem.numChan.numColorChans)
+  {
+    GENERIC_LOG(LogTypes::COMMON, LogTypes::LERROR, "%s", "bad vertexshaderuid");
+    return out;
+  }
 
   uid_data->numTexGens = xfmem.numTexGen.numTexGens;
   uid_data->components = VertexLoaderManager::g_current_components;

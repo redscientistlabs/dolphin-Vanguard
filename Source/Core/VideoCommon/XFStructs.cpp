@@ -272,6 +272,11 @@ void LoadIndexedXF(u32 val, int refarray)
     newData = (u32*)Memory::GetPointer(g_main_cp_state.array_bases[refarray] +
                                        g_main_cp_state.array_strides[refarray] * index);
   }
+
+  //Narrysmod - Catch a nullptr and do nothing
+  if (newData == nullptr)
+    return;
+
   bool changed = false;
   for (int i = 0; i < size; ++i)
   {

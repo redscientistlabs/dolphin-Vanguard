@@ -19,7 +19,6 @@
 #include "NarrysMod/VanguardSettingsWrapper.h"
 
 #include <msclr/marshal_cppstd.h>
-#include "Core/Host.h"
 
 ref class VanguardSettingsWrapper;
 using namespace cli;
