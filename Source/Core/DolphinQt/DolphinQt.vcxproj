@@ -534,6 +534,7 @@
     <ClInclude Include="Debugger\RegisterColumn.h" />
     <ClInclude Include="NarrysMod\Helpers.hpp" />
     <ClInclude Include="NarrysMod\DolphinMemoryDomain.h" />
+    <ClInclude Include="NarrysMod\ThreadLocalHelper.h" />
     <ClInclude Include="NarrysMod\VanguardClient.h" />
     <ClInclude Include="NarrysMod\VanguardClientInitializer.h" />
     <ClInclude Include="NarrysMod\VanguardConfigLoader.h" />

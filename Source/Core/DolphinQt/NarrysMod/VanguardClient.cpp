@@ -98,6 +98,10 @@ static PartialSpec^ getDefaultPartial()
   partial->Set(VSPEC::SUPPORTS_RENDERING, false);
   partial->Set(VSPEC::SUPPORTS_CONFIG_MANAGEMENT, true);
   partial->Set(VSPEC::SUPPORTS_CONFIG_HANDOFF, true);
+  partial->Set(VSPEC::SUPPORTS_KILLSWITCH, true);
+  partial->Set(VSPEC::SUPPORTS_REALTIME, true);
+  partial->Set(VSPEC::SUPPORTS_SAVESTATES, true);
+  partial->Set(VSPEC::SUPPORTS_MIXED_STOCKPILE, true);
   partial->Set(VSPEC::CONFIG_PATHS, ManagedGlobals::client->configPaths);
   partial->Set(VSPEC::SYSTEM, String::Empty);
   partial->Set(VSPEC::GAMENAME, String::Empty);
@@ -105,7 +109,6 @@ static PartialSpec^ getDefaultPartial()
   partial->Set(VSPEC::OPENROMFILENAME, String::Empty);
   partial->Set(VSPEC::SYNCSETTINGS, String::Empty);
   partial->Set(VSPEC::MEMORYDOMAINS_BLACKLISTEDDOMAINS, gcnew array<String ^>{});
-  partial->Set(VSPEC::MEMORYDOMAINS_INTERFACES, gcnew array<MemoryDomainProxy ^>{});
   partial->Set(VSPEC::SYSTEM, String::Empty);
   
   return partial;
