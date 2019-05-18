@@ -1,3 +1,4 @@
+# Dolphin Vanguard
 All new releases available from the RTC Launcher
 
 I am no longer hosting releases here on Github. You can find the releases as part of the RTC launcher.
