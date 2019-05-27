@@ -71,6 +71,16 @@ unsigned char SRAM::PeekByte(long long addr)
   return 0;
 }
 
+array<unsigned char>^ SRAM::PeekBytes(long long address, int length)
+{
+  array<unsigned char> ^ bytes = gcnew array<unsigned char>(length);
+  for (int i = 0; i < length; i++)
+  {
+    bytes[i] = PeekByte(address + i);
+  }
+  return bytes;
+}
+
 void SRAM::PokeByte(long long addr, unsigned char val)
 {
   if (addr < SRAM_SIZE)
@@ -112,6 +122,16 @@ unsigned char EXRAM::PeekByte(long long addr)
   return 0;
 }
 
+array<unsigned char>^ EXRAM::PeekBytes(long long address, int length)
+{
+  array<unsigned char> ^ bytes = gcnew array<unsigned char>(length);
+  for (int i = 0; i < length; i++)
+  {
+    bytes[i] = PeekByte(address + i);
+  }
+  return bytes;
+}
+
 void EXRAM::PokeByte(long long addr, unsigned char val)
 {
   if (addr < EXRAM_SIZE)
@@ -151,6 +171,16 @@ unsigned char ARAM::PeekByte(long long addr)
     return DSP::ReadARAM(static_cast<u32>(addr));
   }
   return 0;
+}
+
+array<unsigned char>^ ARAM::PeekBytes(long long address, int length)
+{
+  array<unsigned char> ^ bytes = gcnew array<unsigned char>(length);
+  for (int i = 0; i < length; i++)
+  {
+    bytes[i] = PeekByte(address + i);
+  }
+  return bytes;
 }
 
 void ARAM::PokeByte(long long addr, unsigned char val)

@@ -7,6 +7,7 @@ public:
   property int WordSize { virtual int get(); }
   property bool BigEndian { virtual bool get(); }
   virtual unsigned char PeekByte(long long addr);
+  virtual array<unsigned char> ^ PeekBytes(long long address, int length);
   virtual void PokeByte(long long addr, unsigned char val);
 };
 
@@ -19,6 +20,7 @@ public:
   property bool BigEndian { virtual bool get(); }
 
   virtual unsigned char PeekByte(long long addr);
+  virtual array<unsigned char> ^ PeekBytes(long long address, int length);
   virtual void PokeByte(long long addr, unsigned char val);
 };
 
@@ -31,5 +33,6 @@ public:
   property bool BigEndian { virtual bool get(); }
 
   virtual unsigned char PeekByte(long long addr);
+  virtual array<unsigned char> ^ PeekBytes(long long address, int length);
   virtual void PokeByte(long long addr, unsigned char val);
 };
