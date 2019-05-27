@@ -318,7 +318,7 @@ static void STEP_CORRUPT() // errors trapped by CPU_STEP
     CPU_STEP_Count = 0;
     array<String ^>^ domains = AllSpec::UISpec->Get<array<String ^> ^>("SELECTEDDOMAINS");
 
-    BlastLayer^ bl = RTCV::CorruptCore::CorruptCore::GenerateBlastLayer(domains);
+    BlastLayer^ bl = RTCV::CorruptCore::CorruptCore::GenerateBlastLayer(domains, -1);
     if (bl != nullptr)
       bl->Apply(false, true);
   }
