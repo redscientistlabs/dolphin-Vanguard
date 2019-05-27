@@ -44,6 +44,11 @@
       <TreatLibWarningAsErrors>false</TreatLibWarningAsErrors>
     </Lib>
   </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+    </ClCompile>
+  </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="library\aes.c" />
     <ClCompile Include="library\aesni.c">

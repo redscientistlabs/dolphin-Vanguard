@@ -384,6 +384,7 @@
     <ClCompile>
       <AdditionalIncludeDirectories>$(ExternalsDir)curl\lib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>CURL_STATICLIB;CURL_DISABLE_LDAP;USE_WINDOWS_SSPI;USE_SCHANNEL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='Release|x64'">stdcpp17</LanguageStandard>
     </ClCompile>
     <Lib>
       <TreatLibWarningAsErrors Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</TreatLibWarningAsErrors>

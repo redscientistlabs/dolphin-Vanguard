@@ -41,6 +41,7 @@
     <ClCompile>
       <!-- Ensure libusb sees it's own config.h first... -->
       <AdditionalIncludeDirectories>.\msvc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='Release|x64'">stdcpp17</LanguageStandard>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>

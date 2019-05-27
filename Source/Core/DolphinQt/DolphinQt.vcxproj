@@ -55,6 +55,7 @@
       <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/Zc:twoPhase- %(AdditionalOptions)</AdditionalOptions>
       <CompileAsManaged Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
       </CompileAsManaged>
+      <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='Release|x64'">stdcpp17</LanguageStandard>
     </ClCompile>
     <Manifest>
       <AdditionalManifestFiles>DolphinQt.manifest;%(AdditionalManifestFiles)</AdditionalManifestFiles>
