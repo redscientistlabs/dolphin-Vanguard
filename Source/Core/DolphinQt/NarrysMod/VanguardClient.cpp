@@ -219,7 +219,7 @@ void VanguardClientInitializer::StartVanguardClient()
 
   ManagedGlobals::client->StartClient();
   ManagedGlobals::client->RegisterVanguardSpec();
-  RTCV::CorruptCore::CorruptCore::StartEmuSide();
+  RtcCore::StartEmuSide();
 }
 
 // Create our VanguardClient
@@ -238,15 +238,15 @@ void VanguardClient::StartClient()
   receiver->MessageReceived +=
       gcnew EventHandler<NetCoreEventArgs ^>(this, &VanguardClient::OnMessageReceived);
 
-  RTCV::NetCore::Extensions::ConsoleHelper::CreateConsole(ManagedGlobals::client->logPath);
-  RTCV::NetCore::Extensions::ConsoleHelper::HideConsole();
+  NetCore_Extensions::ConsoleHelper::CreateConsole(ManagedGlobals::client->logPath);
+  NetCore_Extensions::ConsoleHelper::HideConsole();
   // Can't use contains
   auto args = Environment::GetCommandLineArgs();
   for (int i = 0; i < args->Length; i++)
   {
     if (args[i] == "-CONSOLE")
     {
-      RTCV::NetCore::Extensions::ConsoleHelper::ShowConsole();
+     NetCore_Extensions::ConsoleHelper::ShowConsole();
     }
   }
   connector = gcnew VanguardConnector(receiver);
@@ -311,14 +311,14 @@ static void STEP_CORRUPT() // errors trapped by CPU_STEP
 {
   StepActions::Execute();
   CPU_STEP_Count++;
-  bool autoCorrupt = RTCV::CorruptCore::CorruptCore::AutoCorrupt;
-  long errorDelay = RTCV::CorruptCore::CorruptCore::ErrorDelay;
+  bool autoCorrupt = RtcCore::AutoCorrupt;
+  long errorDelay = RtcCore::ErrorDelay;
   if (autoCorrupt && CPU_STEP_Count >= errorDelay)
   {
     CPU_STEP_Count = 0;
     array<String ^>^ domains = AllSpec::UISpec->Get<array<String ^> ^>("SELECTEDDOMAINS");
 
-    BlastLayer^ bl = RTCV::CorruptCore::CorruptCore::GenerateBlastLayer(domains, -1);
+    BlastLayer ^ bl = RtcCore::GenerateBlastLayer(domains, -1);
     if (bl != nullptr)
       bl->Apply(false, true);
   }
@@ -567,7 +567,7 @@ void VanguardClient::OnMessageReceived(Object^ sender, NetCoreEventArgs^ e)
 
     String^ path = nullptr;
     // Build up our path
-    path = RTCV::CorruptCore::CorruptCore::workingDir + IO::Path::DirectorySeparatorChar +
+    path = RtcCore::workingDir + IO::Path::DirectorySeparatorChar +
            "SESSION" + IO::Path::DirectorySeparatorChar + prefix + "." + quickSlotName + ".State";
 
     // If the path doesn't exist, make it
