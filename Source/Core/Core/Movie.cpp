@@ -92,8 +92,8 @@ static bool s_bSaveConfig = false, s_bNetPlay = false;
 static bool s_bClearSave = false;
 static bool s_bDiscChange = false;
 static bool s_bReset = false;
-static std::string s_author = "";
-static std::string s_discChange = "";
+static std::string s_author;
+static std::string s_discChange;
 static std::array<u8, 16> s_MD5;
 static u8 s_bongos, s_memcards;
 static std::array<u8, 20> s_revision;
@@ -1147,6 +1147,7 @@ void PlayController(GCPadStatus* PadStatus, int controllerID)
   PadStatus->substickX = s_padState.CStickX;
   PadStatus->substickY = s_padState.CStickY;
 
+  PadStatus->button = 0;
   PadStatus->button |= PAD_USE_ORIGIN;
 
   if (s_padState.A)

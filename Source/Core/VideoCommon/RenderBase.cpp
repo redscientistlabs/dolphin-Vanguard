@@ -14,6 +14,7 @@
 
 #include "VideoCommon/RenderBase.h"
 
+#include <algorithm>
 #include <cinttypes>
 #include <cmath>
 #include <memory>
@@ -147,12 +148,6 @@ void Renderer::SetAndClearFramebuffer(AbstractFramebuffer* framebuffer,
   m_current_framebuffer = framebuffer;
 }
 
-std::unique_ptr<AbstractShader> Renderer::CreateShaderFromSource(ShaderStage stage,
-                                                                 const std::string& source)
-{
-  return CreateShaderFromSource(stage, source.c_str(), source.size());
-}
-
 bool Renderer::EFBHasAlphaChannel() const
 {
   return m_prev_efb_format == PEControl::RGBA6_Z24;
@@ -218,11 +213,11 @@ u32 Renderer::AccessEFB(EFBAccessType type, u32 x, u32 y, u32 poke_data)
     if (bpmem.zcontrol.pixel_format == PEControl::RGB565_Z16)
     {
       // if Z is in 16 bit format you must return a 16 bit integer
-      ret = MathUtil::Clamp<u32>(static_cast<u32>(depth * 65536.0f), 0, 0xFFFF);
+      ret = std::clamp<u32>(static_cast<u32>(depth * 65536.0f), 0, 0xFFFF);
     }
     else
     {
-      ret = MathUtil::Clamp<u32>(static_cast<u32>(depth * 16777216.0f), 0, 0xFFFFFF);
+      ret = std::clamp<u32>(static_cast<u32>(depth * 16777216.0f), 0, 0xFFFFFF);
     }
 
     return ret;
@@ -979,10 +974,10 @@ bool Renderer::InitializeImGui()
 
   const std::string vertex_shader_source = GenerateImGuiVertexShader();
   const std::string pixel_shader_source = GenerateImGuiPixelShader();
-  std::unique_ptr<AbstractShader> vertex_shader = CreateShaderFromSource(
-      ShaderStage::Vertex, vertex_shader_source.c_str(), vertex_shader_source.size());
-  std::unique_ptr<AbstractShader> pixel_shader = CreateShaderFromSource(
-      ShaderStage::Pixel, pixel_shader_source.c_str(), pixel_shader_source.size());
+  std::unique_ptr<AbstractShader> vertex_shader =
+      CreateShaderFromSource(ShaderStage::Vertex, vertex_shader_source);
+  std::unique_ptr<AbstractShader> pixel_shader =
+      CreateShaderFromSource(ShaderStage::Pixel, pixel_shader_source);
   if (!vertex_shader || !pixel_shader)
   {
     PanicAlert("Failed to compile imgui shaders");

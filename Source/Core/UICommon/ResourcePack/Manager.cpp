@@ -128,7 +128,7 @@ bool Add(const std::string& path, int offset)
 
   packs.insert(packs.begin() + offset, std::move(pack));
 
-  return pack.IsValid();
+  return true;
 }
 
 bool Remove(ResourcePack& pack)
@@ -142,8 +142,6 @@ bool Remove(ResourcePack& pack)
 
   if (pack_iterator == packs.end())
     return false;
-
-  std::string filename;
 
   IniFile file = GetPackConfig();
 

@@ -1,4 +1,4 @@
-// Copyright 2008 Dolphin Emulator Project
+﻿// Copyright 2008 Dolphin Emulator Project
 // Licensed under GPLv2+
 // Refer to the license.txt file included.
 
@@ -31,29 +31,20 @@ using Report = std::vector<u8>;
 constexpr u32 WIIMOTE_DEFAULT_TIMEOUT = 1000;
 
 // Communication channels
-enum WiimoteChannel
-{
-  WC_OUTPUT = 0x11,
-  WC_INPUT = 0x13,
-};
+constexpr u8 WC_OUTPUT = 0x11;
+constexpr u8 WC_INPUT = 0x13;
 
 // The 4 most significant bits of the first byte of an outgoing command must be
 // 0x50 if sending on the command channel and 0xA0 if sending on the interrupt
 // channel. On Mac and Linux we use interrupt channel; on Windows, command.
-enum WiimoteReport
-{
 #ifdef _WIN32
-  WR_SET_REPORT = 0x50
+constexpr u8 WR_SET_REPORT = 0x50;
 #else
-  WR_SET_REPORT = 0xA0
+constexpr u8 WR_SET_REPORT = 0xA0;
 #endif
-};
 
-enum WiimoteBT
-{
-  BT_INPUT = 0x01,
-  BT_OUTPUT = 0x02
-};
+constexpr u8 BT_INPUT = 0x01;
+constexpr u8 BT_OUTPUT = 0x02;
 
 class Wiimote
 {
@@ -113,10 +104,10 @@ public:
   int GetIndex() const;
 
 protected:
-  Wiimote() = default;
+  Wiimote();
 
   int m_index = 0;
-  Report m_last_input_report = {};
+  Report m_last_input_report;
   u16 m_channel = 0;
 
   // If true, the Wiimote will be really disconnected when it is disconnected by Dolphin.

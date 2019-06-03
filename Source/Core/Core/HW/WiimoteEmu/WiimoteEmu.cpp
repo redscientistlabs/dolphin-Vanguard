@@ -26,10 +26,13 @@
 #include "Core/HW/WiimoteCommon/WiimoteConstants.h"
 #include "Core/HW/WiimoteCommon/WiimoteHid.h"
 #include "Core/HW/WiimoteEmu/Extension/Classic.h"
+#include "Core/HW/WiimoteEmu/Extension/DrawsomeTablet.h"
 #include "Core/HW/WiimoteEmu/Extension/Drums.h"
 #include "Core/HW/WiimoteEmu/Extension/Guitar.h"
 #include "Core/HW/WiimoteEmu/Extension/Nunchuk.h"
+#include "Core/HW/WiimoteEmu/Extension/TaTaCon.h"
 #include "Core/HW/WiimoteEmu/Extension/Turntable.h"
+#include "Core/HW/WiimoteEmu/Extension/UDrawTablet.h"
 
 #include "InputCommon/ControllerEmu/Control/Input.h"
 #include "InputCommon/ControllerEmu/Control/Output.h"
@@ -135,7 +138,7 @@ void Wiimote::Reset()
 
 Wiimote::Wiimote(const unsigned int index) : m_index(index)
 {
-  // buttons
+  // Buttons
   groups.emplace_back(m_buttons = new ControllerEmu::Buttons(_trans("Buttons")));
   for (const char* named_button : named_buttons)
   {
@@ -144,20 +147,14 @@ Wiimote::Wiimote(const unsigned int index) : m_index(index)
         new ControllerEmu::Input(ControllerEmu::DoNotTranslate, named_button, ui_name));
   }
 
-  // ir
-  // i18n: IR stands for infrared and refers to the pointer functionality of Wii Remotes
-  groups.emplace_back(m_ir = new ControllerEmu::Cursor(_trans("IR")));
-
-  // swing
+  // Pointing (IR)
+  // i18n: "Point" refers to the action of pointing a Wii Remote.
+  groups.emplace_back(m_ir = new ControllerEmu::Cursor("IR", _trans("Point")));
   groups.emplace_back(m_swing = new ControllerEmu::Force(_trans("Swing")));
-
-  // tilt
   groups.emplace_back(m_tilt = new ControllerEmu::Tilt(_trans("Tilt")));
-
-  // shake
   groups.emplace_back(m_shake = new ControllerEmu::Shake(_trans("Shake")));
 
-  // extension
+  // Extension
   groups.emplace_back(m_attachments = new ControllerEmu::Attachments(_trans("Extension")));
   m_attachments->AddAttachment(std::make_unique<WiimoteEmu::None>());
   m_attachments->AddAttachment(std::make_unique<WiimoteEmu::Nunchuk>());
@@ -165,15 +162,18 @@ Wiimote::Wiimote(const unsigned int index) : m_index(index)
   m_attachments->AddAttachment(std::make_unique<WiimoteEmu::Guitar>());
   m_attachments->AddAttachment(std::make_unique<WiimoteEmu::Drums>());
   m_attachments->AddAttachment(std::make_unique<WiimoteEmu::Turntable>());
+  m_attachments->AddAttachment(std::make_unique<WiimoteEmu::UDrawTablet>());
+  m_attachments->AddAttachment(std::make_unique<WiimoteEmu::DrawsomeTablet>());
+  m_attachments->AddAttachment(std::make_unique<WiimoteEmu::TaTaCon>());
 
   m_attachments->AddSetting(&m_motion_plus_setting, {_trans("Attach MotionPlus")}, true);
 
-  // rumble
+  // Rumble
   groups.emplace_back(m_rumble = new ControllerEmu::ControlGroup(_trans("Rumble")));
   m_rumble->controls.emplace_back(
       m_motor = new ControllerEmu::Output(ControllerEmu::Translate, _trans("Motor")));
 
-  // dpad
+  // D-Pad
   groups.emplace_back(m_dpad = new ControllerEmu::Buttons(_trans("D-Pad")));
   for (const char* named_direction : named_directions)
   {
@@ -181,7 +181,7 @@ Wiimote::Wiimote(const unsigned int index) : m_index(index)
         new ControllerEmu::Input(ControllerEmu::Translate, named_direction));
   }
 
-  // options
+  // Options
   groups.emplace_back(m_options = new ControllerEmu::ControlGroup(_trans("Options")));
 
   m_options->AddSetting(&m_speaker_pan_setting,
@@ -205,7 +205,7 @@ Wiimote::Wiimote(const unsigned int index) : m_index(index)
                         {"Sideways Wiimote", nullptr, nullptr, _trans("Sideways Wii Remote")},
                         false);
 
-  // hotkeys
+  // Hotkeys
   groups.emplace_back(m_hotkeys = new ControllerEmu::ModifySettingsButton(_trans("Hotkeys")));
   // hotkeys to temporarily modify the Wii Remote orientation (sideways, upright)
   // this setting modifier is toggled
@@ -233,7 +233,7 @@ ControllerEmu::ControlGroup* Wiimote::GetWiimoteGroup(WiimoteGroup group)
     return m_dpad;
   case WiimoteGroup::Shake:
     return m_shake;
-  case WiimoteGroup::IR:
+  case WiimoteGroup::Point:
     return m_ir;
   case WiimoteGroup::Tilt:
     return m_tilt;
@@ -281,6 +281,26 @@ ControllerEmu::ControlGroup* Wiimote::GetTurntableGroup(TurntableGroup group)
 {
   return static_cast<Turntable*>(
              m_attachments->GetAttachmentList()[ExtensionNumber::TURNTABLE].get())
+      ->GetGroup(group);
+}
+
+ControllerEmu::ControlGroup* Wiimote::GetUDrawTabletGroup(UDrawTabletGroup group)
+{
+  return static_cast<UDrawTablet*>(
+             m_attachments->GetAttachmentList()[ExtensionNumber::UDRAW_TABLET].get())
+      ->GetGroup(group);
+}
+
+ControllerEmu::ControlGroup* Wiimote::GetDrawsomeTabletGroup(DrawsomeTabletGroup group)
+{
+  return static_cast<DrawsomeTablet*>(
+             m_attachments->GetAttachmentList()[ExtensionNumber::DRAWSOME_TABLET].get())
+      ->GetGroup(group);
+}
+
+ControllerEmu::ControlGroup* Wiimote::GetTaTaConGroup(TaTaConGroup group)
+{
+  return static_cast<TaTaCon*>(m_attachments->GetAttachmentList()[ExtensionNumber::TATACON].get())
       ->GetGroup(group);
 }
 
@@ -610,7 +630,7 @@ void Wiimote::LoadDefaults(const ControllerInterface& ciface)
   for (int i = 0; i < 3; ++i)
     m_shake->SetControlExpression(i, "Click 2");
 
-  // IR
+  // Pointing (IR)
   m_ir->SetControlExpression(0, "Cursor Y-");
   m_ir->SetControlExpression(1, "Cursor Y+");
   m_ir->SetControlExpression(2, "Cursor X-");
@@ -688,8 +708,6 @@ void Wiimote::StepDynamics()
 
 Common::Vec3 Wiimote::GetAcceleration()
 {
-  // TODO: Cursor forward/backward movement should produce acceleration.
-
   Common::Vec3 accel =
       GetOrientation() *
       GetTransformation().Transform(
@@ -724,7 +742,7 @@ Common::Matrix44 Wiimote::GetTransformation() const
   // Includes positional and rotational effects of:
   // Cursor, Swing, Tilt, Shake
 
-  // TODO: think about and clean up matrix order, make nunchuk match.
+  // TODO: Think about and clean up matrix order + make nunchuk match.
   return Common::Matrix44::Translate(-m_shake_state.position) *
          Common::Matrix44::FromMatrix33(GetRotationalMatrix(
              -m_tilt_state.angle - m_swing_state.angle - m_cursor_state.angle)) *

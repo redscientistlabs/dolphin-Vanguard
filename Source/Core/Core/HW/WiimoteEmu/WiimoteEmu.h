@@ -40,7 +40,7 @@ enum class WiimoteGroup
   Buttons,
   DPad,
   Shake,
-  IR,
+  Point,
   Tilt,
   Swing,
   Rumble,
@@ -55,6 +55,9 @@ enum class ClassicGroup;
 enum class GuitarGroup;
 enum class DrumsGroup;
 enum class TurntableGroup;
+enum class UDrawTabletGroup;
+enum class DrawsomeTabletGroup;
+enum class TaTaConGroup;
 
 template <typename T>
 void UpdateCalibrationDataChecksum(T& data, int cksum_bytes)
@@ -80,27 +83,21 @@ void UpdateCalibrationDataChecksum(T& data, int cksum_bytes)
 class Wiimote : public ControllerEmu::EmulatedController
 {
 public:
-  enum : u8
-  {
-    ACCEL_ZERO_G = 0x80,
-    ACCEL_ONE_G = 0x9A,
-  };
+  static constexpr u8 ACCEL_ZERO_G = 0x80;
+  static constexpr u8 ACCEL_ONE_G = 0x9A;
 
-  enum : u16
-  {
-    PAD_LEFT = 0x01,
-    PAD_RIGHT = 0x02,
-    PAD_DOWN = 0x04,
-    PAD_UP = 0x08,
-    BUTTON_PLUS = 0x10,
+  static constexpr u16 PAD_LEFT = 0x01;
+  static constexpr u16 PAD_RIGHT = 0x02;
+  static constexpr u16 PAD_DOWN = 0x04;
+  static constexpr u16 PAD_UP = 0x08;
+  static constexpr u16 BUTTON_PLUS = 0x10;
 
-    BUTTON_TWO = 0x0100,
-    BUTTON_ONE = 0x0200,
-    BUTTON_B = 0x0400,
-    BUTTON_A = 0x0800,
-    BUTTON_MINUS = 0x1000,
-    BUTTON_HOME = 0x8000,
-  };
+  static constexpr u16 BUTTON_TWO = 0x0100;
+  static constexpr u16 BUTTON_ONE = 0x0200;
+  static constexpr u16 BUTTON_B = 0x0400;
+  static constexpr u16 BUTTON_A = 0x0800;
+  static constexpr u16 BUTTON_MINUS = 0x1000;
+  static constexpr u16 BUTTON_HOME = 0x8000;
 
   explicit Wiimote(unsigned int index);
 
@@ -113,6 +110,9 @@ public:
   ControllerEmu::ControlGroup* GetGuitarGroup(GuitarGroup group);
   ControllerEmu::ControlGroup* GetDrumsGroup(DrumsGroup group);
   ControllerEmu::ControlGroup* GetTurntableGroup(TurntableGroup group);
+  ControllerEmu::ControlGroup* GetUDrawTabletGroup(UDrawTabletGroup group);
+  ControllerEmu::ControlGroup* GetDrawsomeTabletGroup(DrawsomeTabletGroup group);
+  ControllerEmu::ControlGroup* GetTaTaConGroup(TaTaConGroup group);
 
   void Update();
   void StepDynamics();

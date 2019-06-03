@@ -530,7 +530,6 @@
   </ItemGroup>
   <!--Put standard C/C++ headers here. Headers that are listed in the QtMoc ItemGroup must NOT be listed here.-->
   <ItemGroup>
-    <ClInclude Include="..\..\..\..\Dolphin Narry%27s Mod\Source\Core\DolphinQt\NarrysMod\ThreadLocalHelper.h" />
     <ClInclude Include="Config\Mapping\MappingCommon.h" />
     <ClInclude Include="Debugger\RegisterColumn.h" />
     <ClInclude Include="NarrysMod\Helpers.hpp" />

@@ -258,6 +258,16 @@ void RegisterWidget::PopulateTable()
                 [i] { return PowerPC::ppcState.spr[SPR_GQR0 + i]; }, nullptr);
   }
 
+  // HID registers
+  AddRegister(24, 7, RegisterType::hid, "HID0", [] { return PowerPC::ppcState.spr[SPR_HID0]; },
+              [](u64 value) { PowerPC::ppcState.spr[SPR_HID0] = static_cast<u32>(value); });
+  AddRegister(25, 7, RegisterType::hid, "HID1", [] { return PowerPC::ppcState.spr[SPR_HID1]; },
+              [](u64 value) { PowerPC::ppcState.spr[SPR_HID1] = static_cast<u32>(value); });
+  AddRegister(26, 7, RegisterType::hid, "HID2", [] { return PowerPC::ppcState.spr[SPR_HID2]; },
+              [](u64 value) { PowerPC::ppcState.spr[SPR_HID2] = static_cast<u32>(value); });
+  AddRegister(27, 7, RegisterType::hid, "HID4", [] { return PowerPC::ppcState.spr[SPR_HID4]; },
+              [](u64 value) { PowerPC::ppcState.spr[SPR_HID4] = static_cast<u32>(value); });
+
   for (int i = 0; i < 16; i++)
   {
     // SR registers
@@ -355,12 +365,12 @@ void RegisterWidget::AddRegister(int row, int column, RegisterType type, std::st
 
     m_table->setItem(row, column, label);
     m_table->setItem(row, column + 1, value);
-    m_table->item(row, column + 1)->setTextAlignment(Qt::AlignRight);
+    m_table->item(row, column + 1)->setTextAlignment(Qt::AlignVCenter | Qt::AlignRight);
   }
   else
   {
     m_table->setItem(row, column, value);
-    m_table->item(row, column)->setTextAlignment(Qt::AlignRight);
+    m_table->item(row, column)->setTextAlignment(Qt::AlignVCenter | Qt::AlignRight);
   }
 
   connect(this, &RegisterWidget::UpdateTable, [value] { value->RefreshValue(); });

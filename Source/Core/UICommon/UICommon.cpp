@@ -194,7 +194,7 @@ void SetUserDirectory(const std::string& custom_path)
     return;
   }
 
-  std::string user_path = "";
+  std::string user_path;
 #ifdef _WIN32
   // Detect where the User directory is. There are five different cases
   // (on top of the command line flag, which overrides all this):
@@ -255,7 +255,7 @@ void SetUserDirectory(const std::string& custom_path)
     user_path += DIR_SEP;
 
 #else
-  if (File::Exists(ROOT_DIR DIR_SEP USERDATA_DIR))
+  if (File::IsDirectory(ROOT_DIR DIR_SEP USERDATA_DIR))
   {
     user_path = ROOT_DIR DIR_SEP USERDATA_DIR DIR_SEP;
   }
@@ -374,8 +374,8 @@ void EnableScreenSaver(Window win, bool enable)
 void EnableScreenSaver(bool enable)
 #endif
 {
-// Inhibit the screensaver. Depending on the operating system this may also
-// disable low-power states and/or screen dimming.
+  // Inhibit the screensaver. Depending on the operating system this may also
+  // disable low-power states and/or screen dimming.
 
 #if defined(HAVE_X11) && HAVE_X11
   if (Config::Get(Config::MAIN_DISABLE_SCREENSAVER))

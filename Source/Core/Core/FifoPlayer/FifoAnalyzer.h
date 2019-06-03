@@ -10,8 +10,6 @@
 
 namespace FifoAnalyzer
 {
-void Init();
-
 u8 ReadFifo8(const u8*& data);
 u16 ReadFifo16(const u8*& data);
 u32 ReadFifo32(const u8*& data);
@@ -38,4 +36,4 @@ void CalculateVertexElementSizes(int sizes[], int vatIndex, const CPMemory& cpMe
 
 extern bool s_DrawingObject;
 extern FifoAnalyzer::CPMemory s_CpMem;
-}
+}  // namespace FifoAnalyzer

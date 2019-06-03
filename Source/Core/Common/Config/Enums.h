@@ -45,4 +45,4 @@ constexpr std::array<LayerType, 8> SEARCH_ORDER{{
     LayerType::GlobalGame,
     LayerType::Base,
 }};
-}
+}  // namespace Config

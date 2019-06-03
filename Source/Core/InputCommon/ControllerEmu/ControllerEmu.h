@@ -17,8 +17,6 @@
 
 class ControllerInterface;
 
-#define sign(x) ((x) ? (x) < 0 ? -1 : 1 : 0)
-
 const char* const named_directions[] = {_trans("Up"), _trans("Down"), _trans("Left"),
                                         _trans("Right")};
 
@@ -30,7 +28,9 @@ class EmulatedController
 {
 public:
   virtual ~EmulatedController();
+
   virtual std::string GetName() const = 0;
+  virtual std::string GetDisplayName() const;
 
   virtual void LoadDefaults(const ControllerInterface& ciface);
 

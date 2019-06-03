@@ -4,6 +4,7 @@
 
 #include "Core/HW/WiimoteEmu/Dynamics.h"
 
+#include <algorithm>
 #include <cmath>
 
 #include "Common/MathUtil.h"
@@ -170,7 +171,7 @@ void EmulateSwing(MotionState* state, ControllerEmu::Force* swing_group, float t
   if (y_progress > max_y_progress || y_progress < -1)
   {
     state->position.y =
-        MathUtil::Clamp(state->position.y, -1.f * max_distance, max_y_progress * max_distance);
+        std::clamp(state->position.y, -1.f * max_distance, max_y_progress * max_distance);
     state->velocity.y = 0;
     state->acceleration.y = 0;
   }
@@ -184,9 +185,9 @@ WiimoteCommon::DataReportBuilder::AccelData ConvertAccelData(const Common::Vec3&
   // 10-bit integers.
   constexpr long MAX_VALUE = (1 << 10) - 1;
 
-  return {u16(MathUtil::Clamp(std::lround(scaled_accel.x + zero_g), 0l, MAX_VALUE)),
-          u16(MathUtil::Clamp(std::lround(scaled_accel.y + zero_g), 0l, MAX_VALUE)),
-          u16(MathUtil::Clamp(std::lround(scaled_accel.z + zero_g), 0l, MAX_VALUE))};
+  return {u16(std::clamp(std::lround(scaled_accel.x + zero_g), 0l, MAX_VALUE)),
+          u16(std::clamp(std::lround(scaled_accel.y + zero_g), 0l, MAX_VALUE)),
+          u16(std::clamp(std::lround(scaled_accel.z + zero_g), 0l, MAX_VALUE))};
 }
 
 void EmulateCursor(MotionState* state, ControllerEmu::Cursor* ir_group, float time_elapsed)
@@ -203,7 +204,6 @@ void EmulateCursor(MotionState* state, ControllerEmu::Cursor* ir_group, float ti
 
   // Nintendo recommends a distance of 1-3 meters.
   constexpr float NEUTRAL_DISTANCE = 2.f;
-  constexpr float MOVE_DISTANCE = 1.f;
 
   // When the sensor bar position is on bottom, apply the "offset" setting negatively.
   // This is kinda odd but it does seem to maintain consistent cursor behavior.
@@ -214,25 +214,21 @@ void EmulateCursor(MotionState* state, ControllerEmu::Cursor* ir_group, float ti
   const float yaw_scale = ir_group->GetTotalYaw() / 2;
   const float pitch_scale = ir_group->GetTotalPitch() / 2;
 
-  // TODO: Move state out of ControllerEmu::Cursor
-  // TODO: Use ApproachPositionWithJerk
-  // TODO: Move forward/backward after rotation.
-  const auto new_position =
-      Common::Vec3(0, NEUTRAL_DISTANCE - MOVE_DISTANCE * float(cursor.z), -height);
+  // Just jump to the target position.
+  state->position = {0, NEUTRAL_DISTANCE, -height};
+  state->velocity = {};
+  state->acceleration = {};
 
   const auto target_angle = Common::Vec3(pitch_scale * -cursor.y, 0, yaw_scale * -cursor.x);
 
-  // If cursor was hidden, jump to the target position/angle immediately.
+  // If cursor was hidden, jump to the target angle immediately.
   if (state->position.y < 0)
   {
-    state->position = new_position;
     state->angle = target_angle;
+    state->angular_velocity = {};
 
     return;
   }
-
-  state->acceleration = new_position - state->position;
-  state->position = new_position;
 
   // Higher values will be more responsive but increase rate of M+ "desync".
   // I'd rather not expose this value in the UI if not needed.

@@ -2,7 +2,7 @@
 // Licensed under GPLv2+
 // Refer to the license.txt file included.
 
-#include <cstring>
+#include "VideoCommon/VertexShaderGen.h"
 
 #include "Common/Assert.h"
 #include "Common/CommonTypes.h"
@@ -10,7 +10,6 @@
 #include "VideoCommon/LightingShaderGen.h"
 #include "VideoCommon/NativeVertexFormat.h"
 #include "VideoCommon/VertexLoaderManager.h"
-#include "VideoCommon/VertexShaderGen.h"
 #include "VideoCommon/VideoCommon.h"
 #include "VideoCommon/VideoConfig.h"
 #include "VideoCommon/XFMemory.h"
@@ -18,10 +17,9 @@
 VertexShaderUid GetVertexShaderUid()
 {
   VertexShaderUid out;
-  vertex_shader_uid_data* uid_data = out.GetUidData<vertex_shader_uid_data>();
-  memset(uid_data, 0, sizeof(*uid_data));
+  vertex_shader_uid_data* const uid_data = out.GetUidData();
 
-  //Narrysmod - Assert to return
+    // Narrysmod - Assert to return
   if (bpmem.genMode.numtexgens != xfmem.numTexGen.numTexGens ||
       bpmem.genMode.numcolchans != xfmem.numChan.numColorChans)
   {

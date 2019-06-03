@@ -22,7 +22,6 @@
 #include "Common/CommonTypes.h"
 #include "Common/File.h"
 #include "Common/FileUtil.h"
-#include "Common/Hash.h"
 #include "Common/HttpRequest.h"
 #include "Common/Image.h"
 #include "Common/IniFile.h"
@@ -30,7 +29,6 @@
 #include "Common/StringUtil.h"
 #include "Common/Swap.h"
 
-#include "Core/Boot/Boot.h"
 #include "Core/Config/UISettings.h"
 #include "Core/ConfigManager.h"
 #include "Core/IOS/ES/Formats.h"
@@ -41,13 +39,15 @@
 #include "DiscIO/Volume.h"
 #include "DiscIO/WiiSaveBanner.h"
 
-constexpr const char* COVER_URL = "https://art.gametdb.com/wii/cover/%s/%s.png";
-
 namespace UICommon
 {
-static const std::string EMPTY_STRING;
+namespace
+{
+constexpr char COVER_URL[] = "https://art.gametdb.com/wii/cover/%s/%s.png";
 
-static bool UseGameCovers()
+const std::string EMPTY_STRING;
+
+bool UseGameCovers()
 {
 // We ifdef this out on Android because accessing the config before emulation start makes us crash.
 // The Android GUI handles covers in Java anyway, so this doesn't make us lose any functionality.
@@ -57,9 +57,13 @@ static bool UseGameCovers()
   return Config::Get(Config::MAIN_USE_GAME_COVERS);
 #endif
 }
+}  // Anonymous namespace
 
 DiscIO::Language GameFile::GetConfigLanguage() const
 {
+  if (m_platform == DiscIO::Platform::GameCubeDisc && m_country == DiscIO::Country::Japan)
+    return DiscIO::Language::Japanese;
+
 #ifdef ANDROID
   // TODO: Make the Android app load the config at app start instead of emulation start
   // so that we can access the user's preference here
@@ -108,8 +112,9 @@ GameFile::LookupUsingConfigLanguage(const std::map<DiscIO::Language, std::string
   return Lookup(GetConfigLanguage(), strings);
 }
 
-GameFile::GameFile(const std::string& path)
-    : m_file_path(path), m_region(DiscIO::Region::Unknown), m_country(DiscIO::Country::Unknown)
+GameFile::GameFile() = default;
+
+GameFile::GameFile(std::string path) : m_file_path(std::move(path))
 {
   {
     std::string name, extension;
@@ -157,6 +162,8 @@ GameFile::GameFile(const std::string& path)
   }
 }
 
+GameFile::~GameFile() = default;
+
 bool GameFile::IsValid() const
 {
   if (!m_valid)
@@ -180,13 +187,13 @@ bool GameFile::CustomCoverChanged()
 
   // This icon naming format is intended as an alternative to Homebrew Channel icons
   // for those who don't want to have a Homebrew Channel style folder structure.
-  bool success = File::Exists(path + name + ".cover.png") &&
-                 File::ReadFileToString(path + name + ".cover.png", contents);
+  const std::string cover_path = path + name + ".cover.png";
+  bool success = File::Exists(cover_path) && File::ReadFileToString(cover_path, contents);
 
   if (!success)
   {
-    success =
-        File::Exists(path + "cover.png") && File::ReadFileToString(path + "cover.png", contents);
+    const std::string alt_cover_path = path + "cover.png";
+    success = File::Exists(alt_cover_path) && File::ReadFileToString(alt_cover_path, contents);
   }
 
   if (success)
@@ -201,17 +208,13 @@ void GameFile::DownloadDefaultCover()
     return;
 
   const auto cover_path = File::GetUserPath(D_COVERCACHE_IDX) + DIR_SEP;
+  const auto png_path = cover_path + m_gametdb_id + ".png";
 
   // If the cover has already been downloaded, abort
-  if (File::Exists(cover_path + m_gametdb_id + ".png"))
+  if (File::Exists(png_path))
     return;
 
-  Common::HttpRequest request;
-
   std::string region_code;
-
-  auto user_lang = SConfig::GetInstance().GetCurrentLanguage(DiscIO::IsWii(GetPlatform()));
-
   switch (m_region)
   {
   case DiscIO::Region::NTSC_J:
@@ -224,6 +227,8 @@ void GameFile::DownloadDefaultCover()
     region_code = "KO";
     break;
   case DiscIO::Region::PAL:
+  {
+    const auto user_lang = SConfig::GetInstance().GetCurrentLanguage(DiscIO::IsWii(GetPlatform()));
     switch (user_lang)
     {
     case DiscIO::Language::German:
@@ -247,19 +252,20 @@ void GameFile::DownloadDefaultCover()
       break;
     }
     break;
+  }
   case DiscIO::Region::Unknown:
     region_code = "EN";
     break;
   }
 
-  auto response =
+  Common::HttpRequest request;
+  const auto response =
       request.Get(StringFromFormat(COVER_URL, region_code.c_str(), m_gametdb_id.c_str()));
 
-  if (response)
-  {
-    File::WriteStringToFile(std::string(response.value().begin(), response.value().end()),
-                            cover_path + m_gametdb_id + ".png");
-  }
+  if (!response)
+    return;
+
+  File::WriteStringToFile(png_path, std::string(response->begin(), response->end()));
 }
 
 bool GameFile::DefaultCoverChanged()
@@ -468,7 +474,12 @@ std::string GameFile::GetUniqueIdentifier() const
   if (GetRevision() != 0)
     info.push_back("Revision " + std::to_string(GetRevision()));
 
-  const std::string& name = GetName();
+  std::string name = GetLongName(DiscIO::Language::English);
+  if (name.empty())
+  {
+    // Use the file name as a fallback. Not necessarily consistent, but it's the best we have
+    name = m_file_name;
+  }
 
   int disc_number = GetDiscNumber() + 1;
 

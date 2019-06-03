@@ -48,8 +48,8 @@ public:
   ~NullShader() = default;
 };
 
-std::unique_ptr<AbstractShader> Renderer::CreateShaderFromSource(ShaderStage stage,
-                                                                 const char* source, size_t length)
+std::unique_ptr<AbstractShader>
+Renderer::CreateShaderFromSource(ShaderStage stage, [[maybe_unused]] std::string_view source)
 {
   return std::make_unique<NullShader>(stage);
 }
@@ -63,7 +63,7 @@ std::unique_ptr<AbstractShader> Renderer::CreateShaderFromBinary(ShaderStage sta
 class NullPipeline final : public AbstractPipeline
 {
 public:
-  NullPipeline() : AbstractPipeline() {}
+  NullPipeline() = default;
   ~NullPipeline() override = default;
 };
 

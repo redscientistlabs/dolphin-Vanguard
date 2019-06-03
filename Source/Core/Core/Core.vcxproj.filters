@@ -173,6 +173,7 @@
     <ClCompile Include="Core.cpp" />
     <ClCompile Include="CoreTiming.cpp" />
     <ClCompile Include="HotkeyManager.cpp" />
+    <ClCompile Include="LibusbUtils.cpp" />
     <ClCompile Include="MemTools.cpp" />
     <ClCompile Include="Movie.cpp" />
     <ClCompile Include="NetPlayClient.cpp" />
@@ -461,6 +462,9 @@
     </ClCompile>
     <ClCompile Include="HW\Sram.cpp">
       <Filter>HW %28Flipper/Hollywood%29\EXI - Expansion Interface</Filter>
+    </ClCompile>
+    <ClCompile Include="HW\GCMemcard\GCIFile.cpp">
+      <Filter>HW %28Flipper/Hollywood%29\GCMemcard</Filter>
     </ClCompile>
     <ClCompile Include="HW\GCMemcard\GCMemcard.cpp">
       <Filter>HW %28Flipper/Hollywood%29\GCMemcard</Filter>
@@ -895,6 +899,9 @@
     <ClCompile Include="HW\WiimoteEmu\Extension\Classic.cpp">
       <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu\Extension</Filter>
     </ClCompile>
+    <ClCompile Include="HW\WiimoteEmu\Extension\DrawsomeTablet.cpp">
+      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu\Extension</Filter>
+    </ClCompile>
     <ClCompile Include="HW\WiimoteEmu\Extension\Drums.cpp">
       <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu\Extension</Filter>
     </ClCompile>
@@ -904,7 +911,13 @@
     <ClCompile Include="HW\WiimoteEmu\Extension\Nunchuk.cpp">
       <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu\Extension</Filter>
     </ClCompile>
+    <ClCompile Include="HW\WiimoteEmu\Extension\TaTaCon.cpp">
+      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu\Extension</Filter>
+    </ClCompile>
     <ClCompile Include="HW\WiimoteEmu\Extension\Turntable.cpp">
+      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu\Extension</Filter>
+    </ClCompile>
+    <ClCompile Include="HW\WiimoteEmu\Extension\UDrawTablet.cpp">
       <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu\Extension</Filter>
     </ClCompile>
     <ClCompile Include="HW\WiimoteEmu\Extension\Extension.cpp">
@@ -916,7 +929,9 @@
     <ClCompile Include="HW\WiimoteCommon\DataReport.cpp">
       <Filter>HW %28Flipper/Hollywood%29\Wiimote\Common</Filter>
     </ClCompile>
-    <ClCompile Include="PowerPC\ConditionRegister.cpp" />
+    <ClCompile Include="HW\AddressSpace.cpp">
+      <Filter>HW %28Flipper/Hollywood%29</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BootManager.h" />
@@ -925,6 +940,7 @@
     <ClInclude Include="CoreTiming.h" />
     <ClInclude Include="Host.h" />
     <ClInclude Include="HotkeyManager.h" />
+    <ClInclude Include="LibusbUtils.h" />
     <ClInclude Include="MemTools.h" />
     <ClInclude Include="Movie.h" />
     <ClInclude Include="NetPlayClient.h" />
@@ -1161,6 +1177,9 @@
     </ClInclude>
     <ClInclude Include="HW\Sram.h">
       <Filter>HW %28Flipper/Hollywood%29\EXI - Expansion Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="HW\GCMemcard\GCIFile.h">
+      <Filter>HW %28Flipper/Hollywood%29\GCMemcard</Filter>
     </ClInclude>
     <ClInclude Include="HW\GCMemcard\GCMemcard.h">
       <Filter>HW %28Flipper/Hollywood%29\GCMemcard</Filter>
@@ -1608,6 +1627,9 @@
     <ClInclude Include="HW\WiimoteEmu\Extension\Classic.h">
       <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu\Extension</Filter>
     </ClInclude>
+    <ClInclude Include="HW\WiimoteEmu\Extension\DrawsomeTablet.h">
+      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu\Extension</Filter>
+    </ClInclude>
     <ClInclude Include="HW\WiimoteEmu\Extension\Drums.h">
       <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu\Extension</Filter>
     </ClInclude>
@@ -1617,7 +1639,13 @@
     <ClInclude Include="HW\WiimoteEmu\Extension\Nunchuk.h">
       <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu\Extension</Filter>
     </ClInclude>
+    <ClInclude Include="HW\WiimoteEmu\Extension\TaTaCon.h">
+      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu\Extension</Filter>
+    </ClInclude>
     <ClInclude Include="HW\WiimoteEmu\Extension\Turntable.h">
+      <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu\Extension</Filter>
+    </ClInclude>
+    <ClInclude Include="HW\WiimoteEmu\Extension\UDrawTablet.h">
       <Filter>HW %28Flipper/Hollywood%29\Wiimote\Emu\Extension</Filter>
     </ClInclude>
     <ClInclude Include="HW\WiimoteEmu\Extension\Extension.h">
@@ -1630,6 +1658,9 @@
       <Filter>HW %28Flipper/Hollywood%29\Wiimote\Common</Filter>
     </ClInclude>
     <ClInclude Include="PowerPC\ConditionRegister.h" />
+    <ClInclude Include="HW\AddressSpace.h">
+      <Filter>HW %28Flipper/Hollywood%29</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Text Include="CMakeLists.txt" />

@@ -155,7 +155,7 @@ BootParameters::GenerateFromFile(std::vector<std::string> paths,
     std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
   }
 
-  const std::string path = paths.front();
+  std::string path = paths.front();
   if (paths.size() == 1)
     paths.clear();
 
@@ -172,14 +172,16 @@ BootParameters::GenerateFromFile(std::vector<std::string> paths,
 
     if (extension == ".elf")
     {
-      return std::make_unique<BootParameters>(
-          Executable{std::move(path), std::make_unique<ElfReader>(path)}, savestate_path);
+      auto elf_reader = std::make_unique<ElfReader>(path);
+      return std::make_unique<BootParameters>(Executable{std::move(path), std::move(elf_reader)},
+                                              savestate_path);
     }
 
     if (extension == ".dol")
     {
-      return std::make_unique<BootParameters>(
-          Executable{std::move(path), std::make_unique<DolReader>(path)}, savestate_path);
+      auto dol_reader = std::make_unique<DolReader>(path);
+      return std::make_unique<BootParameters>(Executable{std::move(path), std::move(dol_reader)},
+                                              savestate_path);
     }
 
     if (is_drive)
@@ -383,7 +385,11 @@ bool CBoot::BootUp(std::unique_ptr<BootParameters> boot)
 {
   SConfig& config = SConfig::GetInstance();
 
-  g_symbolDB.Clear();
+  if (!g_symbolDB.IsEmpty())
+  {
+    g_symbolDB.Clear();
+    UpdateDebugger_MapLoaded();
+  }
 
   // PAL Wii uses NTSC framerate and linecount in 60Hz modes
   VideoInterface::Preset(DiscIO::IsNTSC(config.m_region) ||

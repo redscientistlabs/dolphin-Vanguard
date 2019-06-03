@@ -1,7 +1,7 @@
 ########################################
 # General setup
 #
-cmake_minimum_required(VERSION 3.5.0)
+cmake_minimum_required(VERSION 3.10)
 set(CMAKE_OSX_ARCHITECTURES "x86_64")
 # Minimum OS X version.
 # This is inserted into the Info.plist as well.
@@ -107,6 +107,14 @@ endif()
 # as defined above.
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/Binaries)
 
+if (WIN32)
+  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/Binary)
+  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
+  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
+  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
+  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
+endif()
+
 # setup CCache
 include(CCache)
 
@@ -203,8 +211,8 @@ endif()
 
 
 # Enforce minimum GCC version
-if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 6.0)
-  message(FATAL_ERROR "Dolphin requires at least GCC 6.0 (found ${CMAKE_CXX_COMPILER_VERSION})")
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7.0)
+  message(FATAL_ERROR "Dolphin requires at least GCC 7.0 (found ${CMAKE_CXX_COMPILER_VERSION})")
 endif()
 
 if(CMAKE_GENERATOR MATCHES "Ninja")
@@ -361,6 +369,11 @@ if(ENABLE_VTUNE)
   )
 endif()
 
+if(WIN32)
+  message(STATUS "Building for Windows, disabling NoGUI frontend.")
+  set(ENABLE_NOGUI OFF)
+endif()
+
 if(ANDROID)
   message(STATUS "Building for Android")
   if(NOT ENABLE_HEADLESS)
@@ -481,6 +494,8 @@ endif()
 if(UNIX)
   message(STATUS "Using named pipes as controller inputs")
   add_definitions(-DUSE_PIPES=1)
+  message(STATUS "Watching game memory for changes")
+  add_definitions(-DUSE_MEMORYWATCHER=1)
 endif()
 
 if(ENABLE_ANALYTICS)
@@ -594,7 +609,7 @@ endif()
 message(STATUS "Using static FreeSurround from Externals")
 add_subdirectory(Externals/FreeSurround)
 
-if (APPLE)
+if (APPLE OR WIN32)
   message(STATUS "Using ed25519 from Externals")
   add_subdirectory(Externals/ed25519)
 endif()

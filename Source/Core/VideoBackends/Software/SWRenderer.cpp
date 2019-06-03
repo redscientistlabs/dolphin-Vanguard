@@ -68,7 +68,7 @@ public:
 };
 
 std::unique_ptr<AbstractShader>
-SWRenderer::CreateShaderFromSource(ShaderStage stage, const char* source, size_t length)
+SWRenderer::CreateShaderFromSource(ShaderStage stage, [[maybe_unused]] std::string_view source)
 {
   return std::make_unique<SWShader>(stage);
 }
@@ -82,7 +82,7 @@ std::unique_ptr<AbstractShader> SWRenderer::CreateShaderFromBinary(ShaderStage s
 class SWPipeline final : public AbstractPipeline
 {
 public:
-  SWPipeline() : AbstractPipeline() {}
+  SWPipeline() = default;
   ~SWPipeline() override = default;
 };
 
