@@ -72,6 +72,7 @@ public:
   static array<String ^>^ configPaths;
 
   static volatile bool loading = false;
+  static bool attached = false;
 };
 
 static void EmuThreadExecute(Action^ callback)
@@ -126,8 +127,8 @@ void VanguardClient::RegisterVanguardSpec()
   AllSpec::VanguardSpec = gcnew FullSpec(emuSpecTemplate, true);
   // You have to feed a partial spec as a template
 
-  if (VanguardCore.attached)
-    RTCV.Vanguard.VanguardConnector.PushVanguardSpecRef(VanguardCore.VanguardSpec);
+  if (VanguardClient::attached)
+    RTCV::Vanguard::VanguardConnector::PushVanguardSpecRef(AllSpec::VanguardSpec);
 
   LocalNetCoreRouter::Route(NetcoreCommands::CORRUPTCORE, NetcoreCommands::REMOTE_PUSHVANGUARDSPEC, emuSpecTemplate, true);
   LocalNetCoreRouter::Route(NetcoreCommands::UI, NetcoreCommands::REMOTE_PUSHVANGUARDSPEC, emuSpecTemplate, true);
@@ -205,6 +206,10 @@ void VanguardClientInitializer::StartVanguardClient()
   VanguardClient::StartClient();
   VanguardClient::RegisterVanguardSpec();
   RtcCore::StartEmuSide();
+
+  //Lie if we're in attached
+  if (VanguardClient::attached)
+    VanguardConnector::ImplyClientConnected();
 }
 
 // Create our VanguardClient
@@ -218,7 +223,6 @@ void VanguardClientInitializer::Initialize()
 
 void VanguardClient::StartClient()
 {
-  bool attached = false;
   // Can't use contains
   auto args = Environment::GetCommandLineArgs();
   for (int i = 0; i < args->Length; i++)
