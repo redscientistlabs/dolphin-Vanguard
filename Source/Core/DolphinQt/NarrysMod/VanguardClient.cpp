@@ -239,8 +239,6 @@ void VanguardClient::StartClient()
   NetCore_Extensions::ConsoleHelper::CreateConsole(logPath);
   NetCore_Extensions::ConsoleHelper::HideConsole();
 
-
-
   receiver = gcnew NetCoreReceiver();
   receiver->Attached = attached;
   connector = gcnew VanguardConnector(receiver);
@@ -284,8 +282,7 @@ static bool RefreshDomains(bool updateSpecs = true)
   array<MemoryDomainProxy^>^ oldInterfaces = AllSpec::VanguardSpec->Get<array<MemoryDomainProxy^>^>(VSPEC::MEMORYDOMAINS_INTERFACES);
   array<MemoryDomainProxy ^> ^ newInterfaces = GetInterfaces();
 
-  
-	// Bruteforce it since domains can change inconsistently in some configs and we keep code consistent between implementations
+  // Bruteforce it since domains can change inconsistently in some configs and we keep code consistent between implementations
   bool domainsChanged = oldInterfaces->Length != newInterfaces->Length;
   for (int i = 0; i < oldInterfaces->Length; i++)
   {
@@ -536,7 +533,6 @@ void VanguardClient::OnMessageReceived(Object^ sender, NetCoreEventArgs^ e)
 
   case LOADSAVESTATE:
   {
-    NetCoreAdvancedMessage^ advancedMessage = (NetCoreAdvancedMessage ^)e->message;
     array<Object ^>^ cmd = static_cast<array<Object ^> ^>(advancedMessage->objectValue);
     String^ path = static_cast<String ^>(cmd[0]);
     std::string converted_path = Helpers::systemStringToUtf8String(path);
