@@ -241,6 +241,7 @@ void VanguardClient::StartClient()
 
   receiver = gcnew NetCoreReceiver();
   receiver->Attached = attached;
+  receiver->MessageReceived += gcnew EventHandler<NetCoreEventArgs ^>(&VanguardClient::OnMessageReceived);
   connector = gcnew VanguardConnector(receiver);
 }
 
