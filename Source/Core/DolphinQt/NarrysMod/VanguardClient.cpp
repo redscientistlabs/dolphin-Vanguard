@@ -289,7 +289,8 @@ static array<MemoryDomainProxy ^> ^
       return interfaces;
     }
 
-    static bool RefreshDomains(bool updateSpecs = true)
+
+static bool RefreshDomains(bool updateSpecs = true)
 {
   array<MemoryDomainProxy ^> ^ oldInterfaces =
       AllSpec::VanguardSpec->Get<array<MemoryDomainProxy ^> ^>(VSPEC::MEMORYDOMAINS_INTERFACES);
@@ -297,15 +298,21 @@ static array<MemoryDomainProxy ^> ^
 
   // Bruteforce it since domains can change inconsistently in some configs and we keep code
   // consistent between implementations
-  bool domainsChanged = oldInterfaces->Length != newInterfaces->Length;
-  for (int i = 0; i < oldInterfaces->Length; i++)
+  bool domainsChanged = false;
+  if (oldInterfaces == nullptr)
+    domainsChanged = true;
+  else
   {
-    if (domainsChanged)
-      break;
-    if (oldInterfaces[i]->Name != newInterfaces[i]->Name)
-      domainsChanged = true;
-    if (oldInterfaces[i]->Size != newInterfaces[i]->Size)
-      domainsChanged = true;
+    domainsChanged = oldInterfaces->Length != newInterfaces->Length;
+    for (int i = 0; i < oldInterfaces->Length; i++)
+    {
+      if (domainsChanged)
+        break;
+      if (oldInterfaces[i]->Name != newInterfaces[i]->Name)
+        domainsChanged = true;
+      if (oldInterfaces[i]->Size != newInterfaces[i]->Size)
+        domainsChanged = true;
+    }
   }
 
   if (updateSpecs)
@@ -317,6 +324,7 @@ static array<MemoryDomainProxy ^> ^
 
   return domainsChanged;
 }
+
 
 #pragma endregion
 
@@ -376,7 +384,6 @@ void VanguardClientUnmanaged::LOAD_GAME_DONE()
     gameDone->Set(VSPEC::SYSTEMCORE, isWii() ? "Wii" : "Gamecube");
     gameDone->Set(VSPEC::SYNCSETTINGS, "");
     gameDone->Set(VSPEC::MEMORYDOMAINS_BLACKLISTEDDOMAINS, gcnew array<String ^>{});
-    gameDone->Set(VSPEC::MEMORYDOMAINS_INTERFACES, GetInterfaces());
     gameDone->Set(VSPEC::CORE_DISKBASED, true);
 
     String ^ oldGame = AllSpec::VanguardSpec->Get<String ^>(VSPEC::GAMENAME);
@@ -392,10 +399,7 @@ void VanguardClientUnmanaged::LOAD_GAME_DONE()
 
     AllSpec::VanguardSpec->Update(gameDone, true, false);
 
-    bool domainsChanged = RefreshDomains(false);
-    // This is local. If the domains changed it propgates over netcore
-    LocalNetCoreRouter::Route(NetcoreCommands::CORRUPTCORE,
-                              NetcoreCommands::REMOTE_EVENT_DOMAINSUPDATED, domainsChanged, true);
+    bool domainsChanged = RefreshDomains(true);
 
     if (oldGame != gameName)
     {
