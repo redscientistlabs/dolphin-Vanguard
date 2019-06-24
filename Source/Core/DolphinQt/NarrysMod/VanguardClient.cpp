@@ -315,7 +315,7 @@ static array<MemoryDomainProxy ^> ^
                               NetcoreCommands::REMOTE_EVENT_DOMAINSUPDATED, domainsChanged, true);
   }
 
-  return true;
+  return domainsChanged;
 }
 
 #pragma endregion
