@@ -233,6 +233,8 @@ void VanguardClientInitializer::Initialize()
 
 void VanguardClient::StartClient()
 {
+  NetCore_Extensions::ConsoleHelper::CreateConsole(logPath);
+  NetCore_Extensions::ConsoleHelper::HideConsole();
   // Can't use contains
   auto args = Environment::GetCommandLineArgs();
   for (int i = 0; i < args->Length; i++)
@@ -246,8 +248,6 @@ void VanguardClient::StartClient()
       attached = true;
     }
   }
-  NetCore_Extensions::ConsoleHelper::CreateConsole(logPath);
-  NetCore_Extensions::ConsoleHelper::HideConsole();
 
   receiver = gcnew NetCoreReceiver();
   receiver->Attached = attached;
