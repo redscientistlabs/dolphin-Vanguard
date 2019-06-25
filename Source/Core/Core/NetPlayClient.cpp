@@ -39,11 +39,11 @@
 #include "Core/GeckoCode.h"
 #include "Core/HW/EXI/EXI_DeviceIPL.h"
 #include "Core/HW/SI/SI.h"
+#include "Core/HW/SI/SI_Device.h"
 #include "Core/HW/SI/SI_DeviceGCController.h"
 #include "Core/HW/Sram.h"
 #include "Core/HW/WiiSave.h"
 #include "Core/HW/WiiSaveStructs.h"
-#include "Core/HW/WiimoteCommon/WiimoteReport.h"
 #include "Core/HW/WiimoteEmu/WiimoteEmu.h"
 #include "Core/HW/WiimoteReal/WiimoteReal.h"
 #include "Core/IOS/FS/FileSystem.h"
@@ -52,11 +52,9 @@
 #include "Core/IOS/Uids.h"
 #include "Core/Movie.h"
 #include "Core/PowerPC/PowerPC.h"
-#include "Core/WiiRoot.h"
 #include "InputCommon/ControllerEmu/ControlGroup/Attachments.h"
 #include "InputCommon/GCAdapter.h"
 #include "InputCommon/InputConfig.h"
-#include "UICommon/GameFile.h"
 #include "VideoCommon/OnScreenDisplay.h"
 #include "VideoCommon/VideoConfig.h"
 
@@ -807,7 +805,7 @@ unsigned int NetPlayClient::OnData(sf::Packet& packet)
       if (m_sync_save_data_count == 0)
         SyncSaveDataResponse(true);
       else
-        m_dialog->AppendChat(GetStringT("Synchronizing save data..."));
+        m_dialog->AppendChat(Common::GetStringT("Synchronizing save data..."));
     }
     break;
 
@@ -1042,7 +1040,7 @@ unsigned int NetPlayClient::OnData(sf::Packet& packet)
         SyncCodeResponse(true);
       }
       else
-        m_dialog->AppendChat(GetStringT("Synchronizing Gecko codes..."));
+        m_dialog->AppendChat(Common::GetStringT("Synchronizing Gecko codes..."));
     }
     break;
 
@@ -1111,7 +1109,7 @@ unsigned int NetPlayClient::OnData(sf::Packet& packet)
         SyncCodeResponse(true);
       }
       else
-        m_dialog->AppendChat(GetStringT("Synchronizing AR codes..."));
+        m_dialog->AppendChat(Common::GetStringT("Synchronizing AR codes..."));
     }
     break;
 
@@ -1291,9 +1289,14 @@ void NetPlayClient::ThreadFunc()
     qos_session = Common::QoSSession(m_server);
 
     if (qos_session.Successful())
-      m_dialog->AppendChat(GetStringT("Quality of Service (QoS) was successfully enabled."));
+    {
+      m_dialog->AppendChat(
+          Common::GetStringT("Quality of Service (QoS) was successfully enabled."));
+    }
     else
-      m_dialog->AppendChat(GetStringT("Quality of Service (QoS) couldn't be enabled."));
+    {
+      m_dialog->AppendChat(Common::GetStringT("Quality of Service (QoS) couldn't be enabled."));
+    }
   }
 
   while (m_do_loop.IsSet())
@@ -1513,8 +1516,8 @@ bool NetPlayClient::StartGame(const std::string& path)
 
 void NetPlayClient::SyncSaveDataResponse(const bool success)
 {
-  m_dialog->AppendChat(success ? GetStringT("Data received!") :
-                                 GetStringT("Error processing data."));
+  m_dialog->AppendChat(success ? Common::GetStringT("Data received!") :
+                                 Common::GetStringT("Error processing data."));
 
   if (success)
   {
@@ -1542,7 +1545,7 @@ void NetPlayClient::SyncCodeResponse(const bool success)
   // If something failed, immediately report back that code sync failed
   if (!success)
   {
-    m_dialog->AppendChat(GetStringT("Error processing codes."));
+    m_dialog->AppendChat(Common::GetStringT("Error processing codes."));
 
     sf::Packet response_packet;
     response_packet << static_cast<MessageId>(NP_MSG_SYNC_CODES);
@@ -1555,7 +1558,7 @@ void NetPlayClient::SyncCodeResponse(const bool success)
   // If both gecko and AR codes have completely finished transferring, report back as successful
   if (m_sync_gecko_codes_complete && m_sync_ar_codes_complete)
   {
-    m_dialog->AppendChat(GetStringT("Codes received!"));
+    m_dialog->AppendChat(Common::GetStringT("Codes received!"));
 
     sf::Packet response_packet;
     response_packet << static_cast<MessageId>(NP_MSG_SYNC_CODES);

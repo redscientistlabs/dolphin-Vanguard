@@ -2,16 +2,17 @@
 // Licensed under GPLv2+
 // Refer to the license.txt file included.
 
+#include "VideoBackends/D3D/D3DBase.h"
+
 #include <algorithm>
+#include <array>
 
 #include "Common/CommonTypes.h"
 #include "Common/DynamicLibrary.h"
 #include "Common/Logging/Log.h"
 #include "Common/MsgHandler.h"
-#include "Common/StringUtil.h"
 #include "Core/Config/GraphicsSettings.h"
 #include "Core/ConfigManager.h"
-#include "VideoBackends/D3D/D3DBase.h"
 #include "VideoBackends/D3D/D3DState.h"
 #include "VideoBackends/D3D/DXTexture.h"
 #include "VideoBackends/D3DCommon/Common.h"
@@ -22,7 +23,7 @@ namespace DX11
 static Common::DynamicLibrary s_d3d11_library;
 namespace D3D
 {
-ComPtr<IDXGIFactory2> dxgi_factory;
+ComPtr<IDXGIFactory> dxgi_factory;
 ComPtr<ID3D11Device> device;
 ComPtr<ID3D11Device1> device1;
 ComPtr<ID3D11DeviceContext> context;
@@ -30,8 +31,11 @@ D3D_FEATURE_LEVEL feature_level;
 
 static ComPtr<ID3D11Debug> s_debug;
 
-static constexpr D3D_FEATURE_LEVEL s_supported_feature_levels[] = {
-    D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_1, D3D_FEATURE_LEVEL_10_0};
+constexpr std::array<D3D_FEATURE_LEVEL, 3> s_supported_feature_levels{
+    D3D_FEATURE_LEVEL_11_0,
+    D3D_FEATURE_LEVEL_10_1,
+    D3D_FEATURE_LEVEL_10_0,
+};
 
 bool Create(u32 adapter_index, bool enable_debug_layer)
 {
@@ -72,8 +76,8 @@ bool Create(u32 adapter_index, bool enable_debug_layer)
   if (enable_debug_layer)
   {
     hr = d3d11_create_device(adapter.Get(), D3D_DRIVER_TYPE_UNKNOWN, nullptr,
-                             D3D11_CREATE_DEVICE_DEBUG, s_supported_feature_levels,
-                             static_cast<UINT>(ArraySize(s_supported_feature_levels)),
+                             D3D11_CREATE_DEVICE_DEBUG, s_supported_feature_levels.data(),
+                             static_cast<UINT>(s_supported_feature_levels.size()),
                              D3D11_SDK_VERSION, &device, &feature_level, &context);
 
     // Debugbreak on D3D error
@@ -102,8 +106,8 @@ bool Create(u32 adapter_index, bool enable_debug_layer)
   if (!enable_debug_layer || FAILED(hr))
   {
     hr = d3d11_create_device(adapter.Get(), D3D_DRIVER_TYPE_UNKNOWN, nullptr, 0,
-                             s_supported_feature_levels,
-                             static_cast<UINT>(ArraySize(s_supported_feature_levels)),
+                             s_supported_feature_levels.data(),
+                             static_cast<UINT>(s_supported_feature_levels.size()),
                              D3D11_SDK_VERSION, &device, &feature_level, &context);
   }
 
@@ -169,7 +173,7 @@ std::vector<u32> GetAAModes(u32 adapter_index)
   ComPtr<ID3D11Device> temp_device = device;
   if (!temp_device)
   {
-    ComPtr<IDXGIFactory2> temp_dxgi_factory = D3DCommon::CreateDXGIFactory(false);
+    ComPtr<IDXGIFactory> temp_dxgi_factory = D3DCommon::CreateDXGIFactory(false);
     if (!temp_dxgi_factory)
       return {};
 
@@ -184,8 +188,8 @@ std::vector<u32> GetAAModes(u32 adapter_index)
     }
 
     HRESULT hr = d3d11_create_device(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, 0,
-                                     s_supported_feature_levels,
-                                     static_cast<UINT>(ArraySize(s_supported_feature_levels)),
+                                     s_supported_feature_levels.data(),
+                                     static_cast<UINT>(s_supported_feature_levels.size()),
                                      D3D11_SDK_VERSION, &temp_device, nullptr, nullptr);
     if (FAILED(hr))
       return {};

@@ -2,6 +2,7 @@
 // Licensed under GPLv2+
 // Refer to the license.txt file included.
 
+#include <array>
 #include <sstream>
 #include <string>
 #include <unordered_map>
@@ -14,9 +15,10 @@
 
 namespace ButtonManager
 {
-const std::string touchScreenKey = "Touchscreen";
-std::unordered_map<std::string, InputDevice*> m_controllers;
-std::vector<std::string> configStrings = {
+namespace
+{
+constexpr char touchScreenKey[] = "Touchscreen";
+constexpr std::array<const char*, 143> configStrings{{
     // GC
     "InputA",
     "InputB",
@@ -168,8 +170,9 @@ std::vector<std::string> configStrings = {
     "TurntableCrossRight",
     // Rumble
     "Rumble",
-};
-std::vector<ButtonType> configTypes = {
+}};
+
+constexpr std::array<ButtonType, 143> configTypes{{
     // GC
     BUTTON_A,
     BUTTON_B,
@@ -321,9 +324,11 @@ std::vector<ButtonType> configTypes = {
     TURNTABLE_CROSSFADE_RIGHT,
     // Rumble
     RUMBLE,
-};
+}};
 
-static void AddBind(const std::string& dev, sBind* bind)
+std::unordered_map<std::string, InputDevice*> m_controllers;
+
+void AddBind(const std::string& dev, sBind* bind)
 {
   auto it = m_controllers.find(dev);
   if (it != m_controllers.end())
@@ -334,6 +339,7 @@ static void AddBind(const std::string& dev, sBind* bind)
   m_controllers[dev] = new InputDevice(dev);
   m_controllers[dev]->AddBind(bind);
 }
+}  // Anonymous namespace
 
 void Init(const std::string& gameId)
 {
@@ -559,41 +565,8 @@ void Init(const std::string& gameId)
   }
   // Init our controller bindings
   IniFile ini;
-  ini.Load(File::GetUserPath(D_CONFIG_IDX) + std::string("Dolphin.ini"));
-  for (u32 a = 0; a < configStrings.size(); ++a)
-  {
-    for (int padID = 0; padID < 8; ++padID)
-    {
-      std::ostringstream config;
-      config << configStrings[a] << "_" << padID;
-      BindType type;
-      int bindnum;
-      char dev[128];
-      bool hasbind = false;
-      char modifier = '+';
-      std::string value;
-      ini.GetOrCreateSection("Android")->Get(config.str(), &value, "None");
-      if (value == "None")
-        continue;
-      if (std::string::npos != value.find("Axis"))
-      {
-        hasbind = true;
-        type = BIND_AXIS;
-        sscanf(value.c_str(), "Device '%127[^\']'-Axis %d%c", dev, &bindnum, &modifier);
-      }
-      else if (std::string::npos != value.find("Button"))
-      {
-        hasbind = true;
-        type = BIND_BUTTON;
-        sscanf(value.c_str(), "Device '%127[^\']'-Button %d", dev, &bindnum);
-      }
-      if (hasbind)
-        AddBind(std::string(dev),
-                new sBind(padID, configTypes[a], type, bindnum, modifier == '-' ? -1.0f : 1.0f));
-    }
-  }
-
-  ini.Load(File::GetUserPath(D_GAMESETTINGS_IDX) + std::string(gameId + ".ini"));
+  ini.Load(File::GetUserPath(D_CONFIG_IDX) + std::string("Dolphin.ini"), true);
+  ini.Load(File::GetUserPath(D_GAMESETTINGS_IDX) + std::string(gameId + ".ini"), true);
   for (u32 a = 0; a < configStrings.size(); ++a)
   {
     for (int padID = 0; padID < 8; ++padID)

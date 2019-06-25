@@ -19,6 +19,8 @@
 #include <variant>
 #include <vector>
 
+#include <fmt/format.h>
+
 #include "Common/Assert.h"
 #include "Common/ChunkFile.h"
 #include "Common/CommonPaths.h"
@@ -44,6 +46,7 @@
 #include "Core/HW/EXI/EXI_DeviceIPL.h"
 #include "Core/HW/ProcessorInterface.h"
 #include "Core/HW/SI/SI.h"
+#include "Core/HW/SI/SI_Device.h"
 #include "Core/HW/Wiimote.h"
 #include "Core/HW/WiimoteCommon/DataReport.h"
 #include "Core/HW/WiimoteCommon/WiimoteReport.h"
@@ -552,61 +555,49 @@ bool BeginRecordingInput(int controllers)
   return true;
 }
 
-static std::string Analog2DToString(u8 x, u8 y, const std::string& prefix, u8 range = 255)
+static std::string Analog2DToString(u32 x, u32 y, const std::string& prefix, u32 range = 255)
 {
-  u8 center = range / 2 + 1;
+  const u32 center = range / 2 + 1;
+
   if ((x <= 1 || x == center || x >= range) && (y <= 1 || y == center || y >= range))
   {
     if (x != center || y != center)
     {
       if (x != center && y != center)
       {
-        return StringFromFormat("%s:%s,%s", prefix.c_str(), x < center ? "LEFT" : "RIGHT",
-                                y < center ? "DOWN" : "UP");
+        return fmt::format("{}:{},{}", prefix, x < center ? "LEFT" : "RIGHT",
+                           y < center ? "DOWN" : "UP");
       }
-      else if (x != center)
-      {
-        return StringFromFormat("%s:%s", prefix.c_str(), x < center ? "LEFT" : "RIGHT");
-      }
-      else
-      {
-        return StringFromFormat("%s:%s", prefix.c_str(), y < center ? "DOWN" : "UP");
-      }
-    }
-    else
-    {
-      return "";
-    }
-  }
-  else
-  {
-    return StringFromFormat("%s:%d,%d", prefix.c_str(), x, y);
-  }
-}
 
-static std::string Analog1DToString(u8 v, const std::string& prefix, u8 range = 255)
-{
-  if (v > 0)
-  {
-    if (v == range)
-    {
-      return prefix;
+      if (x != center)
+      {
+        return fmt::format("{}:{}", prefix, x < center ? "LEFT" : "RIGHT");
+      }
+
+      return fmt::format("{}:{}", prefix, y < center ? "DOWN" : "UP");
     }
-    else
-    {
-      return StringFromFormat("%s:%d", prefix.c_str(), v);
-    }
-  }
-  else
-  {
+
     return "";
   }
+
+  return fmt::format("{}:{},{}", prefix, x, y);
+}
+
+static std::string Analog1DToString(u32 v, const std::string& prefix, u32 range = 255)
+{
+  if (v == 0)
+    return "";
+
+  if (v == range)
+    return prefix;
+
+  return fmt::format("{}:{}", prefix, v);
 }
 
 // NOTE: CPU Thread
 static void SetInputDisplayString(ControllerState padState, int controllerID)
 {
-  std::string display_str = StringFromFormat("P%d:", controllerID + 1);
+  std::string display_str = fmt::format("P{}:", controllerID + 1);
 
   if (padState.is_connected)
   {
@@ -654,7 +645,7 @@ static void SetWiiInputDisplayString(int remoteID, const DataReportBuilder& rpt,
 {
   int controllerID = remoteID + 4;
 
-  std::string display_str = StringFromFormat("R%d:", remoteID + 1);
+  std::string display_str = fmt::format("R{}:", remoteID + 1);
 
   if (rpt.HasCore())
   {
@@ -692,18 +683,18 @@ static void SetWiiInputDisplayString(int remoteID, const DataReportBuilder& rpt,
 
     // FYI: This will only print partial data for interleaved reports.
 
-    display_str += StringFromFormat(" ACC:%d,%d,%d", accel_data.x, accel_data.y, accel_data.z);
+    display_str += fmt::format(" ACC:{},{},{}", accel_data.x, accel_data.y, accel_data.z);
   }
 
   if (rpt.HasIR())
   {
-    const u8* const irData = rpt.GetIRDataPtr();
+    const u8* const ir_data = rpt.GetIRDataPtr();
 
     // TODO: This does not handle the different IR formats.
 
-    u16 x = irData[0] | ((irData[2] >> 4 & 0x3) << 8);
-    u16 y = irData[1] | ((irData[2] >> 6 & 0x3) << 8);
-    display_str += StringFromFormat(" IR:%d,%d", x, y);
+    const u16 x = ir_data[0] | ((ir_data[2] >> 4 & 0x3) << 8);
+    const u16 y = ir_data[1] | ((ir_data[2] >> 6 & 0x3) << 8);
+    display_str += fmt::format(" IR:{},{}", x, y);
   }
 
   // Nunchuk
@@ -716,8 +707,8 @@ static void SetWiiInputDisplayString(int remoteID, const DataReportBuilder& rpt,
     key.Decrypt((u8*)&nunchuk, 0, sizeof(nunchuk));
     nunchuk.bt.hex = nunchuk.bt.hex ^ 0x3;
 
-    std::string accel = StringFromFormat(
-        " N-ACC:%d,%d,%d", (nunchuk.ax << 2) | nunchuk.bt.acc_x_lsb,
+    const std::string accel = fmt::format(
+        " N-ACC:{},{},{}", (nunchuk.ax << 2) | nunchuk.bt.acc_x_lsb,
         (nunchuk.ay << 2) | nunchuk.bt.acc_y_lsb, (nunchuk.az << 2) | nunchuk.bt.acc_z_lsb);
 
     if (nunchuk.bt.c)
@@ -802,6 +793,8 @@ void CheckPadStatus(const GCPadStatus* PadStatus, int controllerID)
   s_padState.CStickY = PadStatus->substickY;
 
   s_padState.is_connected = PadStatus->isConnected;
+
+  s_padState.get_origin = (PadStatus->button & PAD_GET_ORIGIN) != 0;
 
   s_padState.disc = s_bDiscChange;
   s_bDiscChange = false;
@@ -1182,6 +1175,10 @@ void PlayController(GCPadStatus* PadStatus, int controllerID)
     PadStatus->button |= PAD_TRIGGER_L;
   if (s_padState.R)
     PadStatus->button |= PAD_TRIGGER_R;
+
+  if (s_padState.get_origin)
+    PadStatus->button |= PAD_GET_ORIGIN;
+
   if (s_padState.disc)
   {
     Core::RunAsCPUThread([] {
@@ -1338,9 +1335,9 @@ void SaveRecording(const std::string& filename)
   }
 
   if (success)
-    Core::DisplayMessage(StringFromFormat("DTM %s saved", filename.c_str()), 2000);
+    Core::DisplayMessage(fmt::format("DTM {} saved", filename), 2000);
   else
-    Core::DisplayMessage(StringFromFormat("Failed to save %s", filename.c_str()), 2000);
+    Core::DisplayMessage(fmt::format("Failed to save {}", filename), 2000);
 }
 
 void SetGCInputManip(GCManipFunction func)

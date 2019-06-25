@@ -5,8 +5,8 @@
 #include "Core/Boot/Boot.h"
 
 #ifdef _MSC_VER
-#include <experimental/filesystem>
-namespace fs = std::experimental::filesystem;
+#include <filesystem>
+namespace fs = std::filesystem;
 #define HAS_STD_FILESYSTEM
 #endif
 
@@ -88,9 +88,7 @@ static std::vector<std::string> ReadM3UFile(const std::string& m3u_path,
     if (!line.empty() && line.front() != '#')  // Comments start with #
     {
 #ifdef HAS_STD_FILESYSTEM
-      const fs::path path_line = fs::u8path(line);
-      const std::string path_to_add =
-          path_line.is_relative() ? fs::u8path(folder_path).append(path_line).u8string() : line;
+      const std::string path_to_add = (fs::u8path(folder_path) / fs::u8path(line)).u8string();
 #else
       const std::string path_to_add = line.front() != '/' ? folder_path + line : line;
 #endif
@@ -254,21 +252,23 @@ bool CBoot::FindMapFile(std::string* existing_map_file, std::string* writable_ma
   if (writable_map_file)
     *writable_map_file = File::GetUserPath(D_MAPS_IDX) + game_id + ".map";
 
-  bool found = false;
-  static const std::string maps_directories[] = {File::GetUserPath(D_MAPS_IDX),
-                                                 File::GetSysDirectory() + MAPS_DIR DIR_SEP};
-  for (size_t i = 0; !found && i < ArraySize(maps_directories); ++i)
+  static const std::array<std::string, 2> maps_directories{
+      File::GetUserPath(D_MAPS_IDX),
+      File::GetSysDirectory() + MAPS_DIR DIR_SEP,
+  };
+  for (const auto& directory : maps_directories)
   {
-    std::string path = maps_directories[i] + game_id + ".map";
+    std::string path = directory + game_id + ".map";
     if (File::Exists(path))
     {
-      found = true;
       if (existing_map_file)
-        *existing_map_file = path;
+        *existing_map_file = std::move(path);
+
+      return true;
     }
   }
 
-  return found;
+  return false;
 }
 
 bool CBoot::LoadMapFromFilename()

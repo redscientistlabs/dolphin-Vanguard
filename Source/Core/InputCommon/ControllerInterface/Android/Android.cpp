@@ -8,9 +8,7 @@
 #include <thread>
 #include "InputCommon/ControllerInterface/ControllerInterface.h"
 
-namespace ciface
-{
-namespace Android
+namespace ciface::Android
 {
 void PopulateDevices()
 {
@@ -237,10 +235,7 @@ void Touchscreen::Motor::SetState(ControlState state)
 
 void Touchscreen::Motor::Rumble(int padID, double state)
 {
-  JNIEnv* env;
-  IDCache::GetJavaVM()->AttachCurrentThread(&env, nullptr);
+  JNIEnv* env = IDCache::GetEnvForThread();
   env->CallStaticVoidMethod(IDCache::GetNativeLibraryClass(), IDCache::GetDoRumble(), padID, state);
-  IDCache::GetJavaVM()->DetachCurrentThread();
 }
-}  // namespace Android
-}  // namespace ciface
+}  // namespace ciface::Android
