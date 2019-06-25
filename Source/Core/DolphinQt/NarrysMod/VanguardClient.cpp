@@ -565,7 +565,7 @@ void VanguardClient::OnMessageReceived(Object ^ sender, NetCoreEventArgs ^ e)
 
     // Load up the sync settings
     String ^ settingStr = AllSpec::VanguardSpec->Get<String ^>(VSPEC::SYNCSETTINGS);
-    if (settingStr != nullptr)
+    if (!String::IsNullOrWhiteSpace(settingStr))
     {
       VanguardSettingsWrapper ^ settings = GetConfigFromJson(settingStr);
       if (settings != nullptr)

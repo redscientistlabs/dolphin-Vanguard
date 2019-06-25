@@ -16,6 +16,8 @@ namespace Helpers
 
   static std::string systemStringToUtf8String(System::String^ sString)
   {
+    if (System::String::IsNullOrEmpty(sString))
+      return std::string("");
     array<uchar>^ bytes = System::Text::Encoding::UTF8->GetBytes(sString);
     pin_ptr<uchar> pinnedBytes(&bytes[0]);
     return std::string(reinterpret_cast<char*>(static_cast<uchar*>(pinnedBytes)), bytes->Length);
