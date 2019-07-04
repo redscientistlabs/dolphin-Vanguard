@@ -78,5 +78,6 @@ public:
   static void LOAD_GAME_DONE();
   static void GAME_CLOSED();
   static void CLOSE_GAME();
+  static bool RTC_OSD_ENABLED();
   static void InvokeEmuThread();
 };

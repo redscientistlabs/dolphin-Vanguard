@@ -17,6 +17,7 @@
 #include "Core/ConfigManager.h"
 
 #include "VideoCommon/OnScreenDisplay.h"
+#include "DolphinQt/NarrysMod/VanguardClient.h"
 
 namespace OSD
 {
@@ -81,6 +82,8 @@ static float DrawMessage(int index, const Message& msg, const ImVec2& position, 
 
 void AddTypedMessage(MessageType type, const std::string& message, u32 ms, u32 rgba)
 {
+  if (!VanguardClientUnmanaged::RTC_OSD_ENABLED())
+    return;
   std::lock_guard<std::mutex> lock(s_messages_mutex);
   s_messages.erase(type);
   s_messages.emplace(type, Message(message, Common::Timer::GetTimeMs() + ms, rgba));
@@ -88,6 +91,8 @@ void AddTypedMessage(MessageType type, const std::string& message, u32 ms, u32 r
 
 void AddMessage(const std::string& message, u32 ms, u32 rgba)
 {
+  if (!VanguardClientUnmanaged::RTC_OSD_ENABLED())
+    return;
   std::lock_guard<std::mutex> lock(s_messages_mutex);
   s_messages.emplace(MessageType::Typeless,
                      Message(message, Common::Timer::GetTimeMs() + ms, rgba));

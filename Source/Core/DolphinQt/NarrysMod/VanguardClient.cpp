@@ -75,13 +75,14 @@ public:
 
   static volatile bool loading = false;
   static bool attached = false;
+  static bool enableRTC = true;
 };
 
 static void EmuThreadExecute(Action ^ callback)
 {
   EmuThreadExecute(Marshal::GetFunctionPointerForDelegate(callback));
- 
 }
+
 static void EmuThreadExecute(IntPtr callbackPtr)
 {
   std::function<void(void)> nativeCallback =
@@ -89,8 +90,7 @@ static void EmuThreadExecute(IntPtr callbackPtr)
   Core::RunAsCPUThread(nativeCallback);
 }
 
-static PartialSpec ^
-    getDefaultPartial() {
+static PartialSpec ^  getDefaultPartial() {
       PartialSpec ^ partial = gcnew PartialSpec("VanguardSpec");
       partial->Set(VSPEC::NAME, "Dolphin");
       partial->Set(VSPEC::SUPPORTS_RENDERING, false);
@@ -113,7 +113,7 @@ static PartialSpec ^
       return partial;
     }
 
-    void VanguardClient::SpecUpdated(Object ^ sender, SpecUpdateEventArgs ^ e)
+void VanguardClient::SpecUpdated(Object ^ sender, SpecUpdateEventArgs ^ e)
 {
   PartialSpec ^ partial = e->partialSpec;
 
@@ -132,8 +132,8 @@ void VanguardClient::RegisterVanguardSpec()
   AllSpec::VanguardSpec = gcnew FullSpec(emuSpecTemplate, true);
   // You have to feed a partial spec as a template
 
-  if (VanguardClient::attached)
-    RTCV::Vanguard::VanguardConnector::PushVanguardSpecRef(AllSpec::VanguardSpec);
+  if (attached)
+    VanguardConnector::PushVanguardSpecRef(AllSpec::VanguardSpec);
 
   LocalNetCoreRouter::Route(NetcoreCommands::CORRUPTCORE, NetcoreCommands::REMOTE_PUSHVANGUARDSPEC,
                             emuSpecTemplate, true);
@@ -144,8 +144,7 @@ void VanguardClient::RegisterVanguardSpec()
 }
 
 // Lifted from Bizhawk
-static Assembly ^
-    CurrentDomain_AssemblyResolve(Object ^ sender, ResolveEventArgs ^ args) {
+static Assembly ^ CurrentDomain_AssemblyResolve(Object ^ sender, ResolveEventArgs ^ args) {
       try
       {
         Trace::WriteLine("Entering AssemblyResolve\n" + args->Name + "\n" +
@@ -193,8 +192,8 @@ static Assembly ^
       }
     }
 
-    // Create our VanguardClient
-    void VanguardClientInitializer::StartVanguardClient()
+// Create our VanguardClient
+void VanguardClientInitializer::StartVanguardClient()
 {
   System::Windows::Forms::Form ^ dummy = gcnew System::Windows::Forms::Form();
   IntPtr Handle = dummy->Handle;
@@ -247,6 +246,10 @@ void VanguardClient::StartClient()
     {
       attached = true;
     }
+    if (args[i] == "-DISABLERTC")
+    {
+      enableRTC = false;
+    }
   }
 
   receiver = gcnew NetCoreReceiver();
@@ -277,8 +280,7 @@ static bool isWii()
   return false;
 }
 
-static array<MemoryDomainProxy ^> ^
-    GetInterfaces() {
+static array<MemoryDomainProxy ^> ^ GetInterfaces() {
       array<MemoryDomainProxy ^> ^ interfaces = gcnew array<MemoryDomainProxy ^>(2);
       interfaces[0] = (gcnew MemoryDomainProxy(gcnew SRAM));
       if (isWii())
@@ -288,7 +290,6 @@ static array<MemoryDomainProxy ^> ^
 
       return interfaces;
     }
-
 
 static bool RefreshDomains(bool updateSpecs = true)
 {
@@ -325,7 +326,6 @@ static bool RefreshDomains(bool updateSpecs = true)
   return domainsChanged;
 }
 
-
 #pragma endregion
 
 #pragma region Settings
@@ -341,6 +341,9 @@ VanguardSettingsWrapper ^ VanguardClient::GetConfigFromJson(String ^ str)
 #pragma endregion
 static void STEP_CORRUPT()  // errors trapped by CPU_STEP
 {
+  if (!VanguardClient::enableRTC)
+    return;
+
   StepActions::Execute();
   CPU_STEP_Count++;
   bool autoCorrupt = RtcCore::AutoCorrupt;
@@ -359,6 +362,8 @@ static void STEP_CORRUPT()  // errors trapped by CPU_STEP
 #pragma region Hooks
 void VanguardClientUnmanaged::CORE_STEP()
 {
+  if (!VanguardClient::enableRTC)
+    return;
   // Any step hook for corruption
   STEP_CORRUPT();
 }
@@ -366,6 +371,8 @@ void VanguardClientUnmanaged::CORE_STEP()
 // This is on the main thread not the emu thread
 void VanguardClientUnmanaged::LOAD_GAME_START(std::string romPath)
 {
+  if (!VanguardClient::enableRTC)
+    return;
   StepActions::ClearStepBlastUnits();
   CPU_STEP_Count = 0;
 
@@ -375,6 +382,8 @@ void VanguardClientUnmanaged::LOAD_GAME_START(std::string romPath)
 
 void VanguardClientUnmanaged::LOAD_GAME_DONE()
 {
+  if (!VanguardClient::enableRTC)
+    return;
   PartialSpec ^ gameDone = gcnew PartialSpec("VanguardSpec");
 
   try
@@ -416,7 +425,18 @@ void VanguardClientUnmanaged::LOAD_GAME_DONE()
 
 void VanguardClientUnmanaged::GAME_CLOSED()
 {
+  if (!VanguardClient::enableRTC)
+    return;
   AllSpec::VanguardSpec->Update(VSPEC::OPENROMFILENAME, "", true, true);
+}
+
+bool VanguardClientUnmanaged::RTC_OSD_ENABLED()
+{
+  if (!VanguardClient::enableRTC)
+    return true;
+  if (RTCV::NetCore::Params::IsParamSet(RTCSPEC::CORE_EMULATOROSDDISABLED))
+    return false;
+  return true;
 }
 #pragma endregion
 
@@ -497,7 +517,6 @@ void VanguardClient::LoadRom(String ^ filename)
 
     Thread::Sleep(100);  // Give the emu thread a chance to recover
   }
-  return;
 }
 
 bool VanguardClient::LoadState(std::string filename)
@@ -608,8 +627,8 @@ void VanguardClient::OnMessageReceived(Object ^ sender, NetCoreEventArgs ^ e)
   case REMOTE_LOADROM:
   {
     String ^ filename = (String ^) advancedMessage->objectValue;
-    //Dolphin DEMANDS the rom is loaded from the main thread
-    System::Action<String^>^a = gcnew Action<String^>(&LoadRom);
+    // Dolphin DEMANDS the rom is loaded from the main thread
+    Action<String ^> ^ a = gcnew Action<String ^>(&LoadRom);
     SyncObjectSingleton::FormExecute<String ^>(a, filename);
   }
   break;
