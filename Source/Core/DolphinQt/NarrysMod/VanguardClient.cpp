@@ -199,8 +199,7 @@ void VanguardClientInitializer::StartVanguardClient()
   IntPtr Handle = dummy->Handle;
   SyncObjectSingleton::SyncObject = dummy;
 
-  SyncObjectSingleton::EmuInvokeDelegate =
-      gcnew SyncObjectSingleton::ActionDelegate(&EmuThreadExecute);
+  SyncObjectSingleton::EmuInvokeDelegate = gcnew SyncObjectSingleton::ActionDelegate(&EmuThreadExecute);
 
   // Start everything
   VanguardClient::configPaths = gcnew array<String ^>{
