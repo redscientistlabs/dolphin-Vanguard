@@ -108,7 +108,7 @@ static PartialSpec ^  getDefaultPartial() {
       partial->Set(VSPEC::OVERRIDE_DEFAULTMAXINTENSITY, 500000);
       partial->Set(VSPEC::SYNCSETTINGS, String::Empty);
       partial->Set(VSPEC::MEMORYDOMAINS_BLACKLISTEDDOMAINS, gcnew array<String ^>{});
-      partial->Set(VSPEC::SYSTEM, String::Empty);
+      partial->Set(VSPEC::EMUDIR, VanguardClient::emuDir);
 
       return partial;
     }
@@ -550,7 +550,6 @@ void Quit()
 
 void AllSpecsSent()
 {
-  AllSpec::VanguardSpec->Update(VSPEC::EMUDIR, VanguardClient::emuDir, true, true);
 }
 #pragma endregion
 
