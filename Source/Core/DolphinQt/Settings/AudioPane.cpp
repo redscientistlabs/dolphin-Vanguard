@@ -41,7 +41,7 @@ AudioPane::AudioPane()
 
 void AudioPane::CreateWidgets()
 {
-  auto* dsp_box = new QGroupBox(tr("DSP Emulation Engine"));
+  auto* dsp_box = new QGroupBox(tr("DSP Configuration Disabled for Corruption Determinism"));
   auto* dsp_layout = new QVBoxLayout;
 
   dsp_box->setLayout(dsp_layout);
@@ -49,12 +49,12 @@ void AudioPane::CreateWidgets()
   m_dsp_lle = new QRadioButton(tr("DSP LLE Recompiler"));
   m_dsp_interpreter = new QRadioButton(tr("DSP LLE Interpreter (slow)"));
 
-  dsp_layout->addStretch(1);
-  dsp_layout->addWidget(m_dsp_hle);
-  //Narrysmod - Disable LLE and interpreter
+  // Narrysmod - Disable LLE and interpreter
+  //dsp_layout->addStretch(1);
+  //dsp_layout->addWidget(m_dsp_hle);
   //dsp_layout->addWidget(m_dsp_lle);
   //dsp_layout->addWidget(m_dsp_interpreter);
-  dsp_layout->addStretch(1);
+  //dsp_layout->addStretch(1);
 
   auto* volume_box = new QGroupBox(tr("Volume"));
   auto* volume_layout = new QVBoxLayout;
@@ -225,10 +225,11 @@ void AudioPane::SaveSettings()
   auto& settings = Settings::Instance();
 
   // DSP
-  SConfig::GetInstance().bDSPHLE = m_dsp_hle->isChecked();
-  Config::SetBaseOrCurrent(Config::MAIN_DSP_HLE, m_dsp_hle->isChecked());
-  SConfig::GetInstance().m_DSPEnableJIT = m_dsp_lle->isChecked();
-  Config::SetBaseOrCurrent(Config::MAIN_DSP_JIT, m_dsp_lle->isChecked());
+  // Narrysmod_Hijack - Override to always set to HLE
+  SConfig::GetInstance().bDSPHLE = true;
+  Config::SetBaseOrCurrent(Config::MAIN_DSP_HLE, true);
+  SConfig::GetInstance().m_DSPEnableJIT = false;
+  Config::SetBaseOrCurrent(Config::MAIN_DSP_JIT, false);
 
   // Backend
   const auto selection =
