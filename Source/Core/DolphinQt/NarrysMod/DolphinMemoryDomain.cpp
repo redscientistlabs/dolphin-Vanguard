@@ -6,6 +6,8 @@
 #include "Core/HW/Memmap.h"
 
 #include "DolphinMemoryDomain.h"
+#include "Core/PowerPC/PPCCache.h"
+#include "Core/PowerPC/Jit64Common/Jit64PowerPCState.h"
 
 using namespace cli;
 using namespace System;
@@ -88,6 +90,7 @@ void SRAM::PokeByte(long long addr, unsigned char val)
     // Convert the address
     addr += SRAM_OFFSET;
     Memory::Write_U8(val, static_cast<u32>(addr));
+    PowerPC::ppcState.iCache.Invalidate(addr);
   }
 }
 
@@ -139,6 +142,7 @@ void EXRAM::PokeByte(long long addr, unsigned char val)
     // Convert the address
     addr += EXRAM_OFFSET;
     Memory::Write_U8(val, static_cast<u32>(addr));
+    PowerPC::ppcState.iCache.Invalidate(addr);
   }
 }
 
