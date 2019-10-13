@@ -636,6 +636,7 @@ void VanguardClient::OnMessageReceived(Object ^ sender, NetCoreEventArgs ^ e)
     SyncObjectSingleton::GenericDelegate ^ g =
         gcnew SyncObjectSingleton::GenericDelegate(&StopGame);
     SyncObjectSingleton::FormExecute(g);
+    Thread::Sleep(500);//Sometimes it takes a moment despite claiming it's done
   }
   break;
 
