@@ -15,6 +15,7 @@
     <RootNamespace>DSP_InterC</RootNamespace>
     <Keyword>Win32Proj</Keyword>
   </PropertyGroup>
+  <Import Project="$(SolutionDir)\VSProps\Microsoft.VCToolsVersion.14.22.props" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>

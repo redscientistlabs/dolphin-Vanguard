@@ -16,6 +16,7 @@
     <ProjectName>Dolphin</ProjectName>
     <TargetFrameworkVersion>v4.7.1</TargetFrameworkVersion>
   </PropertyGroup>
+  <Import Project="$(SolutionDir)\VSProps\Microsoft.VCToolsVersion.14.22.props" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
