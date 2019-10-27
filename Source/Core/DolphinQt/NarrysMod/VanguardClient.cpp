@@ -64,6 +64,7 @@ public:
   static void LoadRom(String ^ filename);
   static bool LoadState(std::string filename);
   static bool SaveState(String ^ filename, bool wait);
+  static void CloseGame();
 
   static String ^ GetConfigAsJson(VanguardSettingsWrapper ^ settings);
   static VanguardSettingsWrapper ^ GetConfigFromJson(String ^ json);
@@ -383,6 +384,18 @@ void VanguardClientUnmanaged::LOAD_GAME_DONE()
 {
   if (!VanguardClient::enableRTC)
     return;
+
+  if (AllSpec::UISpec == nullptr)
+  {
+    VanguardClient::CloseGame();
+    System::Windows::Forms::MessageBox::Show("It appears you haven't connected to StandaloneRTC. Please make sure that the "
+                    "RTC is running and not just Bizhawk.\nIf you have an antivirus, it might be "
+                    "blocking the RTC from launching.\n\nIf you keep getting this message, poke "
+                    "the RTC devs for help (Discord is in the launcher).",
+                    "RTC Not Connected");
+    return;
+  }
+
   PartialSpec ^ gameDone = gcnew PartialSpec("VanguardSpec");
 
   try
@@ -438,6 +451,25 @@ bool VanguardClientUnmanaged::RTC_OSD_ENABLED()
   return true;
 }
 #pragma endregion
+
+
+// No fun anonymous classes with closure here
+#pragma region Delegates
+void StopGame()
+{
+  Core::Stop();
+}
+
+void Quit()
+{
+  VanguardClientInitializer::win->close();
+}
+
+void AllSpecsSent()
+{
+}
+#pragma endregion
+
 
 /*ENUMS FOR THE SWITCH STATEMENT*/
 enum COMMANDS
@@ -536,22 +568,13 @@ bool VanguardClient::SaveState(String ^ filename, bool wait)
   return false;
 }
 
-// No fun anonymous classes with closure here
-#pragma region Delegates
-void StopGame()
+void VanguardClient::CloseGame()
 {
-  Core::Stop();
+  SyncObjectSingleton::GenericDelegate ^ g = gcnew SyncObjectSingleton::GenericDelegate(&StopGame);
+  SyncObjectSingleton::FormExecute(g);
+  Thread::Sleep(500);  // Sometimes it takes a moment despite claiming it's done
 }
 
-void Quit()
-{
-  VanguardClientInitializer::win->close();
-}
-
-void AllSpecsSent()
-{
-}
-#pragma endregion
 
 /* THIS IS WHERE YOU HANDLE ANY RECEIVED MESSAGES */
 void VanguardClient::OnMessageReceived(Object ^ sender, NetCoreEventArgs ^ e)
@@ -633,10 +656,7 @@ void VanguardClient::OnMessageReceived(Object ^ sender, NetCoreEventArgs ^ e)
 
   case REMOTE_CLOSEGAME:
   {
-    SyncObjectSingleton::GenericDelegate ^ g =
-        gcnew SyncObjectSingleton::GenericDelegate(&StopGame);
-    SyncObjectSingleton::FormExecute(g);
-    Thread::Sleep(500);//Sometimes it takes a moment despite claiming it's done
+    VanguardClient::CloseGame();
   }
   break;
 
