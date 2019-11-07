@@ -196,6 +196,9 @@ static Assembly ^ CurrentDomain_AssemblyResolve(Object ^ sender, ResolveEventArg
 // Create our VanguardClient
 void VanguardClientInitializer::StartVanguardClient()
 {
+  // this needs to be done before the warnings/errors show up
+  System::Windows::Forms::Application::EnableVisualStyles();
+  System::Windows::Forms::Application::SetCompatibleTextRenderingDefault(false);
   System::Windows::Forms::Form ^ dummy = gcnew System::Windows::Forms::Form();
   IntPtr Handle = dummy->Handle;
   SyncObjectSingleton::SyncObject = dummy;
@@ -281,15 +284,19 @@ static bool isWii()
 }
 
 static array<MemoryDomainProxy ^> ^ GetInterfaces() {
-      array<MemoryDomainProxy ^> ^ interfaces = gcnew array<MemoryDomainProxy ^>(2);
-      interfaces[0] = (gcnew MemoryDomainProxy(gcnew SRAM));
-      if (isWii())
-        interfaces[1] = (gcnew MemoryDomainProxy(gcnew EXRAM));
-      else
-        interfaces[1] = (gcnew MemoryDomainProxy(gcnew ARAM));
 
-      return interfaces;
-    }
+  if (String::IsNullOrWhiteSpace(AllSpec::VanguardSpec->Get<String ^>(VSPEC::OPENROMFILENAME)))
+    return gcnew array<MemoryDomainProxy ^>(0);
+  
+  array<MemoryDomainProxy ^> ^ interfaces = gcnew array<MemoryDomainProxy ^>(2);
+  interfaces[0] = (gcnew MemoryDomainProxy(gcnew SRAM));
+  if (isWii())
+    interfaces[1] = (gcnew MemoryDomainProxy(gcnew EXRAM));
+  else
+    interfaces[1] = (gcnew MemoryDomainProxy(gcnew ARAM));
+  
+  return interfaces;
+}
 
 static bool RefreshDomains(bool updateSpecs = true)
 {
@@ -427,6 +434,8 @@ void VanguardClientUnmanaged::LOAD_GAME_DONE()
       LocalNetCoreRouter::Route(NetcoreCommands::UI,
                                 NetcoreCommands::RESET_GAME_PROTECTION_IF_RUNNING, true);
     }
+
+    RtcCore::LOAD_GAME_DONE();
   }
   catch (Exception ^ e)
   {
@@ -439,7 +448,11 @@ void VanguardClientUnmanaged::GAME_CLOSED()
 {
   if (!VanguardClient::enableRTC)
     return;
+
   AllSpec::VanguardSpec->Update(VSPEC::OPENROMFILENAME, "", true, true);
+  RefreshDomains();
+
+  RtcCore::GAME_CLOSED();
 }
 
 bool VanguardClientUnmanaged::RTC_OSD_ENABLED()
