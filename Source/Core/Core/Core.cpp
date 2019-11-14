@@ -899,6 +899,9 @@ void UpdateTitle()
 
 void Shutdown()
 {
+  //Let the RTC shut down anything it needs to shut down gracefully
+  VanguardClientUnmanaged::EMULATOR_CLOSING();
+
   // During shutdown DXGI expects us to handle some messages on the UI thread.
   // Therefore we can't immediately block and wait for the emu thread to shut
   // down, so we join the emu thread as late as possible when the UI has already

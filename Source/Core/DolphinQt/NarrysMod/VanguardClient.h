@@ -73,11 +73,9 @@ class VanguardClientUnmanaged
 {
 public:
   static void CORE_STEP();
-  VanguardSettingsUnmanaged& GetVanguardSettings();
   static void LOAD_GAME_START(std::string romPath);
   static void LOAD_GAME_DONE();
   static void GAME_CLOSED();
-  static void CLOSE_GAME();
+  static void EMULATOR_CLOSING();
   static bool RTC_OSD_ENABLED();
-  static void InvokeEmuThread();
 };
