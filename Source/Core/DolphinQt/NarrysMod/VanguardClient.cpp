@@ -452,7 +452,8 @@ void VanguardClientUnmanaged::GAME_CLOSED()
   AllSpec::VanguardSpec->Update(VSPEC::OPENROMFILENAME, "", true, true);
   RefreshDomains();
 
-  RtcCore::GAME_CLOSED();
+  //We need to do this or else the thread hangs when you try and X down through the game itself rather than the hex editor
+  RtcCore::GAME_CLOSED(true);
 }
 
 bool VanguardClientUnmanaged::RTC_OSD_ENABLED()
