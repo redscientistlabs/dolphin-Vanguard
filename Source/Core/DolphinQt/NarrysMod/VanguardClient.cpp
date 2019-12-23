@@ -100,6 +100,7 @@ static PartialSpec ^  getDefaultPartial() {
       partial->Set(VSPEC::SUPPORTS_KILLSWITCH, true);
       partial->Set(VSPEC::SUPPORTS_REALTIME, true);
       partial->Set(VSPEC::SUPPORTS_SAVESTATES, true);
+      partial->Set(VSPEC::SUPPORTS_REFERENCES, true);
       partial->Set(VSPEC::SUPPORTS_MIXED_STOCKPILE, true);
       partial->Set(VSPEC::CONFIG_PATHS, VanguardClient::configPaths);
       partial->Set(VSPEC::SYSTEM, String::Empty);
