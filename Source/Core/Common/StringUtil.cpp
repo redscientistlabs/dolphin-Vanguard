@@ -484,7 +484,7 @@ std::string UTF16ToCP(u32 code_page, const std::wstring& input)
     output.resize(size);
 
     if (size != WideCharToMultiByte(code_page, 0, input.data(), static_cast<int>(input.size()),
-                                    &output[0], static_cast<int>(output.size()), nullptr, false))
+                                    &output[0], static_cast<int>(output.size()), nullptr, nullptr))
     {
       const DWORD error_code = GetLastError();
       ERROR_LOG(COMMON, "WideCharToMultiByte Error in String '%s': %lu", input.c_str(), error_code);

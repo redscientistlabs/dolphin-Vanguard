@@ -1,6 +1,7 @@
 // A basic test implementation of Netcore for IPC in Dolphin
 
 #pragma warning(disable : 4564)
+#pragma warning(disable : 4538)
 
 #include "stdafx.h"
 
