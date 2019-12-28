@@ -888,6 +888,7 @@ void MainWindow::ScanForSecondDiscAndStartGame(const UICommon::GameFile& game,
 void MainWindow::StartGame(const QString& path, ScanForSecondDisc scan,
                            const std::optional<std::string>& savestate_path)
 {
+  VanguardClientUnmanaged::GAME_TO_LOAD = path.toStdString();
   StartGame(path.toStdString(), scan, savestate_path);
 }
 
@@ -903,17 +904,19 @@ void MainWindow::StartGame(const std::string& path, ScanForSecondDisc scan,
       return;
     }
   }
-
+  VanguardClientUnmanaged::GAME_TO_LOAD = path;
   StartGame(BootParameters::GenerateFromFile(path, savestate_path));
 }
 void MainWindow::StartGame(const std::string& path)
 {
+  VanguardClientUnmanaged::GAME_TO_LOAD = path;
   StartGame(BootParameters::GenerateFromFile(path));
 }
 
 void MainWindow::StartGame(const std::vector<std::string>& paths,
                            const std::optional<std::string>& savestate_path)
 {
+  VanguardClientUnmanaged::GAME_TO_LOAD = paths[0];
   StartGame(BootParameters::GenerateFromFile(paths, savestate_path));
 }
 

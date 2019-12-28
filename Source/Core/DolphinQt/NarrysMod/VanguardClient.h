@@ -78,4 +78,5 @@ public:
   static void GAME_CLOSED();
   static void EMULATOR_CLOSING();
   static bool RTC_OSD_ENABLED();
+  static std::string GAME_TO_LOAD;
 };

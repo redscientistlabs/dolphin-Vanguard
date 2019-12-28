@@ -62,6 +62,8 @@ public:
   static void RestartClient();
   static void StopClient();
 
+  static String ^ RomToLoad;
+
   static void LoadRom(String ^ filename);
   static bool LoadState(std::string filename);
   static bool SaveState(String ^ filename, bool wait);
@@ -377,6 +379,7 @@ void VanguardClientUnmanaged::CORE_STEP()
   STEP_CORRUPT();
 }
 
+std::string VanguardClientUnmanaged::GAME_TO_LOAD = "";
 // This is on the main thread not the emu thread
 void VanguardClientUnmanaged::LOAD_GAME_START(std::string romPath)
 {
@@ -384,6 +387,13 @@ void VanguardClientUnmanaged::LOAD_GAME_START(std::string romPath)
     return;
   StepActions::ClearStepBlastUnits();
   CPU_STEP_Count = 0;
+
+  if (romPath == "")
+  {
+    romPath = GAME_TO_LOAD;
+    GAME_TO_LOAD = "";
+  }
+  
 
   String ^ gameName = Helpers::utf8StringToSystemString(romPath);
   AllSpec::VanguardSpec->Update(VSPEC::OPENROMFILENAME, gameName, true, true);
