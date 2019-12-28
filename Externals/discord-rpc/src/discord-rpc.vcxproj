@@ -17,7 +17,6 @@
     <Platform>x64</Platform>
     <ProjectName>discord-rpc</ProjectName>
   </PropertyGroup>
-  <Import Project="$(SolutionDir)\VSProps\Microsoft.VCToolsVersion.14.22.props" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>

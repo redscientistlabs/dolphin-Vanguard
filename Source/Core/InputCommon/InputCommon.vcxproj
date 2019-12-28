@@ -14,7 +14,6 @@
     <ProjectGuid>{6BBD47CF-91FD-4077-B676-8B76980178A9}</ProjectGuid>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
-  <Import Project="$(SolutionDir)\VSProps\Microsoft.VCToolsVersion.14.22.props" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>

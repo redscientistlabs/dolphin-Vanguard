@@ -1,4 +1,4 @@
 ﻿  imgui.cpp
   imgui_draw.cpp
   imgui_widgets.cpp
-C:\Program Files (x86)\Microsoft Visual Studio\2019\Preview\MSBuild\Microsoft\VC\v160\Microsoft.CppCommon.targets(1272,5): error MSB6006: "Lib.exe" exited with code -1073741502.
+  imgui.vcxproj -> C:\Users\Daniel\Documents\dolphin-vanguard\Source\..\Build\x64\Release\imgui\bin\imgui.lib
