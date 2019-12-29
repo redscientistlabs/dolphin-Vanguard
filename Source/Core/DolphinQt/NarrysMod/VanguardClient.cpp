@@ -20,6 +20,7 @@
 #include "NarrysMod/VanguardSettingsWrapper.h"
 
 #include <msclr/marshal_cppstd.h>
+#include <QGuiApplication>
 
 ref class VanguardSettingsWrapper;
 using namespace cli;
@@ -94,7 +95,8 @@ static void EmuThreadExecute(IntPtr callbackPtr)
   Core::RunAsCPUThread(nativeCallback);
 }
 
-static PartialSpec ^  getDefaultPartial() {
+static PartialSpec ^
+    getDefaultPartial() {
       PartialSpec ^ partial = gcnew PartialSpec("VanguardSpec");
       partial->Set(VSPEC::NAME, "Dolphin");
       partial->Set(VSPEC::SUPPORTS_RENDERING, false);
@@ -118,7 +120,7 @@ static PartialSpec ^  getDefaultPartial() {
       return partial;
     }
 
-void VanguardClient::SpecUpdated(Object ^ sender, SpecUpdateEventArgs ^ e)
+    void VanguardClient::SpecUpdated(Object ^ sender, SpecUpdateEventArgs ^ e)
 {
   PartialSpec ^ partial = e->partialSpec;
 
@@ -149,7 +151,8 @@ void VanguardClient::RegisterVanguardSpec()
 }
 
 // Lifted from Bizhawk
-static Assembly ^ CurrentDomain_AssemblyResolve(Object ^ sender, ResolveEventArgs ^ args) {
+static Assembly ^
+    CurrentDomain_AssemblyResolve(Object ^ sender, ResolveEventArgs ^ args) {
       try
       {
         Trace::WriteLine("Entering AssemblyResolve\n" + args->Name + "\n" +
@@ -197,8 +200,8 @@ static Assembly ^ CurrentDomain_AssemblyResolve(Object ^ sender, ResolveEventArg
       }
     }
 
-// Create our VanguardClient
-void VanguardClientInitializer::StartVanguardClient()
+    // Create our VanguardClient
+    void VanguardClientInitializer::StartVanguardClient()
 {
   // this needs to be done before the warnings/errors show up
   System::Windows::Forms::Application::EnableVisualStyles();
@@ -207,7 +210,8 @@ void VanguardClientInitializer::StartVanguardClient()
   IntPtr Handle = dummy->Handle;
   SyncObjectSingleton::SyncObject = dummy;
 
-  SyncObjectSingleton::EmuInvokeDelegate = gcnew SyncObjectSingleton::ActionDelegate(&EmuThreadExecute);
+  SyncObjectSingleton::EmuInvokeDelegate =
+      gcnew SyncObjectSingleton::ActionDelegate(&EmuThreadExecute);
 
   // Start everything
   VanguardClient::configPaths = gcnew array<String ^>{
@@ -287,22 +291,22 @@ static bool isWii()
   return false;
 }
 
-static array<MemoryDomainProxy ^> ^ GetInterfaces() {
+static array<MemoryDomainProxy ^> ^
+    GetInterfaces() {
+      if (String::IsNullOrWhiteSpace(AllSpec::VanguardSpec->Get<String ^>(VSPEC::OPENROMFILENAME)))
+        return gcnew array<MemoryDomainProxy ^>(0);
 
-  if (String::IsNullOrWhiteSpace(AllSpec::VanguardSpec->Get<String ^>(VSPEC::OPENROMFILENAME)))
-    return gcnew array<MemoryDomainProxy ^>(0);
-  
-  array<MemoryDomainProxy ^> ^ interfaces = gcnew array<MemoryDomainProxy ^>(2);
-  interfaces[0] = (gcnew MemoryDomainProxy(gcnew SRAM));
-  if (isWii())
-    interfaces[1] = (gcnew MemoryDomainProxy(gcnew EXRAM));
-  else
-    interfaces[1] = (gcnew MemoryDomainProxy(gcnew ARAM));
-  
-  return interfaces;
-}
+      array<MemoryDomainProxy ^> ^ interfaces = gcnew array<MemoryDomainProxy ^>(2);
+      interfaces[0] = (gcnew MemoryDomainProxy(gcnew SRAM));
+      if (isWii())
+        interfaces[1] = (gcnew MemoryDomainProxy(gcnew EXRAM));
+      else
+        interfaces[1] = (gcnew MemoryDomainProxy(gcnew ARAM));
 
-static bool RefreshDomains(bool updateSpecs = true)
+      return interfaces;
+    }
+
+    static bool RefreshDomains(bool updateSpecs = true)
 {
   array<MemoryDomainProxy ^> ^ oldInterfaces =
       AllSpec::VanguardSpec->Get<array<MemoryDomainProxy ^> ^>(VSPEC::MEMORYDOMAINS_INTERFACES);
@@ -393,7 +397,6 @@ void VanguardClientUnmanaged::LOAD_GAME_START(std::string romPath)
     romPath = GAME_TO_LOAD;
     GAME_TO_LOAD = "";
   }
-  
 
   String ^ gameName = Helpers::utf8StringToSystemString(romPath);
   AllSpec::VanguardSpec->Update(VSPEC::OPENROMFILENAME, gameName, true, true);
@@ -407,11 +410,12 @@ void VanguardClientUnmanaged::LOAD_GAME_DONE()
   if (AllSpec::UISpec == nullptr)
   {
     VanguardClient::CloseGame();
-    System::Windows::Forms::MessageBox::Show("It appears you haven't connected to StandaloneRTC. Please make sure that the "
-                    "RTC is running and not just Bizhawk.\nIf you have an antivirus, it might be "
-                    "blocking the RTC from launching.\n\nIf you keep getting this message, poke "
-                    "the RTC devs for help (Discord is in the launcher).",
-                    "RTC Not Connected");
+    System::Windows::Forms::MessageBox::Show(
+        "It appears you haven't connected to StandaloneRTC. Please make sure that the "
+        "RTC is running and not just Bizhawk.\nIf you have an antivirus, it might be "
+        "blocking the RTC from launching.\n\nIf you keep getting this message, poke "
+        "the RTC devs for help (Discord is in the launcher).",
+        "RTC Not Connected");
     return;
   }
 
@@ -474,7 +478,7 @@ void VanguardClientUnmanaged::EMULATOR_CLOSING()
   if (!VanguardClient::enableRTC)
     return;
 
-  //Make sure we call this from the main thread
+  // Make sure we call this from the main thread
   VanguardClient::StopClient();
   RtcCore::GAME_CLOSED(true);
 }
@@ -489,7 +493,6 @@ bool VanguardClientUnmanaged::RTC_OSD_ENABLED()
 }
 #pragma endregion
 
-
 // No fun anonymous classes with closure here
 #pragma region Delegates
 void StopGame()
@@ -497,16 +500,15 @@ void StopGame()
   Core::Stop();
 }
 
-void Quit()
+void PrepShutdown()
 {
-  VanguardClientInitializer::win->close();
+  VanguardClientInitializer::win->m_exit_requested = true;
 }
 
 void AllSpecsSent()
 {
 }
 #pragma endregion
-
 
 /*ENUMS FOR THE SWITCH STATEMENT*/
 enum COMMANDS
@@ -612,7 +614,6 @@ void VanguardClient::CloseGame()
   Thread::Sleep(500);  // Sometimes it takes a moment despite claiming it's done
 }
 
-
 /* THIS IS WHERE YOU HANDLE ANY RECEIVED MESSAGES */
 void VanguardClient::OnMessageReceived(Object ^ sender, NetCoreEventArgs ^ e)
 {
@@ -624,15 +625,13 @@ void VanguardClient::OnMessageReceived(Object ^ sender, NetCoreEventArgs ^ e)
 
   switch (CheckCommand(message->Type))
   {
-  case REMOTE_ALLSPECSSENT:
-  {
+  case REMOTE_ALLSPECSSENT: {
     auto g = gcnew SyncObjectSingleton::GenericDelegate(&AllSpecsSent);
     SyncObjectSingleton::FormExecute(g);
   }
   break;
 
-  case LOADSAVESTATE:
-  {
+  case LOADSAVESTATE: {
     array<Object ^> ^ cmd = static_cast<array<Object ^> ^>(advancedMessage->objectValue);
     String ^ path = static_cast<String ^>(cmd[0]);
     std::string converted_path = Helpers::systemStringToUtf8String(path);
@@ -653,8 +652,7 @@ void VanguardClient::OnMessageReceived(Object ^ sender, NetCoreEventArgs ^ e)
   }
   break;
 
-  case SAVESAVESTATE:
-  {
+  case SAVESAVESTATE: {
     String ^ Key = (String ^)(advancedMessage->objectValue);
 
     // Build the shortname
@@ -682,8 +680,7 @@ void VanguardClient::OnMessageReceived(Object ^ sender, NetCoreEventArgs ^ e)
   }
   break;
 
-  case REMOTE_LOADROM:
-  {
+  case REMOTE_LOADROM: {
     String ^ filename = (String ^) advancedMessage->objectValue;
     // Dolphin DEMANDS the rom is loaded from the main thread
     Action<String ^> ^ a = gcnew Action<String ^>(&LoadRom);
@@ -691,57 +688,54 @@ void VanguardClient::OnMessageReceived(Object ^ sender, NetCoreEventArgs ^ e)
   }
   break;
 
-  case REMOTE_CLOSEGAME:
-  {
+  case REMOTE_CLOSEGAME: {
     VanguardClient::CloseGame();
   }
   break;
 
-  case REMOTE_DOMAIN_GETDOMAINS:
-  {
+  case REMOTE_DOMAIN_GETDOMAINS: {
     RefreshDomains();
   }
   break;
 
-  case REMOTE_KEY_SETSYNCSETTINGS:
-  {
+  case REMOTE_KEY_SETSYNCSETTINGS: {
     String ^ settings = (String ^)(advancedMessage->objectValue);
     AllSpec::VanguardSpec->Set(VSPEC::SYNCSETTINGS, settings);
   }
   break;
 
-  case REMOTE_KEY_SETSYSTEMCORE:
-  {
+  case REMOTE_KEY_SETSYSTEMCORE: {
     // Do nothing
   }
   break;
 
-  case REMOTE_EVENT_EMUSTARTED:
-  {
+  case REMOTE_EVENT_EMUSTARTED: {
     // Do nothing
   }
   break;
 
-  case REMOTE_ISNORMALADVANCE:
-  {
+  case REMOTE_ISNORMALADVANCE: {
     // Todo - Dig out fast forward?
     e->setReturnValue(true);
   }
   break;
 
   case REMOTE_EVENT_EMU_MAINFORM_CLOSE:
-  case REMOTE_EVENT_CLOSEEMULATOR:
-  {
-    // Stop the game first
-    auto g = gcnew SyncObjectSingleton::GenericDelegate(&StopGame);
+  case REMOTE_EVENT_CLOSEEMULATOR: {
+
+
+    VanguardClient::StopClient();
+    RtcCore::GAME_CLOSED(true);
+
+    // Prep dolphin so when the game closes it exits
+    auto g = gcnew SyncObjectSingleton::GenericDelegate(&PrepShutdown);
     SyncObjectSingleton::FormExecute(g);
 
-    // Kill the client cleanly
-    StopClient();
-
-    // Clean quit
-    g = gcnew SyncObjectSingleton::GenericDelegate(&Quit);
+    // Stop the game 
+    g = gcnew SyncObjectSingleton::GenericDelegate(&StopGame);
     SyncObjectSingleton::FormExecute(g);
+
+
   }
   break;
 

@@ -832,6 +832,15 @@ void MainWindow::ForceStop()
 {
   Core::Stop();
 }
+void MainWindow::ForceStopVanguard()
+{
+  if (!Core::IsRunning())
+  {
+    Core::QueueHostJob([this] { OnStopComplete(); }, true);
+  }
+  Core::Stop();
+  OnStopComplete();
+}
 
 void MainWindow::Reset()
 {

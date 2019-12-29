@@ -75,8 +75,9 @@ public:
   // Narrysmod_Hijacks
   //Add a startgame that doesn't need any extra stuff
   void StartGame(const std::string& path);
-  //Make public
   void ForceStop();
+  void ForceStopVanguard();
+  bool m_exit_requested = false;
 
 signals:
   void ReadOnlyModeChanged(bool read_only);
@@ -205,7 +206,6 @@ private:
   RenderWidget* m_render_widget = nullptr;
   bool m_rendering_to_main;
   bool m_stop_requested = false;
-  bool m_exit_requested = false;
   bool m_fullscreen_requested = false;
   int m_state_slot = 1;
   std::unique_ptr<BootParameters> m_pending_boot;
