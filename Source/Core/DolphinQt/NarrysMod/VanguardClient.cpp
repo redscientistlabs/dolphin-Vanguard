@@ -497,7 +497,7 @@ bool VanguardClientUnmanaged::RTC_OSD_ENABLED()
 #pragma region Delegates
 void StopGame()
 {
-  Core::Stop();
+  VanguardClientInitializer::win->ForceStopVanguard();
 }
 
 void PrepShutdown()
@@ -735,6 +735,7 @@ void VanguardClient::OnMessageReceived(Object ^ sender, NetCoreEventArgs ^ e)
     g = gcnew SyncObjectSingleton::GenericDelegate(&StopGame);
     SyncObjectSingleton::FormExecute(g);
 
+    RtcCore::KILL_HEX_EDITOR();
 
   }
   break;

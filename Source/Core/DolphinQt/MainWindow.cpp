@@ -838,8 +838,10 @@ void MainWindow::ForceStopVanguard()
   {
     Core::QueueHostJob([this] { OnStopComplete(); }, true);
   }
-  Core::Stop();
-  OnStopComplete();
+  else
+  {
+    Core::Stop();
+  }
 }
 
 void MainWindow::Reset()
