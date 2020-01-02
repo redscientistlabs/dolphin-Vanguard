@@ -243,7 +243,9 @@ void VanguardClientInitializer::Initialize()
 
 void VanguardClient::StartClient()
 {
-  NetCore_Extensions::ConsoleHelper::CreateConsole(logPath);
+
+  NetCore_Extensions::ConsoleHelper::CreateConsole(nullptr);
+  RTCV::Common::Logging::StartLogging(logPath);
   NetCore_Extensions::ConsoleHelper::HideConsole();
   // Can't use contains
   auto args = Environment::GetCommandLineArgs();
