@@ -940,9 +940,13 @@ void MenuBar::UpdateToolsMenu(bool emulation_started)
         tmd.IsValid() ?
             QString::fromStdString(DiscIO::GetSysMenuVersionString(tmd.GetTitleVersion())) :
             QStringLiteral("");
-    m_boot_sysmenu->setText(tr("Load Wii System Menu %1").arg(sysmenu_version));
 
-    m_boot_sysmenu->setEnabled(tmd.IsValid());
+    // VANGUARD_HIJACK - Replace "Load Wii System Menu" button
+    //m_boot_sysmenu->setText(tr("Load Wii System Menu %1").arg(sysmenu_version));
+    m_boot_sysmenu->setText(tr("Load Wii Menu WAD directly to corrupt"));
+
+    //m_boot_sysmenu->setEnabled(tmd.IsValid());
+    m_boot_sysmenu->setEnabled(false);
 
     for (QAction* action : m_perform_online_update_menu->actions())
       action->setEnabled(!tmd.IsValid());
