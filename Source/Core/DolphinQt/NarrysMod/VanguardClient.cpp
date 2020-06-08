@@ -43,7 +43,6 @@ using namespace Diagnostics;
 #define ARAM_SIZE 16777216
 #define EXRAM_SIZE 67108864
 
-static int CPU_STEP_Count = 0;
 static void EmuThreadExecute(Action ^ callback);
 static void EmuThreadExecute(IntPtr ptr);
 
@@ -360,20 +359,7 @@ static void STEP_CORRUPT()  // errors trapped by CPU_STEP
 {
   if (!VanguardClient::enableRTC)
     return;
-
-  StepActions::Execute();
-  CPU_STEP_Count++;
-  bool autoCorrupt = RtcCore::AutoCorrupt;
-  long errorDelay = RtcCore::ErrorDelay;
-  if (autoCorrupt && CPU_STEP_Count >= errorDelay)
-  {
-    CPU_STEP_Count = 0;
-    array<String ^> ^ domains = AllSpec::UISpec->Get<array<String ^> ^>("SELECTEDDOMAINS");
-
-    BlastLayer ^ bl = RtcCore::GenerateBlastLayer(domains, -1);
-    if (bl != nullptr)
-      bl->Apply(false, true);
-  }
+  RtcClock::STEP_CORRUPT(true, true);
 }
 
 #pragma region Hooks
@@ -392,7 +378,7 @@ void VanguardClientUnmanaged::LOAD_GAME_START(std::string romPath)
   if (!VanguardClient::enableRTC)
     return;
   StepActions::ClearStepBlastUnits();
-  CPU_STEP_Count = 0;
+  RtcClock::RESET_COUNT();
 
   if (romPath == "")
   {
@@ -594,6 +580,7 @@ void VanguardClient::LoadRom(String ^ filename)
 bool VanguardClient::LoadState(std::string filename)
 {
   StepActions::ClearStepBlastUnits();
+  RtcClock::RESET_COUNT();
   State::LoadAs(filename);
   return true;
 }
