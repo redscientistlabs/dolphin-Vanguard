@@ -23,8 +23,8 @@ jobs:
     - name: Restore Nuget packages in RTCV
       run: nuget restore '.\RTCV\'
     - name: Restore Nuget packages in dolphin-vanguard
-      run: nuget restore '.\dolphin-vanguard\Source\dolphin-emu-ci.sln'
+      run: nuget restore '.\dolphin-vanguard\Source\dolphin-emu.sln'
     - name: Setup MSBuild.exe
       uses: microsoft/setup-msbuild@v1.0.0
     - name: Build with MSBuild
-      run: msbuild '.\dolphin-vanguard\Source\dolphin-emu-ci.sln' /property:Configuration=Debug /property:Platform=x64 /p:TreatWarningAsError=false
+      run: msbuild '.\dolphin-vanguard\Source\dolphin-emu.sln' /property:Configuration=Debug /property:Platform=x64 /p:TreatWarningAsError=false
