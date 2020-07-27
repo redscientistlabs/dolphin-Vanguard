@@ -11,9 +11,11 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Environment;
 import android.preference.PreferenceManager;
-import android.support.v4.content.LocalBroadcastManager;
+
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import org.dolphinemu.dolphinemu.NativeLibrary;
+import org.dolphinemu.dolphinemu.activities.EmulationActivity;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -22,7 +24,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.concurrent.atomic.AtomicBoolean;
-
 
 /**
  * A service that spawns its own thread in order to copy several binary and shader files
@@ -34,7 +35,7 @@ public final class DirectoryInitialization
           "org.dolphinemu.dolphinemu.DIRECTORY_INITIALIZATION";
 
   public static final String EXTRA_STATE = "directoryState";
-  private static final Integer WiimoteNewVersion = 2;
+  private static final int WiimoteNewVersion = 5;  // Last changed in PR 8907
   private static volatile DirectoryInitializationState directoryState = null;
   private static String userPath;
   private static String internalPath;
@@ -63,10 +64,12 @@ public final class DirectoryInitialization
     {
       if (PermissionsHandler.hasWriteAccess(context))
       {
-        if (setDolphinUserDirectory())
+        if (setDolphinUserDirectory(context))
         {
           initializeInternalStorage(context);
           initializeExternalStorage(context);
+          NativeLibrary.Initialize();
+          NativeLibrary.ReportStartToAnalytics();
 
           directoryState = DirectoryInitializationState.DOLPHIN_DIRECTORIES_INITIALIZED;
         }
@@ -85,22 +88,27 @@ public final class DirectoryInitialization
     sendBroadcastState(directoryState, context);
   }
 
-  private static boolean setDolphinUserDirectory()
+  private static boolean setDolphinUserDirectory(Context context)
   {
-    if (Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState()))
-    {
-      File externalPath = Environment.getExternalStorageDirectory();
-      if (externalPath != null)
-      {
-        userPath = externalPath.getAbsolutePath() + "/dolphin-emu";
-        Log.debug("[DirectoryInitialization] User Dir: " + userPath);
-        NativeLibrary.SetUserDirectory(userPath);
-        return true;
-      }
+    if (!Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState()))
+      return false;
 
-    }
+    File externalPath = Environment.getExternalStorageDirectory();
+    if (externalPath == null)
+      return false;
 
-    return false;
+    userPath = externalPath.getAbsolutePath() + "/dolphin-emu";
+    Log.debug("[DirectoryInitialization] User Dir: " + userPath);
+    NativeLibrary.SetUserDirectory(userPath);
+
+    File cacheDir = context.getExternalCacheDir();
+    if (cacheDir == null)
+      return false;
+
+    Log.debug("[DirectoryInitialization] Cache Dir: " + cacheDir.getPath());
+    NativeLibrary.SetCacheDirectory(cacheDir.getPath());
+
+    return true;
   }
 
   private static void initializeInternalStorage(Context context)
@@ -150,6 +158,7 @@ public final class DirectoryInitialization
     SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
     if (prefs.getInt("WiimoteNewVersion", 0) != WiimoteNewVersion)
     {
+      EmulationActivity.clearWiimoteNewIniLinkedPreferences(context);
       copyAsset("WiimoteNew.ini", new File(configDirectory, "WiimoteNew.ini"), true, context);
       SharedPreferences.Editor sPrefsEditor = prefs.edit();
       sPrefsEditor.putInt("WiimoteNewVersion", WiimoteNewVersion);

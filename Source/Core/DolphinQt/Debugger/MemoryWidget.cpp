@@ -23,7 +23,9 @@
 #include "Common/File.h"
 #include "Common/FileUtil.h"
 #include "Core/ConfigManager.h"
+#include "Core/HW/AddressSpace.h"
 #include "DolphinQt/Debugger/MemoryViewWidget.h"
+#include "DolphinQt/Host.h"
 #include "DolphinQt/QtUtils/ModalMessageBox.h"
 #include "DolphinQt/Settings.h"
 
@@ -53,11 +55,11 @@ MemoryWidget::MemoryWidget(QWidget* parent) : QDockWidget(parent)
           [this](bool enabled) { setHidden(!enabled || !Settings::Instance().IsMemoryVisible()); });
 
   connect(&Settings::Instance(), &Settings::EmulationStateChanged, this, &MemoryWidget::Update);
+  connect(Host::GetInstance(), &Host::UpdateDisasmDialog, this, &MemoryWidget::Update);
 
   LoadSettings();
 
   ConnectWidgets();
-  Update();
   OnAddressSpaceChanged();
   OnTypeChanged();
 }
@@ -225,15 +227,15 @@ void MemoryWidget::ConnectWidgets()
   connect(m_find_ascii, &QRadioButton::toggled, this, &MemoryWidget::ValidateSearchValue);
   connect(m_find_hex, &QRadioButton::toggled, this, &MemoryWidget::ValidateSearchValue);
 
-  connect(m_set_value, &QPushButton::pressed, this, &MemoryWidget::OnSetValue);
+  connect(m_set_value, &QPushButton::clicked, this, &MemoryWidget::OnSetValue);
 
-  connect(m_dump_mram, &QPushButton::pressed, this, &MemoryWidget::OnDumpMRAM);
-  connect(m_dump_exram, &QPushButton::pressed, this, &MemoryWidget::OnDumpExRAM);
-  connect(m_dump_aram, &QPushButton::pressed, this, &MemoryWidget::OnDumpARAM);
-  connect(m_dump_fake_vmem, &QPushButton::pressed, this, &MemoryWidget::OnDumpFakeVMEM);
+  connect(m_dump_mram, &QPushButton::clicked, this, &MemoryWidget::OnDumpMRAM);
+  connect(m_dump_exram, &QPushButton::clicked, this, &MemoryWidget::OnDumpExRAM);
+  connect(m_dump_aram, &QPushButton::clicked, this, &MemoryWidget::OnDumpARAM);
+  connect(m_dump_fake_vmem, &QPushButton::clicked, this, &MemoryWidget::OnDumpFakeVMEM);
 
-  connect(m_find_next, &QPushButton::pressed, this, &MemoryWidget::OnFindNextValue);
-  connect(m_find_previous, &QPushButton::pressed, this, &MemoryWidget::OnFindPreviousValue);
+  connect(m_find_next, &QPushButton::clicked, this, &MemoryWidget::OnFindNextValue);
+  connect(m_find_previous, &QPushButton::clicked, this, &MemoryWidget::OnFindPreviousValue);
 
   for (auto* radio :
        {m_address_space_effective, m_address_space_auxiliary, m_address_space_physical})
@@ -258,8 +260,16 @@ void MemoryWidget::closeEvent(QCloseEvent*)
   Settings::Instance().SetMemoryVisible(false);
 }
 
+void MemoryWidget::showEvent(QShowEvent* event)
+{
+  Update();
+}
+
 void MemoryWidget::Update()
 {
+  if (!isVisible())
+    return;
+
   m_memory_view->Update();
   update();
 }
@@ -480,12 +490,15 @@ void MemoryWidget::OnSetValue()
     const QByteArray bytes = m_data_edit->text().toUtf8();
 
     for (char c : bytes)
-      accessors->WriteU8(static_cast<u8>(c), addr++);
+      accessors->WriteU8(addr++, static_cast<u8>(c));
   }
   else
   {
     bool good_value;
-    u64 value = m_data_edit->text().toULongLong(&good_value, 16);
+    const QString text = m_data_edit->text();
+    const int length =
+        text.startsWith(QStringLiteral("0x"), Qt::CaseInsensitive) ? text.size() - 2 : text.size();
+    const u64 value = text.toULongLong(&good_value, 16);
 
     if (!good_value)
     {
@@ -493,15 +506,15 @@ void MemoryWidget::OnSetValue()
       return;
     }
 
-    if (value == static_cast<u8>(value))
+    if (length <= 2)
     {
       accessors->WriteU8(addr, static_cast<u8>(value));
     }
-    else if (value == static_cast<u16>(value))
+    else if (length <= 4)
     {
       accessors->WriteU16(addr, static_cast<u16>(value));
     }
-    else if (value == static_cast<u32>(value))
+    else if (length <= 8)
     {
       accessors->WriteU32(addr, static_cast<u32>(value));
     }

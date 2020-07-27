@@ -68,10 +68,10 @@ void NewPatchDialog::CreateWidgets()
 
 void NewPatchDialog::ConnectWidgets()
 {
-  connect(m_name_edit, static_cast<void (QLineEdit::*)(const QString&)>(&QLineEdit::textEdited),
+  connect(m_name_edit, qOverload<const QString&>(&QLineEdit::textEdited),
           [this](const QString& name) { m_patch.name = name.toStdString(); });
 
-  connect(m_add_button, &QPushButton::pressed, this, &NewPatchDialog::AddEntry);
+  connect(m_add_button, &QPushButton::clicked, this, &NewPatchDialog::AddEntry);
 
   connect(m_button_box, &QDialogButtonBox::accepted, this, &NewPatchDialog::accept);
   connect(m_button_box, &QDialogButtonBox::rejected, this, &QDialog::reject);
@@ -130,7 +130,7 @@ QGroupBox* NewPatchDialog::CreateEntry(PatchEngine::PatchEntry& entry)
   layout->addWidget(remove, 3, 0, 1, -1);
   box->setLayout(layout);
 
-  connect(offset, static_cast<void (QLineEdit::*)(const QString&)>(&QLineEdit::textEdited),
+  connect(offset, qOverload<const QString&>(&QLineEdit::textEdited),
           [&entry, offset](const QString& text) {
             bool okay = true;
             entry.address = text.toUInt(&okay, 16);
@@ -147,7 +147,7 @@ QGroupBox* NewPatchDialog::CreateEntry(PatchEngine::PatchEntry& entry)
             offset->setPalette(palette);
           });
 
-  connect(value, static_cast<void (QLineEdit::*)(const QString&)>(&QLineEdit::textEdited),
+  connect(value, qOverload<const QString&>(&QLineEdit::textEdited),
           [&entry, value](const QString& text) {
             bool okay;
             entry.value = text.toUInt(&okay, 16);
@@ -164,7 +164,7 @@ QGroupBox* NewPatchDialog::CreateEntry(PatchEngine::PatchEntry& entry)
             value->setPalette(palette);
           });
 
-  connect(remove, &QPushButton::pressed, [this, box, entry] {
+  connect(remove, &QPushButton::clicked, [this, box, entry] {
     if (m_patch.entries.size() > 1)
     {
       box->setVisible(false);

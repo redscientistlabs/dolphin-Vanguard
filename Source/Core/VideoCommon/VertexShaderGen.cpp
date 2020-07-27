@@ -23,7 +23,7 @@ VertexShaderUid GetVertexShaderUid()
   if (bpmem.genMode.numtexgens != xfmem.numTexGen.numTexGens ||
       bpmem.genMode.numcolchans != xfmem.numChan.numColorChans)
   {
-    GENERIC_LOG(LogTypes::COMMON, LogTypes::LERROR, "%s", "bad vertexshaderuid");
+    ERROR_LOG(COMMON, "%s", "bad vertexshaderuid");
     return out;
   }
 

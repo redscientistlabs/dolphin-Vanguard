@@ -13,6 +13,9 @@
 #include "InputCommon/ControllerEmu/ControlGroup/Buttons.h"
 #include "InputCommon/ControllerEmu/ControlGroup/Cursor.h"
 #include "InputCommon/ControllerEmu/ControlGroup/Force.h"
+#include "InputCommon/ControllerEmu/ControlGroup/IMUAccelerometer.h"
+#include "InputCommon/ControllerEmu/ControlGroup/IMUCursor.h"
+#include "InputCommon/ControllerEmu/ControlGroup/IMUGyroscope.h"
 #include "InputCommon/ControllerEmu/ControlGroup/Tilt.h"
 
 namespace
@@ -55,6 +58,32 @@ double CalculateStopDistance(double velocity, double max_accel)
 
 namespace WiimoteEmu
 {
+Common::Matrix33 ComplementaryFilter(const Common::Matrix33& gyroscope,
+                                     const Common::Vec3& accelerometer, float accel_weight,
+                                     const Common::Vec3& accelerometer_normal)
+{
+  const auto gyro_vec = gyroscope * accelerometer_normal;
+  const auto normalized_accel = accelerometer.Normalized();
+
+  const auto cos_angle = normalized_accel.Dot(gyro_vec);
+
+  // If gyro to accel angle difference is betwen 0 and 180 degrees we make an adjustment.
+  const auto abs_cos_angle = std::abs(cos_angle);
+  if (abs_cos_angle > 0 && abs_cos_angle < 1)
+  {
+    const auto axis = gyro_vec.Cross(normalized_accel).Normalized();
+    return Common::Matrix33::Rotate(std::acos(cos_angle) * accel_weight, axis) * gyroscope;
+  }
+  else
+  {
+    return gyroscope;
+  }
+}
+
+IMUCursorState::IMUCursorState() : rotation{Common::Matrix33::Identity()}
+{
+}
+
 void EmulateShake(PositionalState* state, ControllerEmu::Shake* const shake_group,
                   float time_elapsed)
 {
@@ -91,12 +120,9 @@ void EmulateTilt(RotationalState* state, ControllerEmu::Tilt* const tilt_group, 
   const ControlState roll = target.x * MathUtil::PI;
   const ControlState pitch = target.y * MathUtil::PI;
 
-  // Higher values will be more responsive but will increase rate of M+ "desync".
-  // I'd rather not expose this value in the UI if not needed.
-  // Desync caused by tilt seems not as severe as accelerometer data can estimate pitch/yaw.
-  constexpr auto MAX_ACCEL = float(MathUtil::TAU * 50);
+  const auto max_accel = std::pow(tilt_group->GetMaxRotationalVelocity(), 2) / MathUtil::TAU;
 
-  ApproachAngleWithAccel(state, Common::Vec3(pitch, -roll, 0), MAX_ACCEL, time_elapsed);
+  ApproachAngleWithAccel(state, Common::Vec3(pitch, -roll, 0), max_accel, time_elapsed);
 }
 
 void EmulateSwing(MotionState* state, ControllerEmu::Force* swing_group, float time_elapsed)
@@ -177,20 +203,20 @@ void EmulateSwing(MotionState* state, ControllerEmu::Force* swing_group, float t
   }
 }
 
-WiimoteCommon::DataReportBuilder::AccelData ConvertAccelData(const Common::Vec3& accel, u16 zero_g,
-                                                             u16 one_g)
+WiimoteCommon::AccelData ConvertAccelData(const Common::Vec3& accel, u16 zero_g, u16 one_g)
 {
   const auto scaled_accel = accel * (one_g - zero_g) / float(GRAVITY_ACCELERATION);
 
   // 10-bit integers.
   constexpr long MAX_VALUE = (1 << 10) - 1;
 
-  return {u16(std::clamp(std::lround(scaled_accel.x + zero_g), 0l, MAX_VALUE)),
-          u16(std::clamp(std::lround(scaled_accel.y + zero_g), 0l, MAX_VALUE)),
-          u16(std::clamp(std::lround(scaled_accel.z + zero_g), 0l, MAX_VALUE))};
+  return WiimoteCommon::AccelData(
+      {u16(std::clamp(std::lround(scaled_accel.x + zero_g), 0l, MAX_VALUE)),
+       u16(std::clamp(std::lround(scaled_accel.y + zero_g), 0l, MAX_VALUE)),
+       u16(std::clamp(std::lround(scaled_accel.z + zero_g), 0l, MAX_VALUE))});
 }
 
-void EmulateCursor(MotionState* state, ControllerEmu::Cursor* ir_group, float time_elapsed)
+void EmulatePoint(MotionState* state, ControllerEmu::Cursor* ir_group, float time_elapsed)
 {
   const auto cursor = ir_group->GetState(true);
 
@@ -271,6 +297,46 @@ void ApproachAngleWithAccel(RotationalState* state, const Common::Vec3& angle_ta
   }
 }
 
+void EmulateIMUCursor(IMUCursorState* state, ControllerEmu::IMUCursor* imu_ir_group,
+                      ControllerEmu::IMUAccelerometer* imu_accelerometer_group,
+                      ControllerEmu::IMUGyroscope* imu_gyroscope_group, float time_elapsed)
+{
+  const auto ang_vel = imu_gyroscope_group->GetState();
+
+  // Reset if pointing is disabled or we have no gyro data.
+  if (!imu_ir_group->enabled || !ang_vel.has_value())
+  {
+    *state = {};
+    return;
+  }
+
+  // Apply rotation from gyro data.
+  const auto gyro_rotation = GetMatrixFromGyroscope(*ang_vel * -1 * time_elapsed);
+  state->rotation = gyro_rotation * state->rotation;
+
+  // If we have some non-zero accel data use it to adjust gyro drift.
+  constexpr auto ACCEL_WEIGHT = 0.02f;
+  auto const accel = imu_accelerometer_group->GetState().value_or(Common::Vec3{});
+  if (accel.LengthSquared())
+    state->rotation = ComplementaryFilter(state->rotation, accel, ACCEL_WEIGHT);
+
+  // Clamp yaw within configured bounds.
+  const auto yaw = GetYaw(state->rotation);
+  const auto max_yaw = float(imu_ir_group->GetTotalYaw() / 2);
+  auto target_yaw = std::clamp(yaw, -max_yaw, max_yaw);
+
+  // Handle the "Recenter" button being pressed.
+  if (imu_ir_group->controls[0]->GetState<bool>())
+  {
+    state->recentered_pitch = GetPitch(state->rotation);
+    target_yaw = 0;
+  }
+
+  // Adjust yaw as needed.
+  if (yaw != target_yaw)
+    state->rotation *= Common::Matrix33::RotateZ(target_yaw - yaw);
+}
+
 void ApproachPositionWithJerk(PositionalState* state, const Common::Vec3& position_target,
                               const Common::Vec3& max_jerk, float time_elapsed)
 {
@@ -308,10 +374,45 @@ void ApproachPositionWithJerk(PositionalState* state, const Common::Vec3& positi
   }
 }
 
+Common::Matrix33 GetMatrixFromAcceleration(const Common::Vec3& accel)
+{
+  const auto normalized_accel = accel.Normalized();
+
+  const auto angle = std::acos(normalized_accel.Dot({0, 0, 1}));
+  const auto axis = normalized_accel.Cross({0, 0, 1});
+
+  // Check that axis is non-zero to handle perfect up/down orientations.
+  return Common::Matrix33::Rotate(angle,
+                                  axis.LengthSquared() ? axis.Normalized() : Common::Vec3{0, 1, 0});
+}
+
+Common::Matrix33 GetMatrixFromGyroscope(const Common::Vec3& gyro)
+{
+  return Common::Matrix33::FromQuaternion(gyro.x / 2, gyro.y / 2, gyro.z / 2, 1);
+}
+
 Common::Matrix33 GetRotationalMatrix(const Common::Vec3& angle)
 {
   return Common::Matrix33::RotateZ(angle.z) * Common::Matrix33::RotateY(angle.y) *
          Common::Matrix33::RotateX(angle.x);
+}
+
+float GetPitch(const Common::Matrix33& world_rotation)
+{
+  const auto vec = world_rotation * Common::Vec3{0, 0, 1};
+  return std::atan2(vec.y, Common::Vec2(vec.x, vec.z).Length());
+}
+
+float GetRoll(const Common::Matrix33& world_rotation)
+{
+  const auto vec = world_rotation * Common::Vec3{0, 0, 1};
+  return std::atan2(vec.x, vec.z);
+}
+
+float GetYaw(const Common::Matrix33& world_rotation)
+{
+  const auto vec = world_rotation.Inverted() * Common::Vec3{0, 1, 0};
+  return std::atan2(vec.x, vec.y);
 }
 
 }  // namespace WiimoteEmu

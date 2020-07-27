@@ -34,12 +34,12 @@
 
 #include "Common/GekkoDisassembler.h"
 
+#include <array>
 #include <string>
 
 #include <fmt/format.h>
 
 #include "Common/CommonTypes.h"
-#include "Common/StringUtil.h"
 
 namespace Common
 {
@@ -86,37 +86,68 @@ namespace Common
 #define PPCGETIDX2(x) (((x)&PPCIDX2MASK) >> PPCIDX2SH)
 #define PPCGETSTRM(x) (((x)&PPCSTRM) >> PPCDSH)
 
-static const char* trap_condition[32] = {
+constexpr std::array<const char*, 32> trap_condition{
     nullptr, "lgt",   "llt",   nullptr, "eq",    "lge",   "lle",   nullptr,
     "gt",    nullptr, nullptr, nullptr, "ge",    nullptr, nullptr, nullptr,
     "lt",    nullptr, nullptr, nullptr, "le",    nullptr, nullptr, nullptr,
-    "ne",    nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
+    "ne",    nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+};
 
-static const char* cmpname[4] = {"cmpw", "cmpd", "cmplw", "cmpld"};
+constexpr std::array<const char*, 4> cmpname{
+    "cmpw",
+    "cmpd",
+    "cmplw",
+    "cmpld",
+};
 
-static const char* ps_cmpname[4] = {"ps_cmpu0", "ps_cmpo0", "ps_cmpu1", "ps_cmpo1"};
+constexpr std::array<const char*, 4> ps_cmpname{
+    "ps_cmpu0",
+    "ps_cmpo0",
+    "ps_cmpu1",
+    "ps_cmpo1",
+};
 
-static const char* b_ext[4] = {"", "l", "a", "la"};
+constexpr std::array<const char*, 4> b_ext{
+    "",
+    "l",
+    "a",
+    "la",
+};
 
-static const char* b_condition[8] = {"ge", "le", "ne", "ns", "lt", "gt", "eq", "so"};
+constexpr std::array<const char*, 8> b_condition{
+    "ge", "le", "ne", "ns", "lt", "gt", "eq", "so",
+};
 
-static const char* b_decr[16] = {"nzf", "zf", nullptr, nullptr, "nzt", "zt", nullptr, nullptr,
-                                 "nz",  "z",  nullptr, nullptr, "nz",  "z",  nullptr, nullptr};
+constexpr std::array<const char*, 16> b_decr{
+    "nzf", "zf", nullptr, nullptr, "nzt", "zt", nullptr, nullptr,
+    "nz",  "z",  nullptr, nullptr, "nz",  "z",  nullptr, nullptr,
+};
 
-static const char* regsel[2] = {"", "r"};
+constexpr std::array<const char*, 2> regsel{
+    "",
+    "r",
+};
 
-static const char* oesel[2] = {"", "o"};
+constexpr std::array<const char*, 2> oesel{
+    "",
+    "o",
+};
 
-static const char* rcsel[2] = {"", "."};
+constexpr std::array<const char*, 2> rcsel{
+    "",
+    ".",
+};
 
-static const char* ldstnames[24] = {"lwz", "lwzu", "lbz", "lbzu", "stw",  "stwu",  "stb",  "stbu",
-                                    "lhz", "lhzu", "lha", "lhau", "sth",  "sthu",  "lmw",  "stmw",
-                                    "lfs", "lfsu", "lfd", "lfdu", "stfs", "stfsu", "stfd", "stfdu"};
+constexpr std::array<const char*, 24> ldstnames{
+    "lwz", "lwzu", "lbz", "lbzu", "stw", "stwu", "stb", "stbu", "lhz",  "lhzu",  "lha",  "lhau",
+    "sth", "sthu", "lmw", "stmw", "lfs", "lfsu", "lfd", "lfdu", "stfs", "stfsu", "stfd", "stfdu",
+};
 
-static const char* regnames[32] = {"r0",  "sp",  "rtoc", "r3",  "r4",  "r5",  "r6",  "r7",
-                                   "r8",  "r9",  "r10",  "r11", "r12", "r13", "r14", "r15",
-                                   "r16", "r17", "r18",  "r19", "r20", "r21", "r22", "r23",
-                                   "r24", "r25", "r26",  "r27", "r28", "r29", "r30", "r31"};
+constexpr std::array<const char*, 32> regnames{
+    "r0",  "sp",  "rtoc", "r3",  "r4",  "r5",  "r6",  "r7",  "r8",  "r9",  "r10",
+    "r11", "r12", "r13",  "r14", "r15", "r16", "r17", "r18", "r19", "r20", "r21",
+    "r22", "r23", "r24",  "r25", "r26", "r27", "r28", "r29", "r30", "r31",
+};
 
 // Initialize static class variables.
 u32* GekkoDisassembler::m_instr = nullptr;
@@ -473,7 +504,7 @@ void GekkoDisassembler::cmpi(u32 in, int uimm)
     i = (int)PPCGETCRD(in);
     if (i != 0)
     {
-      m_operands += fmt::format("cr{}, ", '0' + i);
+      m_operands += fmt::format("cr{}, ", i);
     }
 
     m_operands += imm(in, uimm, 2, false);
@@ -484,7 +515,7 @@ void GekkoDisassembler::cmpi(u32 in, int uimm)
   }
 }
 
-void GekkoDisassembler::addi(u32 in, const std::string& ext)
+void GekkoDisassembler::addi(u32 in, std::string_view ext)
 {
   if ((in & 0x08000000) && !PPCGETA(in))
   {
@@ -508,7 +539,7 @@ void GekkoDisassembler::addi(u32 in, const std::string& ext)
 }
 
 // Build a branch instr. and return number of chars written to operand.
-size_t GekkoDisassembler::branch(u32 in, const char* bname, int aform, int bdisp)
+size_t GekkoDisassembler::branch(u32 in, std::string_view bname, int aform, int bdisp)
 {
   int bo = (int)PPCGETD(in);
   int bi = (int)PPCGETA(in);
@@ -595,11 +626,11 @@ void GekkoDisassembler::bli(u32 in)
   m_displacement = d;
 }
 
-void GekkoDisassembler::mcrf(u32 in, char c)
+void GekkoDisassembler::mcrf(u32 in, std::string_view suffix)
 {
   if ((in & 0x0063f801) == 0)
   {
-    m_opcode = fmt::format("mcrf{}", c);
+    m_opcode = fmt::format("mcrf{}", suffix);
     m_operands = fmt::format("cr{}, cr{}", PPCGETCRD(in), PPCGETCRA(in));
   }
   else
@@ -608,7 +639,7 @@ void GekkoDisassembler::mcrf(u32 in, char c)
   }
 }
 
-void GekkoDisassembler::crop(u32 in, const char* n1, const char* n2)
+void GekkoDisassembler::crop(u32 in, std::string_view n1, std::string_view n2)
 {
   int crd = (int)PPCGETD(in);
   int cra = (int)PPCGETA(in);
@@ -616,8 +647,8 @@ void GekkoDisassembler::crop(u32 in, const char* n1, const char* n2)
 
   if ((in & 1) == 0)
   {
-    m_opcode = fmt::format("cr{}", (cra == crb && n2) ? n2 : n1);
-    if (cra == crb && n2)
+    m_opcode = fmt::format("cr{}", (cra == crb && !n2.empty()) ? n2 : n1);
+    if (cra == crb && !n2.empty())
       m_operands = fmt::format("{}, {}", crd, cra);
     else
       m_operands = fmt::format("{}, {}, {}", crd, cra, crb);
@@ -628,7 +659,7 @@ void GekkoDisassembler::crop(u32 in, const char* n1, const char* n2)
   }
 }
 
-void GekkoDisassembler::nooper(u32 in, const char* name, unsigned char dmode)
+void GekkoDisassembler::nooper(u32 in, std::string_view name, unsigned char dmode)
 {
   if (in & (PPCDMASK | PPCAMASK | PPCBMASK | 1))
   {
@@ -641,7 +672,7 @@ void GekkoDisassembler::nooper(u32 in, const char* name, unsigned char dmode)
   }
 }
 
-void GekkoDisassembler::rlw(u32 in, const char* name, int i)
+void GekkoDisassembler::rlw(u32 in, std::string_view name, int i)
 {
   int s = (int)PPCGETD(in);
   int a = (int)PPCGETA(in);
@@ -649,18 +680,18 @@ void GekkoDisassembler::rlw(u32 in, const char* name, int i)
   int mb = (int)PPCGETC(in);
   int me = (int)PPCGETM(in);
 
-  m_opcode = fmt::format("rlw{}{}", name, (in & 1) ? '.' : '\0');
+  m_opcode = fmt::format("rlw{}{}", name, (in & 1) ? "." : "");
   m_operands = fmt::format("{}, {}, {}{}, {}, {} ({:08x})", regnames[a], regnames[s], regsel[i],
                            bsh, mb, me, HelperRotateMask(bsh, mb, me));
 }
 
-void GekkoDisassembler::ori(u32 in, const char* name)
+void GekkoDisassembler::ori(u32 in, std::string_view name)
 {
   m_opcode = name;
   m_operands = imm(in, 1, 1, true);
 }
 
-void GekkoDisassembler::rld(u32 in, const char* name, int i)
+void GekkoDisassembler::rld(u32 in, std::string_view name, int i)
 {
   int s = (int)PPCGETD(in);
   int a = (int)PPCGETA(in);
@@ -668,7 +699,7 @@ void GekkoDisassembler::rld(u32 in, const char* name, int i)
   int m = (int)(in & 0x7e0) >> 5;
 
   m_flags |= PPCF_64;
-  m_opcode = fmt::format("rld{}{}", name, (in & 1) ? '.' : '\0');
+  m_opcode = fmt::format("rld{}{}", name, (in & 1) ? "." : "");
   m_operands = fmt::format("{}, {}, {}{}, {}", regnames[a], regnames[s], regsel[i], bsh, m);
 }
 
@@ -685,7 +716,7 @@ void GekkoDisassembler::cmp(u32 in)
 
     i = (int)PPCGETCRD(in);
     if (i != 0)
-      m_operands += fmt::format("cr{},", static_cast<char>('0' + i));
+      m_operands += fmt::format("cr{},", i);
 
     m_operands += ra_rb(in);
   }
@@ -729,8 +760,8 @@ void GekkoDisassembler::trap(u32 in, unsigned char dmode)
 }
 
 // Standard instruction: xxxx rD,rA,rB
-void GekkoDisassembler::dab(u32 in, const char* name, int mask, int smode, int chkoe, int chkrc,
-                            unsigned char dmode)
+void GekkoDisassembler::dab(u32 in, std::string_view name, int mask, int smode, int chkoe,
+                            int chkrc, unsigned char dmode)
 {
   if (chkrc >= 0 && ((in & 1) != (unsigned int)chkrc))
   {
@@ -751,7 +782,7 @@ void GekkoDisassembler::dab(u32 in, const char* name, int mask, int smode, int c
 }
 
 // Last operand is no register: xxxx rD,rA,NB
-void GekkoDisassembler::rrn(u32 in, const char* name, int smode, int chkoe, int chkrc,
+void GekkoDisassembler::rrn(u32 in, std::string_view name, int smode, int chkoe, int chkrc,
                             unsigned char dmode)
 {
   if (chkrc >= 0 && ((in & 1) != (unsigned int)chkrc))
@@ -784,7 +815,7 @@ void GekkoDisassembler::mtcr(u32 in)
   }
   else
   {
-    m_opcode = fmt::format("mtcr{}", crm == 0xff ? '\0' : 'f');
+    m_opcode = fmt::format("mtcr{}", crm == 0xff ? "" : "f");
 
     if (crm != 0xff)
       m_operands += fmt::format("0x{:02x},", crm);
@@ -879,19 +910,18 @@ void GekkoDisassembler::mtb(u32 in)
   {
     m_operands += regnames[d];
 
-    char x;
+    const char* x = "";
     switch (tbr)
     {
     case 268:
-      x = 'l';
+      x = "l";
       break;
 
     case 269:
-      x = 'u';
+      x = "u";
       break;
 
     default:
-      x = '\0';
       m_flags |= PPCF_SUPER;
       m_operands += fmt::format(",{}", tbr);
       break;
@@ -908,11 +938,11 @@ void GekkoDisassembler::sradi(u32 in)
   int bsh = (int)(((in & 2) << 4) + PPCGETB(in));
 
   m_flags |= PPCF_64;
-  m_opcode = fmt::format("sradi{}", (in & 1) ? '.' : '\0');
+  m_opcode = fmt::format("sradi{}", (in & 1) ? "." : "");
   m_operands = fmt::format("{}, {}, {}", regnames[a], regnames[s], bsh);
 }
 
-void GekkoDisassembler::ldst(u32 in, const char* name, char reg, unsigned char dmode)
+void GekkoDisassembler::ldst(u32 in, std::string_view name, char reg, unsigned char dmode)
 {
   int s = (int)PPCGETD(in);
   int a = (int)PPCGETA(in);
@@ -937,7 +967,7 @@ void GekkoDisassembler::ldst(u32 in, const char* name, char reg, unsigned char d
 }
 
 // Standard floating point instruction: xxxx fD,fA,fC,fB
-void GekkoDisassembler::fdabc(u32 in, const char* name, int mask, unsigned char dmode)
+void GekkoDisassembler::fdabc(u32 in, std::string_view name, int mask, unsigned char dmode)
 {
   int err = 0;
 
@@ -974,7 +1004,7 @@ void GekkoDisassembler::fmr(u32 in)
 }
 
 // Indexed float instruction: xxxx fD,rA,rB
-void GekkoDisassembler::fdab(u32 in, const char* name, int mask)
+void GekkoDisassembler::fdab(u32 in, std::string_view name, int mask)
 {
   m_opcode = name;
   m_operands = fd_ra_rb(in, mask);
@@ -1189,7 +1219,7 @@ void GekkoDisassembler::ps(u32 inst)
 
     int i = (int)PPCGETCRD(inst);
     if (i != 0)
-      m_operands += fmt::format("cr{}, ", '0' + i);
+      m_operands += fmt::format("cr{}, ", i);
     m_operands += fmt::format("p{}, p{}", FA, FB);
     return;
   }
@@ -1343,7 +1373,7 @@ u32* GekkoDisassembler::DoDisassembly(bool big_endian)
     switch (PPCGETIDX2(in))
     {
     case 0:
-      mcrf(in, '\0');  // mcrf
+      mcrf(in, "");  // mcrf
       break;
 
     case 16:
@@ -1359,7 +1389,7 @@ u32* GekkoDisassembler::DoDisassembly(bool big_endian)
       break;
 
     case 129:
-      crop(in, "andc", nullptr);  // crandc
+      crop(in, "andc", {});  // crandc
       break;
 
     case 150:
@@ -1371,11 +1401,11 @@ u32* GekkoDisassembler::DoDisassembly(bool big_endian)
       break;
 
     case 225:
-      crop(in, "nand", nullptr);  // crnand
+      crop(in, "nand", {});  // crnand
       break;
 
     case 257:
-      crop(in, "and", nullptr);  // crand
+      crop(in, "and", {});  // crand
       break;
 
     case 289:
@@ -1383,7 +1413,7 @@ u32* GekkoDisassembler::DoDisassembly(bool big_endian)
       break;
 
     case 417:
-      crop(in, "orc", nullptr);  // crorc
+      crop(in, "orc", {});  // crorc
       break;
 
     case 449:
@@ -2237,7 +2267,7 @@ u32* GekkoDisassembler::DoDisassembly(bool big_endian)
         break;
 
       case 64:
-        mcrf(in, 's');  // mcrfs
+        mcrf(in, "s");  // mcrfs
         break;
 
       case 70:
@@ -2328,28 +2358,30 @@ std::string GekkoDisassembler::Disassemble(u32 opcode, u32 current_instruction_a
   return m_opcode.append("\t").append(m_operands);
 }
 
-static const char* gprnames[] = {
+constexpr std::array<const char*, 32> gpr_names{
     " r0", " r1 (sp)", " r2 (rtoc)", " r3", " r4", " r5", " r6", " r7", " r8", " r9", "r10",
     "r11", "r12",      "r13",        "r14", "r15", "r16", "r17", "r18", "r19", "r20", "r21",
-    "r22", "r23",      "r24",        "r25", "r26", "r27", "r28", "r29", "r30", "r31"};
+    "r22", "r23",      "r24",        "r25", "r26", "r27", "r28", "r29", "r30", "r31",
+};
 
 const char* GekkoDisassembler::GetGPRName(u32 index)
 {
-  if (index < 32)
-    return gprnames[index];
+  if (index < gpr_names.size())
+    return gpr_names[index];
 
   return nullptr;
 }
 
-static const char* fprnames[] = {" f0", " f1", " f2", " f3", " f4", " f5", " f6", " f7",
-                                 " f8", " f9", "f10", "f11", "f12", "f13", "f14", "f15",
-                                 "f16", "f17", "f18", "f19", "f20", "f21", "f22", "f23",
-                                 "f24", "f25", "f26", "f27", "f28", "f29", "f30", "f31"};
+constexpr std::array<const char*, 32> fpr_names{
+    " f0", " f1", " f2", " f3", " f4", " f5", " f6", " f7", " f8", " f9", "f10",
+    "f11", "f12", "f13", "f14", "f15", "f16", "f17", "f18", "f19", "f20", "f21",
+    "f22", "f23", "f24", "f25", "f26", "f27", "f28", "f29", "f30", "f31",
+};
 
 const char* GekkoDisassembler::GetFPRName(u32 index)
 {
-  if (index < 32)
-    return fprnames[index];
+  if (index < fpr_names.size())
+    return fpr_names[index];
 
   return nullptr;
 }

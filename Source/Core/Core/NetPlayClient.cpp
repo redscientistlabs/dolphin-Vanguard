@@ -15,6 +15,7 @@
 #include <type_traits>
 #include <vector>
 
+#include <fmt/format.h>
 #include <lzo/lzo1x.h>
 #include <mbedtls/md5.h>
 
@@ -251,6 +252,9 @@ bool NetPlayClient::Connect()
     case CON_ERR_GAME_RUNNING:
       m_dialog->OnConnectionError(_trans("The game is currently running."));
       break;
+    case CON_ERR_NAME_TOO_LONG:
+      m_dialog->OnConnectionError(_trans("Nickname is too long."));
+      break;
     default:
       m_dialog->OnConnectionError(_trans("The server sent an unknown error message."));
       break;
@@ -305,6 +309,8 @@ unsigned int NetPlayClient::OnData(sf::Packet& packet)
       m_players[player.pid] = player;
     }
 
+    m_dialog->OnPlayerConnect(player.name);
+
     m_dialog->Update();
   }
   break;
@@ -314,10 +320,15 @@ unsigned int NetPlayClient::OnData(sf::Packet& packet)
     PlayerId pid;
     packet >> pid;
 
-    INFO_LOG(NETPLAY, "Player %s (%d) left", m_players.find(pid)->second.name.c_str(), pid);
-
     {
       std::lock_guard<std::recursive_mutex> lkp(m_crit.players);
+      const auto it = m_players.find(pid);
+      if (it == m_players.end())
+        break;
+
+      const auto& player = it->second;
+      INFO_LOG(NETPLAY, "Player %s (%d) left", player.name.c_str(), pid);
+      m_dialog->OnPlayerDisconnect(player.name);
       m_players.erase(m_players.find(pid));
     }
 
@@ -624,7 +635,7 @@ unsigned int NetPlayClient::OnData(sf::Packet& packet)
 
       packet >> m_net_settings.m_EnableCheats;
       packet >> m_net_settings.m_SelectedLanguage;
-      packet >> m_net_settings.m_OverrideGCLanguage;
+      packet >> m_net_settings.m_OverrideRegionSettings;
       packet >> m_net_settings.m_ProgressiveScan;
       packet >> m_net_settings.m_PAL60;
       packet >> m_net_settings.m_DSPEnableJIT;
@@ -633,7 +644,6 @@ unsigned int NetPlayClient::OnData(sf::Packet& packet)
       packet >> m_net_settings.m_CopyWiiSave;
       packet >> m_net_settings.m_OCEnable;
       packet >> m_net_settings.m_OCFactor;
-      packet >> m_net_settings.m_ReducePollingRate;
 
       for (auto& device : m_net_settings.m_EXIDevice)
       {
@@ -774,9 +784,9 @@ unsigned int NetPlayClient::OnData(sf::Packet& packet)
   {
     const size_t sram_settings_len = sizeof(g_SRAM) - offsetof(Sram, settings);
     u8 sram[sram_settings_len];
-    for (size_t i = 0; i < sram_settings_len; ++i)
+    for (u8& cell : sram)
     {
-      packet >> sram[i];
+      packet >> cell;
     }
 
     {
@@ -843,7 +853,7 @@ unsigned int NetPlayClient::OnData(sf::Packet& packet)
       packet >> is_slot_a >> file_count;
 
       const std::string path = File::GetUserPath(D_GCUSER_IDX) + GC_MEMCARD_NETPLAY DIR_SEP +
-                               StringFromFormat("Card %c", is_slot_a ? 'A' : 'B');
+                               fmt::format("Card {}", is_slot_a ? 'A' : 'B');
 
       if ((File::Exists(path) && !File::DeleteDirRecursively(path + DIR_SEP)) ||
           !File::CreateFullPath(path + DIR_SEP))
@@ -897,8 +907,8 @@ unsigned int NetPlayClient::OnData(sf::Packet& packet)
       {
         auto buffer = DecompressPacketIntoBuffer(packet);
 
-        temp_fs->CreateDirectory(IOS::PID_KERNEL, IOS::PID_KERNEL, "/shared2/menu/FaceLib", 0,
-                                 fs_modes);
+        temp_fs->CreateFullPath(IOS::PID_KERNEL, IOS::PID_KERNEL, "/shared2/menu/FaceLib/", 0,
+                                fs_modes);
         auto file = temp_fs->CreateAndOpenFile(IOS::PID_KERNEL, IOS::PID_KERNEL,
                                                Common::GetMiiDatabasePath(), fs_modes);
 
@@ -917,8 +927,8 @@ unsigned int NetPlayClient::OnData(sf::Packet& packet)
       {
         u64 title_id = Common::PacketReadU64(packet);
         titles.push_back(title_id);
-        temp_fs->CreateDirectory(IOS::PID_KERNEL, IOS::PID_KERNEL,
-                                 Common::GetTitleDataPath(title_id), 0, fs_modes);
+        temp_fs->CreateFullPath(IOS::PID_KERNEL, IOS::PID_KERNEL,
+                                Common::GetTitleDataPath(title_id) + '/', 0, fs_modes);
         auto save = WiiSave::MakeNandStorage(temp_fs.get(), title_id);
 
         bool exists;
@@ -932,8 +942,8 @@ unsigned int NetPlayClient::OnData(sf::Packet& packet)
         packet >> header.banner_size;
         packet >> header.permissions;
         packet >> header.unk1;
-        for (size_t i = 0; i < header.md5.size(); i++)
-          packet >> header.md5[i];
+        for (u8& byte : header.md5)
+          packet >> byte;
         packet >> header.unk2;
         for (size_t i = 0; i < header.banner_size; i++)
           packet >> header.banner[i];
@@ -948,11 +958,11 @@ unsigned int NetPlayClient::OnData(sf::Packet& packet)
         packet >> bk_header.unk1;
         packet >> bk_header.unk2;
         packet >> bk_header.total_size;
-        for (size_t i = 0; i < bk_header.unk3.size(); i++)
-          packet >> bk_header.unk3[i];
+        for (u8& byte : bk_header.unk3)
+          packet >> byte;
         packet >> bk_header.tid;
-        for (size_t i = 0; i < bk_header.mac_address.size(); i++)
-          packet >> bk_header.mac_address[i];
+        for (u8& byte : bk_header.mac_address)
+          packet >> byte;
 
         // Files
         std::vector<WiiSave::Storage::SaveFile> files;
@@ -1229,9 +1239,8 @@ void NetPlayClient::DisplayPlayersPing()
   if (!g_ActiveConfig.bShowNetPlayPing)
     return;
 
-  OSD::AddTypedMessage(OSD::MessageType::NetPlayPing,
-                       StringFromFormat("Ping: %u", GetPlayersMaxPing()), OSD::Duration::SHORT,
-                       OSD::Color::CYAN);
+  OSD::AddTypedMessage(OSD::MessageType::NetPlayPing, fmt::format("Ping: {}", GetPlayersMaxPing()),
+                       OSD::Duration::SHORT, OSD::Color::CYAN);
 }
 
 u32 NetPlayClient::GetPlayersMaxPing() const
@@ -1504,7 +1513,10 @@ bool NetPlayClient::StartGame(const std::string& path)
   }
 
   for (unsigned int i = 0; i < 4; ++i)
-    WiimoteReal::ChangeWiimoteSource(i, m_wiimote_map[i] > 0 ? WIIMOTE_SRC_EMU : WIIMOTE_SRC_NONE);
+  {
+    WiimoteCommon::SetSource(i,
+                             m_wiimote_map[i] > 0 ? WiimoteSource::Emulated : WiimoteSource::None);
+  }
 
   // boot game
   m_dialog->BootGame(path);
@@ -1587,8 +1599,8 @@ bool NetPlayClient::DecompressPacketIntoFile(sf::Packet& packet, const std::stri
 
   while (true)
   {
-    lzo_uint32 cur_len = 0;  // number of bytes to read
-    lzo_uint new_len = 0;    // number of bytes to write
+    u32 cur_len = 0;       // number of bytes to read
+    lzo_uint new_len = 0;  // number of bytes to write
 
     packet >> cur_len;
     if (!cur_len)
@@ -1630,8 +1642,8 @@ std::optional<std::vector<u8>> NetPlayClient::DecompressPacketIntoBuffer(sf::Pac
   lzo_uint i = 0;
   while (true)
   {
-    lzo_uint32 cur_len = 0;  // number of bytes to read
-    lzo_uint new_len = 0;    // number of bytes to write
+    u32 cur_len = 0;       // number of bytes to read
+    lzo_uint new_len = 0;  // number of bytes to write
 
     packet >> cur_len;
     if (!cur_len)
@@ -1920,15 +1932,15 @@ bool NetPlayClient::WiimoteUpdate(int _number, u8* data, const u8 size, u8 repor
     if (m_wiimote_map[_number] == m_local_player->pid)
     {
       nw.assign(data, data + size);
-      do
+
+      // TODO: add a seperate setting for wiimote buffer?
+      while (m_wiimote_buffer[_number].Size() <= m_target_buffer_size * 200 / 120)
       {
         // add to buffer
         m_wiimote_buffer[_number].Push(nw);
 
         SendWiimoteState(_number, nw);
-      } while (m_wiimote_buffer[_number].Size() <=
-               m_target_buffer_size * 200 /
-                   120);  // TODO: add a seperate setting for wiimote buffer?
+      }
     }
 
   }  // unlock players
@@ -2036,6 +2048,18 @@ bool NetPlayClient::PollLocalPad(const int local_pad, sf::Packet& packet)
 
 void NetPlayClient::SendPadHostPoll(const PadIndex pad_num)
 {
+  // Here we handle polling for the Host Input Authority and Golf modes. Pad data is "polled" from
+  // the most recent data received for the given pad. Passing pad_num < 0 will poll all assigned
+  // pads (used for batched polls), while 0..3 will poll the respective pad (used for MMIO polls).
+  // See GetNetPads for more details.
+  //
+  // If the local buffer is non-empty, we skip actually buffering and sending new pad data, this way
+  // don't end up with permanent local latency. It does create a period of time where no inputs are
+  // accepted, but under typical circumstances this is not noticeable.
+  //
+  // Additionally, we wait until some actual pad data has been received before buffering and sending
+  // it, otherwise controllers get calibrated wrongly with the default values of GCPadStatus.
+
   if (m_local_player->pid != m_current_golfer)
     return;
 

@@ -31,6 +31,9 @@ VertexManager::~VertexManager() = default;
 
 bool VertexManager::Initialize()
 {
+  if (!VertexManagerBase::Initialize())
+    return false;
+
   if (!m_vertex_stream_buffer.AllocateBuffer(VERTEX_STREAM_BUFFER_SIZE) ||
       !m_index_stream_buffer.AllocateBuffer(INDEX_STREAM_BUFFER_SIZE) ||
       !m_uniform_stream_buffer.AllocateBuffer(UNIFORM_STREAM_BUFFER_SIZE) ||
@@ -96,7 +99,7 @@ void VertexManager::ResetBuffer(u32 vertex_stride)
   m_base_buffer_pointer = m_vertex_stream_buffer.GetHostPointer();
   m_end_buffer_pointer = m_vertex_stream_buffer.GetCurrentHostPointer() + MAXVBUFFERSIZE;
   m_cur_buffer_pointer = m_vertex_stream_buffer.GetCurrentHostPointer();
-  IndexGenerator::Start(reinterpret_cast<u16*>(m_index_stream_buffer.GetCurrentHostPointer()));
+  m_index_generator.Start(reinterpret_cast<u16*>(m_index_stream_buffer.GetCurrentHostPointer()));
 }
 
 void VertexManager::CommitBuffer(u32 num_vertices, u32 vertex_stride, u32 num_indices,
@@ -112,8 +115,8 @@ void VertexManager::CommitBuffer(u32 num_vertices, u32 vertex_stride, u32 num_in
   m_vertex_stream_buffer.CommitMemory(vertex_data_size);
   m_index_stream_buffer.CommitMemory(index_data_size);
 
-  ADDSTAT(stats.thisFrame.bytesVertexStreamed, static_cast<int>(vertex_data_size));
-  ADDSTAT(stats.thisFrame.bytesIndexStreamed, static_cast<int>(index_data_size));
+  ADDSTAT(g_stats.this_frame.bytes_vertex_streamed, static_cast<int>(vertex_data_size));
+  ADDSTAT(g_stats.this_frame.bytes_index_streamed, static_cast<int>(index_data_size));
 
   Renderer::GetInstance()->SetVertexBuffer(m_vertex_stream_buffer.GetGPUPointer(), vertex_stride,
                                            m_vertex_stream_buffer.GetSize());
@@ -137,7 +140,7 @@ void VertexManager::UpdateVertexShaderConstants()
   std::memcpy(m_uniform_stream_buffer.GetCurrentHostPointer(), &VertexShaderManager::constants,
               sizeof(VertexShaderConstants));
   m_uniform_stream_buffer.CommitMemory(sizeof(VertexShaderConstants));
-  ADDSTAT(stats.thisFrame.bytesUniformStreamed, sizeof(VertexShaderConstants));
+  ADDSTAT(g_stats.this_frame.bytes_uniform_streamed, sizeof(VertexShaderConstants));
   VertexShaderManager::dirty = false;
 }
 
@@ -150,7 +153,7 @@ void VertexManager::UpdateGeometryShaderConstants()
   std::memcpy(m_uniform_stream_buffer.GetCurrentHostPointer(), &GeometryShaderManager::constants,
               sizeof(GeometryShaderConstants));
   m_uniform_stream_buffer.CommitMemory(sizeof(GeometryShaderConstants));
-  ADDSTAT(stats.thisFrame.bytesUniformStreamed, sizeof(GeometryShaderConstants));
+  ADDSTAT(g_stats.this_frame.bytes_uniform_streamed, sizeof(GeometryShaderConstants));
   GeometryShaderManager::dirty = false;
 }
 
@@ -163,7 +166,7 @@ void VertexManager::UpdatePixelShaderConstants()
   std::memcpy(m_uniform_stream_buffer.GetCurrentHostPointer(), &PixelShaderManager::constants,
               sizeof(PixelShaderConstants));
   m_uniform_stream_buffer.CommitMemory(sizeof(PixelShaderConstants));
-  ADDSTAT(stats.thisFrame.bytesUniformStreamed, sizeof(PixelShaderConstants));
+  ADDSTAT(g_stats.this_frame.bytes_uniform_streamed, sizeof(PixelShaderConstants));
   PixelShaderManager::dirty = false;
 }
 
@@ -227,7 +230,7 @@ void VertexManager::UploadAllConstants()
 
   // Finally, flush buffer memory after copying
   m_uniform_stream_buffer.CommitMemory(allocation_size);
-  ADDSTAT(stats.thisFrame.bytesUniformStreamed, allocation_size);
+  ADDSTAT(g_stats.this_frame.bytes_uniform_streamed, allocation_size);
 
   // Clear dirty flags
   VertexShaderManager::dirty = false;
@@ -250,7 +253,7 @@ void VertexManager::UploadUtilityUniforms(const void* data, u32 data_size)
   Renderer::GetInstance()->SetConstantBuffer(2, m_uniform_stream_buffer.GetCurrentGPUPointer());
   std::memcpy(m_uniform_stream_buffer.GetCurrentHostPointer(), data, data_size);
   m_uniform_stream_buffer.CommitMemory(data_size);
-  ADDSTAT(stats.thisFrame.bytesUniformStreamed, data_size);
+  ADDSTAT(g_stats.this_frame.bytes_uniform_streamed, data_size);
 }
 
 bool VertexManager::UploadTexelBuffer(const void* data, u32 data_size, TexelBufferFormat format,
@@ -275,7 +278,7 @@ bool VertexManager::UploadTexelBuffer(const void* data, u32 data_size, TexelBuff
   std::memcpy(m_texel_stream_buffer.GetCurrentHostPointer(), data, data_size);
   *out_offset = static_cast<u32>(m_texel_stream_buffer.GetCurrentOffset()) / elem_size;
   m_texel_stream_buffer.CommitMemory(data_size);
-  ADDSTAT(stats.thisFrame.bytesUniformStreamed, data_size);
+  ADDSTAT(g_stats.this_frame.bytes_uniform_streamed, data_size);
   Renderer::GetInstance()->SetTextureDescriptor(0, m_texel_buffer_views[format].cpu_handle);
   return true;
 }
@@ -312,7 +315,7 @@ bool VertexManager::UploadTexelBuffer(const void* data, u32 data_size, TexelBuff
       palette_elem_size;
 
   m_texel_stream_buffer.CommitMemory(palette_byte_offset + palette_size);
-  ADDSTAT(stats.thisFrame.bytesUniformStreamed, palette_byte_offset + palette_size);
+  ADDSTAT(g_stats.this_frame.bytes_uniform_streamed, palette_byte_offset + palette_size);
   Renderer::GetInstance()->SetTextureDescriptor(0, m_texel_buffer_views[format].cpu_handle);
   Renderer::GetInstance()->SetTextureDescriptor(1, m_texel_buffer_views[palette_format].cpu_handle);
   return true;

@@ -7,6 +7,8 @@
 #include <QCheckBox>
 #include <QGridLayout>
 #include <QGroupBox>
+#include <QLabel>
+#include <QSpinBox>
 #include <QVBoxLayout>
 
 #include "Core/Config/GraphicsSettings.h"
@@ -16,6 +18,7 @@
 
 #include "DolphinQt/Config/Graphics/GraphicsBool.h"
 #include "DolphinQt/Config/Graphics/GraphicsChoice.h"
+#include "DolphinQt/Config/Graphics/GraphicsInteger.h"
 #include "DolphinQt/Config/Graphics/GraphicsWindow.h"
 #include "DolphinQt/Settings.h"
 
@@ -62,27 +65,61 @@ void AdvancedWidget::CreateWidgets()
   auto* utility_layout = new QGridLayout();
   utility_box->setLayout(utility_layout);
 
-  m_dump_textures = new GraphicsBool(tr("Dump Textures"), Config::GFX_DUMP_TEXTURES);
   m_load_custom_textures = new GraphicsBool(tr("Load Custom Textures"), Config::GFX_HIRES_TEXTURES);
   m_prefetch_custom_textures =
       new GraphicsBool(tr("Prefetch Custom Textures"), Config::GFX_CACHE_HIRES_TEXTURES);
-  m_use_fullres_framedumps = new GraphicsBool(tr("Internal Resolution Frame Dumps"),
-                                              Config::GFX_INTERNAL_RESOLUTION_FRAME_DUMPS);
   m_dump_efb_target = new GraphicsBool(tr("Dump EFB Target"), Config::GFX_DUMP_EFB_TARGET);
   m_disable_vram_copies =
       new GraphicsBool(tr("Disable EFB VRAM Copies"), Config::GFX_HACK_DISABLE_COPY_TO_VRAM);
-  m_enable_freelook = new GraphicsBool(tr("Free Look"), Config::GFX_FREE_LOOK);
-  m_dump_use_ffv1 = new GraphicsBool(tr("Frame Dumps Use FFV1"), Config::GFX_USE_FFV1);
 
-  utility_layout->addWidget(m_dump_textures, 0, 0);
-  utility_layout->addWidget(m_load_custom_textures, 0, 1);
-  utility_layout->addWidget(m_prefetch_custom_textures, 1, 0);
-  utility_layout->addWidget(m_use_fullres_framedumps, 1, 1);
-  utility_layout->addWidget(m_dump_efb_target, 2, 0);
-  utility_layout->addWidget(m_disable_vram_copies, 2, 1);
-  utility_layout->addWidget(m_enable_freelook, 3, 0);
+  utility_layout->addWidget(m_load_custom_textures, 0, 0);
+  utility_layout->addWidget(m_prefetch_custom_textures, 0, 1);
+
+  utility_layout->addWidget(m_disable_vram_copies, 1, 0);
+
+  utility_layout->addWidget(m_dump_efb_target, 1, 1);
+
+  // Freelook
+  auto* freelook_box = new QGroupBox(tr("Free Look"));
+  auto* freelook_layout = new QGridLayout();
+  freelook_box->setLayout(freelook_layout);
+
+  m_enable_freelook = new GraphicsBool(tr("Enable"), Config::GFX_FREE_LOOK);
+  m_freelook_control_type = new GraphicsChoice({tr("Six Axis"), tr("First Person"), tr("Orbital")},
+                                               Config::GFX_FREE_LOOK_CONTROL_TYPE);
+
+  freelook_layout->addWidget(m_enable_freelook, 0, 0);
+  freelook_layout->addWidget(new QLabel(tr("Control Type:")), 1, 0);
+  freelook_layout->addWidget(m_freelook_control_type, 1, 1);
+
+  // Texture dumping
+  auto* texture_dump_box = new QGroupBox(tr("Texture Dumping"));
+  auto* texture_dump_layout = new QGridLayout();
+  texture_dump_box->setLayout(texture_dump_layout);
+  m_dump_textures = new GraphicsBool(tr("Enable"), Config::GFX_DUMP_TEXTURES);
+  m_dump_base_textures = new GraphicsBool(tr("Dump Base Textures"), Config::GFX_DUMP_BASE_TEXTURES);
+  m_dump_mip_textures = new GraphicsBool(tr("Dump Mip Maps"), Config::GFX_DUMP_MIP_TEXTURES);
+
+  texture_dump_layout->addWidget(m_dump_textures, 0, 0);
+
+  texture_dump_layout->addWidget(m_dump_base_textures, 1, 0);
+  texture_dump_layout->addWidget(m_dump_mip_textures, 1, 1);
+
+  // Frame dumping
+  auto* dump_box = new QGroupBox(tr("Frame Dumping"));
+  auto* dump_layout = new QGridLayout();
+  dump_box->setLayout(dump_layout);
+
+  m_use_fullres_framedumps = new GraphicsBool(tr("Dump at Internal Resolution"),
+                                              Config::GFX_INTERNAL_RESOLUTION_FRAME_DUMPS);
+  m_dump_use_ffv1 = new GraphicsBool(tr("Use Lossless Codec (FFV1)"), Config::GFX_USE_FFV1);
+  m_dump_bitrate = new GraphicsInteger(0, 1000000, Config::GFX_BITRATE_KBPS, 1000);
+
+  dump_layout->addWidget(m_use_fullres_framedumps, 0, 0);
 #if defined(HAVE_FFMPEG)
-  utility_layout->addWidget(m_dump_use_ffv1, 3, 1);
+  dump_layout->addWidget(m_dump_use_ffv1, 0, 1);
+  dump_layout->addWidget(new QLabel(tr("Bitrate (kbps):")), 1, 0);
+  dump_layout->addWidget(m_dump_bitrate, 1, 1);
 #endif
 
   // Misc.
@@ -117,6 +154,9 @@ void AdvancedWidget::CreateWidgets()
 
   main_layout->addWidget(debugging_box);
   main_layout->addWidget(utility_box);
+  main_layout->addWidget(freelook_box);
+  main_layout->addWidget(texture_dump_box);
+  main_layout->addWidget(dump_box);
   main_layout->addWidget(misc_box);
   main_layout->addWidget(experimental_box);
   main_layout->addStretch();
@@ -127,21 +167,34 @@ void AdvancedWidget::CreateWidgets()
 void AdvancedWidget::ConnectWidgets()
 {
   connect(m_load_custom_textures, &QCheckBox::toggled, this, &AdvancedWidget::SaveSettings);
+  connect(m_dump_use_ffv1, &QCheckBox::toggled, this, &AdvancedWidget::SaveSettings);
   connect(m_enable_prog_scan, &QCheckBox::toggled, this, &AdvancedWidget::SaveSettings);
+  connect(m_enable_freelook, &QCheckBox::toggled, this, &AdvancedWidget::SaveSettings);
+  connect(m_dump_textures, &QCheckBox::toggled, this, &AdvancedWidget::SaveSettings);
 }
 
 void AdvancedWidget::LoadSettings()
 {
   m_prefetch_custom_textures->setEnabled(Config::Get(Config::GFX_HIRES_TEXTURES));
+  m_dump_bitrate->setEnabled(!Config::Get(Config::GFX_USE_FFV1));
+
   m_enable_prog_scan->setChecked(Config::Get(Config::SYSCONF_PROGRESSIVE_SCAN));
+
+  m_freelook_control_type->setEnabled(Config::Get(Config::GFX_FREE_LOOK));
+  m_dump_mip_textures->setEnabled(Config::Get(Config::GFX_DUMP_TEXTURES));
+  m_dump_base_textures->setEnabled(Config::Get(Config::GFX_DUMP_TEXTURES));
 }
 
 void AdvancedWidget::SaveSettings()
 {
-  const auto hires_enabled = Config::Get(Config::GFX_HIRES_TEXTURES);
-  m_prefetch_custom_textures->setEnabled(hires_enabled);
+  m_prefetch_custom_textures->setEnabled(Config::Get(Config::GFX_HIRES_TEXTURES));
+  m_dump_bitrate->setEnabled(!Config::Get(Config::GFX_USE_FFV1));
 
   Config::SetBase(Config::SYSCONF_PROGRESSIVE_SCAN, m_enable_prog_scan->isChecked());
+
+  m_freelook_control_type->setEnabled(Config::Get(Config::GFX_FREE_LOOK));
+  m_dump_mip_textures->setEnabled(Config::Get(Config::GFX_DUMP_TEXTURES));
+  m_dump_base_textures->setEnabled(Config::Get(Config::GFX_DUMP_TEXTURES));
 }
 
 void AdvancedWidget::OnBackendChanged()
@@ -165,9 +218,20 @@ void AdvancedWidget::AddDescriptions()
   static const char TR_VALIDATION_LAYER_DESCRIPTION[] =
       QT_TR_NOOP("Enables validation of API calls made by the video backend, which may assist in "
                  "debugging graphical issues.\n\nIf unsure, leave this unchecked.");
-  static const char TR_DUMP_TEXTURE_DESCRIPTION[] = QT_TR_NOOP(
-      "Dumps decoded game textures to User/Dump/Textures/<game_id>/.\n\nIf unsure, leave "
-      "this unchecked.");
+  static const char TR_DUMP_TEXTURE_DESCRIPTION[] =
+      QT_TR_NOOP("Dumps decoded game textures based on the other flags to "
+                 "User/Dump/Textures/<game_id>/.\n\nIf unsure, leave "
+                 "this unchecked.");
+  static const char TR_DUMP_MIP_TEXTURE_DESCRIPTION[] = QT_TR_NOOP(
+      "Whether to dump mipmapped game textures to "
+      "User/Dump/Textures/<game_id>/.  This includes arbitrary mipmapped textures if 'Arbitrary "
+      "Mipmap Detection' is enabled in Enhancements.\n\nIf unsure, leave "
+      "this checked.");
+  static const char TR_DUMP_BASE_TEXTURE_DESCRIPTION[] = QT_TR_NOOP(
+      "Whether to dump base game textures to "
+      "User/Dump/Textures/<game_id>/.  This includes arbitrary base textures if 'Arbitrary "
+      "Mipmap Detection' is enabled in Enhancements.\n\nIf unsure, leave "
+      "this checked.");
   static const char TR_LOAD_CUSTOM_TEXTURE_DESCRIPTION[] = QT_TR_NOOP(
       "Loads custom textures from User/Load/Textures/<game_id>/.\n\nIf unsure, leave this "
       "unchecked.");
@@ -194,6 +258,14 @@ void AdvancedWidget::AddDescriptions()
       "to pan or middle button to roll.\n\nUse the WASD keys while holding SHIFT to move the "
       "camera. Press SHIFT+2 to increase speed or SHIFT+1 to decrease speed. Press SHIFT+R "
       "to reset the camera or SHIFT+F to reset the speed.\n\nIf unsure, leave this unchecked. ");
+  static const char TR_FREE_LOOK_CONTROL_TYPE_DESCRIPTION[] = QT_TR_NOOP(
+      "Changes the in-game camera type during freelook.\n\n"
+      "Six Axis: Offers full camera control on all axes, akin to moving a spacecraft in zero "
+      "gravity. This is the most powerful freelook option but is the most challenging to use.\n"
+      "First Person: Controls the free camera similarly to a first person video game. The camera "
+      "can rotate and travel, but roll is impossible. Easy to use, but limiting.\n"
+      "Orbital: Rotates the free camera around the original camera. Has no lateral movement, only "
+      "rotation and you may zoom up to the camera's origin point.");
   static const char TR_CROPPING_DESCRIPTION[] =
       QT_TR_NOOP("Crops the picture from its native aspect ratio to 4:3 or "
                  "16:9.\n\nIf unsure, leave this unchecked.");
@@ -216,8 +288,7 @@ void AdvancedWidget::AddDescriptions()
       "Implements fullscreen mode with a borderless window spanning the whole screen instead of "
       "using exclusive mode. Allows for faster transitions between fullscreen and windowed mode, "
       "but slightly increases input latency, makes movement less smooth and slightly decreases "
-      "performance.\n\nExclusive mode is required for Nvidia 3D Vision to work in the Direct3D "
-      "backend.\n\nIf unsure, leave this unchecked.");
+      "performance.\n\nIf unsure, leave this unchecked.");
 #endif
 
   AddDescription(m_enable_wireframe, TR_WIREFRAME_DESCRIPTION);
@@ -225,6 +296,8 @@ void AdvancedWidget::AddDescriptions()
   AddDescription(m_enable_format_overlay, TR_TEXTURE_FORMAT_DESCRIPTION);
   AddDescription(m_enable_api_validation, TR_VALIDATION_LAYER_DESCRIPTION);
   AddDescription(m_dump_textures, TR_DUMP_TEXTURE_DESCRIPTION);
+  AddDescription(m_dump_mip_textures, TR_DUMP_MIP_TEXTURE_DESCRIPTION);
+  AddDescription(m_dump_base_textures, TR_DUMP_BASE_TEXTURE_DESCRIPTION);
   AddDescription(m_load_custom_textures, TR_LOAD_CUSTOM_TEXTURE_DESCRIPTION);
   AddDescription(m_prefetch_custom_textures, TR_CACHE_CUSTOM_TEXTURE_DESCRIPTION);
   AddDescription(m_dump_efb_target, TR_DUMP_EFB_DESCRIPTION);
@@ -236,6 +309,7 @@ void AdvancedWidget::AddDescriptions()
   AddDescription(m_enable_cropping, TR_CROPPING_DESCRIPTION);
   AddDescription(m_enable_prog_scan, TR_PROGRESSIVE_SCAN_DESCRIPTION);
   AddDescription(m_enable_freelook, TR_FREE_LOOK_DESCRIPTION);
+  AddDescription(m_freelook_control_type, TR_FREE_LOOK_CONTROL_TYPE_DESCRIPTION);
   AddDescription(m_backend_multithreading, TR_BACKEND_MULTITHREADING_DESCRIPTION);
 #ifdef _WIN32
   AddDescription(m_borderless_fullscreen, TR_BORDERLESS_FULLSCREEN_DESCRIPTION);

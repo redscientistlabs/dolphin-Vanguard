@@ -6,7 +6,7 @@
 
 #include <optional>
 
-#include "Core/Core.h"
+#include "Common/CommonTypes.h"
 
 namespace AddressSpace
 {
@@ -40,11 +40,13 @@ struct Accessors
   virtual iterator begin() const;
   virtual iterator end() const;
 
-  virtual std::optional<u32> Search(u32 haystack_offset, u8* needle_start, u32 needle_size,
-                                    bool forward) const;
+  virtual std::optional<u32> Search(u32 haystack_offset, const u8* needle_start,
+                                    std::size_t needle_size, bool forward) const;
   virtual ~Accessors();
 };
 
 Accessors* GetAccessors(Type address_space);
+
+void Init();
 
 }  // namespace AddressSpace

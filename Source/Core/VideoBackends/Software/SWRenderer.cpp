@@ -9,7 +9,6 @@
 #include "Common/CommonTypes.h"
 #include "Common/GL/GLContext.h"
 
-#include "Core/Config/GraphicsSettings.h"
 #include "Core/HW/Memmap.h"
 
 #include "VideoBackends/Software/EfbCopy.h"
@@ -22,9 +21,8 @@
 #include "VideoCommon/AbstractTexture.h"
 #include "VideoCommon/BoundingBox.h"
 #include "VideoCommon/NativeVertexFormat.h"
-#include "VideoCommon/OnScreenDisplay.h"
 #include "VideoCommon/VideoBackendBase.h"
-#include "VideoCommon/VideoConfig.h"
+#include "VideoCommon/VideoCommon.h"
 
 namespace SW
 {
@@ -130,12 +128,12 @@ u32 SWRenderer::AccessEFB(EFBAccessType type, u32 x, u32 y, u32 InputData)
 
 u16 SWRenderer::BBoxRead(int index)
 {
-  return BoundingBox::coords[index];
+  return BoundingBox::GetCoordinate(static_cast<BoundingBox::Coordinate>(index));
 }
 
 void SWRenderer::BBoxWrite(int index, u16 value)
 {
-  BoundingBox::coords[index] = value;
+  BoundingBox::SetCoordinate(static_cast<BoundingBox::Coordinate>(index), value);
 }
 
 void SWRenderer::ClearScreen(const MathUtil::Rectangle<int>& rc, bool colorEnable, bool alphaEnable,

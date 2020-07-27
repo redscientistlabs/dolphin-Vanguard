@@ -18,6 +18,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include <fmt/format.h>
 #include <lzo/lzo1x.h>
 
 #include "Common/CommonPaths.h"
@@ -100,8 +101,9 @@ NetPlayServer::~NetPlayServer()
 }
 
 // called from ---GUI--- thread
-NetPlayServer::NetPlayServer(const u16 port, const bool forward_port,
+NetPlayServer::NetPlayServer(const u16 port, const bool forward_port, NetPlayUI* dialog,
                              const NetTraversalConfig& traversal_config)
+    : m_dialog(dialog)
 {
   //--use server time
   if (enet_initialize() != 0)
@@ -168,8 +170,11 @@ static void ClearPeerPlayerId(ENetPeer* peer)
 
 void NetPlayServer::SetupIndex()
 {
-  if (!Config::Get(Config::NETPLAY_USE_INDEX))
+  if (!Config::Get(Config::NETPLAY_USE_INDEX) || Config::Get(Config::NETPLAY_INDEX_NAME).empty() ||
+      Config::Get(Config::NETPLAY_INDEX_REGION).empty())
+  {
     return;
+  }
 
   NetPlaySession session;
 
@@ -205,11 +210,9 @@ void NetPlayServer::SetupIndex()
 
   session.EncryptID(Config::Get(Config::NETPLAY_INDEX_PASSWORD));
 
+  bool success = m_index.Add(session);
   if (m_dialog != nullptr)
-  {
-    bool success = m_index.Add(session);
     m_dialog->OnIndexAdded(success, success ? "" : m_index.GetLastError());
-  }
 
   m_index.SetErrorCallback([this] {
     if (m_dialog != nullptr)
@@ -374,15 +377,18 @@ unsigned int NetPlayServer::OnConnect(ENetPeer* socket, sf::Packet& rpac)
   if (m_players.size() >= 255)
     return CON_ERR_SERVER_FULL;
 
-  // cause pings to be updated
-  m_update_pings = true;
-
   Client player;
   player.pid = pid;
   player.socket = socket;
 
   rpac >> player.revision;
   rpac >> player.name;
+
+  if (StringUTF8CodePointCount(player.name) > MAX_NAME_LENGTH)
+    return CON_ERR_NAME_TOO_LONG;
+
+  // cause pings to be updated
+  m_update_pings = true;
 
   // try to automatically assign new user a pad
   for (PlayerId& mapping : m_pad_map)
@@ -428,21 +434,6 @@ unsigned int NetPlayServer::OnConnect(ENetPeer* socket, sf::Packet& rpac)
   spac.clear();
   spac << static_cast<MessageId>(NP_MSG_HOST_INPUT_AUTHORITY);
   spac << m_host_input_authority;
-  Send(player.socket, spac);
-
-  // sync GC SRAM with new client
-  if (!g_SRAM_netplay_initialized)
-  {
-    SConfig::GetInstance().m_strSRAM = File::GetUserPath(F_GCSRAM_IDX);
-    InitSRAM();
-    g_SRAM_netplay_initialized = true;
-  }
-  spac.clear();
-  spac << static_cast<MessageId>(NP_MSG_SYNC_GC_SRAM);
-  for (size_t i = 0; i < sizeof(g_SRAM) - offsetof(Sram, settings); ++i)
-  {
-    spac << g_SRAM[offsetof(Sram, settings) + i];
-  }
   Send(player.socket, spac);
 
   // sync values with new client
@@ -796,8 +787,8 @@ unsigned int NetPlayServer::OnData(sf::Packet& packet, Client& player)
     u8 size;
     packet >> map >> size;
     std::vector<u8> data(size);
-    for (size_t i = 0; i < data.size(); ++i)
-      packet >> data[i];
+    for (u8& byte : data)
+      packet >> byte;
 
     // If the data is not from the correct player,
     // then disconnect them.
@@ -1064,8 +1055,8 @@ unsigned int NetPlayServer::OnData(sf::Packet& packet, Client& player)
 
     case SYNC_SAVE_DATA_FAILURE:
     {
-      m_dialog->AppendChat(StringFromFormat(Common::GetStringT("%s failed to synchronize.").c_str(),
-                                            player.name.c_str()));
+      m_dialog->AppendChat(
+          fmt::format(Common::GetStringT("{} failed to synchronize."), player.name));
       m_dialog->OnGameStartAborted();
       ChunkedDataAbort();
       m_start_pending = false;
@@ -1108,8 +1099,8 @@ unsigned int NetPlayServer::OnData(sf::Packet& packet, Client& player)
 
     case SYNC_CODES_FAILURE:
     {
-      m_dialog->AppendChat(StringFromFormat(
-          Common::GetStringT("%s failed to synchronize codes.").c_str(), player.name.c_str()));
+      m_dialog->AppendChat(
+          fmt::format(Common::GetStringT("{} failed to synchronize codes."), player.name));
       m_dialog->OnGameStartAborted();
       m_start_pending = false;
     }
@@ -1271,6 +1262,21 @@ bool NetPlayServer::StartGame()
   const std::string region = SConfig::GetDirectoryForRegion(
       SConfig::ToGameCubeRegion(m_dialog->FindGameFile(m_selected_game)->GetRegion()));
 
+  // sync GC SRAM with clients
+  if (!g_SRAM_netplay_initialized)
+  {
+    SConfig::GetInstance().m_strSRAM = File::GetUserPath(F_GCSRAM_IDX);
+    InitSRAM();
+    g_SRAM_netplay_initialized = true;
+  }
+  sf::Packet srampac;
+  srampac << static_cast<MessageId>(NP_MSG_SYNC_GC_SRAM);
+  for (size_t i = 0; i < sizeof(g_SRAM) - offsetof(Sram, settings); ++i)
+  {
+    srampac << g_SRAM[offsetof(Sram, settings) + i];
+  }
+  SendAsyncToClients(std::move(srampac), 1);
+
   // tell clients to start game
   sf::Packet spac;
   spac << static_cast<MessageId>(NP_MSG_START_GAME);
@@ -1279,7 +1285,7 @@ bool NetPlayServer::StartGame()
   spac << static_cast<std::underlying_type_t<PowerPC::CPUCore>>(m_settings.m_CPUcore);
   spac << m_settings.m_EnableCheats;
   spac << m_settings.m_SelectedLanguage;
-  spac << m_settings.m_OverrideGCLanguage;
+  spac << m_settings.m_OverrideRegionSettings;
   spac << m_settings.m_ProgressiveScan;
   spac << m_settings.m_PAL60;
   spac << m_settings.m_DSPEnableJIT;
@@ -1288,7 +1294,6 @@ bool NetPlayServer::StartGame()
   spac << m_settings.m_CopyWiiSave;
   spac << m_settings.m_OCEnable;
   spac << m_settings.m_OCFactor;
-  spac << m_settings.m_ReducePollingRate;
 
   for (auto& device : m_settings.m_EXIDevice)
     spac << device;
@@ -1456,15 +1461,14 @@ bool NetPlayServer::SyncSaveData()
         pac << sf::Uint64{0};
       }
 
-      SendChunkedToClients(
-          std::move(pac), 1,
-          StringFromFormat("Memory Card %c Synchronization", is_slot_a ? 'A' : 'B'));
+      SendChunkedToClients(std::move(pac), 1,
+                           fmt::format("Memory Card {} Synchronization", is_slot_a ? 'A' : 'B'));
     }
     else if (SConfig::GetInstance().m_EXIDevice[i] ==
              ExpansionInterface::EXIDEVICE_MEMORYCARDFOLDER)
     {
       const std::string path = File::GetUserPath(D_GCUSER_IDX) + region + DIR_SEP +
-                               StringFromFormat("Card %c", is_slot_a ? 'A' : 'B');
+                               fmt::format("Card {}", is_slot_a ? 'A' : 'B');
 
       sf::Packet pac;
       pac << static_cast<MessageId>(NP_MSG_SYNC_SAVE_DATA);
@@ -1490,9 +1494,8 @@ bool NetPlayServer::SyncSaveData()
         pac << static_cast<u8>(0);
       }
 
-      SendChunkedToClients(
-          std::move(pac), 1,
-          StringFromFormat("GCI Folder %c Synchronization", is_slot_a ? 'A' : 'B'));
+      SendChunkedToClients(std::move(pac), 1,
+                           fmt::format("GCI Folder {} Synchronization", is_slot_a ? 'A' : 'B'));
     }
   }
 
@@ -1565,8 +1568,8 @@ bool NetPlayServer::SyncSaveData()
         // Header
         pac << sf::Uint64{header->tid};
         pac << header->banner_size << header->permissions << header->unk1;
-        for (size_t i = 0; i < header->md5.size(); i++)
-          pac << header->md5[i];
+        for (u8 byte : header->md5)
+          pac << byte;
         pac << header->unk2;
         for (size_t i = 0; i < header->banner_size; i++)
           pac << header->banner[i];
@@ -1575,11 +1578,11 @@ bool NetPlayServer::SyncSaveData()
         pac << bk_header->size << bk_header->magic << bk_header->ngid << bk_header->number_of_files
             << bk_header->size_of_files << bk_header->unk1 << bk_header->unk2
             << bk_header->total_size;
-        for (size_t i = 0; i < bk_header->unk3.size(); i++)
-          pac << bk_header->unk3[i];
+        for (u8 byte : bk_header->unk3)
+          pac << byte;
         pac << sf::Uint64{bk_header->tid};
-        for (size_t i = 0; i < bk_header->mac_address.size(); i++)
-          pac << bk_header->mac_address[i];
+        for (u8 byte : bk_header->mac_address)
+          pac << byte;
 
         // Files
         for (const WiiSave::Storage::SaveFile& file : *files)
@@ -1930,11 +1933,6 @@ bool NetPlayServer::PlayerHasControllerMapped(const PlayerId pid) const
 u16 NetPlayServer::GetPort() const
 {
   return m_server->address.port;
-}
-
-void NetPlayServer::SetNetPlayUI(NetPlayUI* dialog)
-{
-  m_dialog = dialog;
 }
 
 // called from ---GUI--- thread

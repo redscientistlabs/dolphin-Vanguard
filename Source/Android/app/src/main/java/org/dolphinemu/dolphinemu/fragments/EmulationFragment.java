@@ -5,8 +5,10 @@ import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
-import android.support.v4.app.Fragment;
-import android.support.v4.content.LocalBroadcastManager;
+
+import androidx.fragment.app.Fragment;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
+
 import android.view.LayoutInflater;
 import android.view.Surface;
 import android.view.SurfaceHolder;
@@ -24,7 +26,6 @@ import org.dolphinemu.dolphinemu.utils.DirectoryInitialization;
 import org.dolphinemu.dolphinemu.utils.DirectoryInitialization.DirectoryInitializationState;
 import org.dolphinemu.dolphinemu.utils.DirectoryStateReceiver;
 import org.dolphinemu.dolphinemu.utils.Log;
-import org.dolphinemu.dolphinemu.utils.StartupHandler;
 
 import java.io.File;
 
@@ -82,12 +83,7 @@ public final class EmulationFragment extends Fragment implements SurfaceHolder.C
     mPreferences = PreferenceManager.getDefaultSharedPreferences(getActivity());
 
     String[] gamePaths = getArguments().getStringArray(KEY_GAMEPATHS);
-    SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(getActivity());
-    boolean firstOpen = preferences.getBoolean(StartupHandler.NEW_SESSION, true);
-    SharedPreferences.Editor sPrefsEditor = preferences.edit();
-    sPrefsEditor.putBoolean(StartupHandler.NEW_SESSION, false);
-    sPrefsEditor.apply();
-    mEmulationState = new EmulationState(gamePaths, getTemporaryStateFilePath(), firstOpen);
+    mEmulationState = new EmulationState(gamePaths, getTemporaryStateFilePath());
   }
 
   /**
@@ -266,17 +262,14 @@ public final class EmulationFragment extends Fragment implements SurfaceHolder.C
     }
 
     private final String[] mGamePaths;
-    private Thread mEmulationThread;
     private State state;
     private Surface mSurface;
     private boolean mRunWhenSurfaceIsValid;
     private boolean loadPreviousTemporaryState;
-    private boolean firstOpen;
     private final String temporaryStatePath;
 
-    EmulationState(String[] gamePaths, String temporaryStatePath, boolean firstOpen)
+    EmulationState(String[] gamePaths, String temporaryStatePath)
     {
-      this.firstOpen = firstOpen;
       mGamePaths = gamePaths;
       this.temporaryStatePath = temporaryStatePath;
       // Starting state is stopped.
@@ -323,8 +316,6 @@ public final class EmulationFragment extends Fragment implements SurfaceHolder.C
         state = State.PAUSED;
         Log.debug("[EmulationFragment] Pausing emulation.");
 
-        // Release the surface before pausing, since emulation has to be running for that.
-        NativeLibrary.SurfaceDestroyed();
         NativeLibrary.PauseEmulation();
       }
       else
@@ -388,19 +379,17 @@ public final class EmulationFragment extends Fragment implements SurfaceHolder.C
         mSurface = null;
         Log.debug("[EmulationFragment] Surface destroyed.");
 
-        if (state == State.RUNNING)
+        if (state != State.STOPPED)
         {
-          NativeLibrary.SurfaceDestroyed();
-          state = State.PAUSED;
+          // In order to avoid dereferencing nullptr, we must not destroy the surface while booting
+          // the core, so wait here if necessary. An easy (but not 100% consistent) way to reach
+          // this method while the core is booting is by having landscape orientation lock enabled
+          // and starting emulation while the phone is in portrait mode, leading to the activity
+          // being recreated very soon after NativeLibrary.Run has been called.
+          NativeLibrary.WaitUntilDoneBooting();
         }
-        else if (state == State.PAUSED)
-        {
-          Log.warning("[EmulationFragment] Surface cleared while emulation paused.");
-        }
-        else
-        {
-          Log.warning("[EmulationFragment] Surface cleared while emulation stopped.");
-        }
+
+        NativeLibrary.SurfaceDestroyed();
       }
     }
 
@@ -409,7 +398,7 @@ public final class EmulationFragment extends Fragment implements SurfaceHolder.C
       mRunWhenSurfaceIsValid = false;
       if (state == State.STOPPED)
       {
-        mEmulationThread = new Thread(() ->
+        Thread emulationThread = new Thread(() ->
         {
           NativeLibrary.SurfaceChanged(mSurface);
           if (loadPreviousTemporaryState)
@@ -420,11 +409,11 @@ public final class EmulationFragment extends Fragment implements SurfaceHolder.C
           else
           {
             Log.debug("[EmulationFragment] Starting emulation thread.");
-            NativeLibrary.Run(mGamePaths, firstOpen);
+            NativeLibrary.Run(mGamePaths);
           }
+          EmulationActivity.stopIgnoringLaunchRequests();
         }, "NativeEmulation");
-        mEmulationThread.start();
-
+        emulationThread.start();
       }
       else if (state == State.PAUSED)
       {

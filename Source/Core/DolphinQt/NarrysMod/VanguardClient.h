@@ -13,7 +13,7 @@ struct VanguardSettingsUnmanaged
   AspectMode m_AspectRatio;
   bool m_EnableCheats;
   int m_SelectedLanguage;
-  bool m_OverrideGCLanguage;
+  bool m_OverrideRegionSettings;
   bool m_ProgressiveScan;
   bool m_PAL60;
   bool m_DSPHLE;
@@ -44,6 +44,8 @@ struct VanguardSettingsUnmanaged
   bool m_FastDiscSpeed;
   bool m_MMU;
   bool m_Fastmem;
+  bool m_SkipIPL;
+  bool m_LoadIPLDump;
   bool m_VertexRounding;
   int m_InternalResolution;
   bool m_EFBScaledCopy;
@@ -64,9 +66,10 @@ struct VanguardSettingsUnmanaged
   bool m_StrictSettingsSync;
   bool m_SyncSaveData;
   bool m_SyncCodes;
+  std::string m_SaveDataRegion;
   bool m_SyncAllWiiSaves;
-  bool m_IsHosting;
-  bool m_HostInputAuthority;
+  std::array<int, 4> m_WiimoteExtension;
+  bool m_GolfMode;
 };
 
 class VanguardClientUnmanaged

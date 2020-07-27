@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <iosfwd>
 #include <memory>
 #include "Common/CommonTypes.h"
 
@@ -63,6 +64,9 @@ enum SIDevices : int
   SIDEVICE_COUNT,
 };
 
+std::ostream& operator<<(std::ostream& stream, SIDevices device);
+std::istream& operator>>(std::istream& stream, SIDevices& device);
+
 class ISIDevice
 {
 public:
@@ -73,7 +77,7 @@ public:
   SIDevices GetDeviceType() const;
 
   // Run the SI Buffer
-  virtual int RunBuffer(u8* buffer, int length);
+  virtual int RunBuffer(u8* buffer, int request_length);
   virtual int TransferInterval();
 
   // Return true on new data

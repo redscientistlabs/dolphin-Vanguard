@@ -1,3 +1,8 @@
+option(DOLPHIN_CXX_FLAGS "Flags used to compile Dolphin-only sources" "")
+if(DOLPHIN_CXX_FLAGS)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${DOLPHIN_CXX_FLAGS}")
+endif()
+
 if(CMAKE_SYSTEM_NAME MATCHES "Windows")
   add_definitions(-DNOMINMAX)
   add_definitions(-DUNICODE)
@@ -13,10 +18,17 @@ endif()
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 if (MSVC)
-  # Set warning level to 4
-  add_compile_options(/W4)
+	# TODO: Use https://cmake.org/cmake/help/latest/policy/CMP0092.html instead (once we can require CMake >= 3.15)
+  # Taken from http://www.cmake.org/Wiki/CMake_FAQ#Dynamic_Replace.
+  foreach(flag_var
+	        CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
+					MAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO)
+		# Replaces /W3 with /W4 in defaults (add_compile_options would cause very annoying warnings here)
+    string(REPLACE "/W3" "/W4" ${flag_var} "${${flag_var}}")
+  endforeach()
 
   # Disable some warnings
   add_compile_options(
@@ -50,6 +62,9 @@ if (MSVC)
   add_subdirectory(PCH)
   add_definitions(/I${PCH_DIRECTORY})
   add_definitions(/Yu${PCH_PATH}) 
+
+	# Don't include timestamps in binaries
+	add_link_options(/Brepro)
 endif()
 
 # These aren't actually needed for C11/C++11

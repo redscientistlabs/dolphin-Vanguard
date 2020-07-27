@@ -12,7 +12,7 @@ VanguardSettingsWrapper^ VanguardSettings::GetVanguardSettingsFromDolphin()
   // Copy all relevant settings
   settings->m_EnableCheats = Get(Config::MAIN_ENABLE_CHEATS);
   settings->m_SelectedLanguage = Get(Config::MAIN_GC_LANGUAGE);
-  settings->m_OverrideGCLanguage = Get(Config::MAIN_OVERRIDE_GC_LANGUAGE);
+  settings->m_OverrideRegionSettings = Get(Config::MAIN_OVERRIDE_REGION_SETTINGS);
   settings->m_ProgressiveScan = Get(Config::SYSCONF_PROGRESSIVE_SCAN);
   settings->m_PAL60 = Get(Config::SYSCONF_PAL60);
   settings->m_DSPHLE = Get(Config::MAIN_DSP_HLE);
@@ -72,7 +72,7 @@ VanguardSettingsUnmanaged VanguardSettings::GetVanguardSettingFromVanguardSettin
   nSettings.m_AspectRatio = vSettings->m_AspectRatio;
   nSettings.m_EnableCheats = vSettings->m_EnableCheats;
   nSettings.m_SelectedLanguage = vSettings->m_SelectedLanguage;
-  nSettings.m_OverrideGCLanguage = vSettings->m_OverrideGCLanguage;
+  nSettings.m_OverrideRegionSettings = vSettings->m_OverrideRegionSettings;
   nSettings.m_ProgressiveScan = vSettings->m_ProgressiveScan;
   nSettings.m_PAL60 = vSettings->m_PAL60;
   nSettings.m_DSPHLE = vSettings->m_DSPHLE;

@@ -1,9 +1,17 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|ARM64">
+      <Configuration>Debug</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
     <ProjectConfiguration Include="Debug|x64">
       <Configuration>Debug</Configuration>
       <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|ARM64">
+      <Configuration>Release</Configuration>
+      <Platform>ARM64</Platform>
     </ProjectConfiguration>
     <ProjectConfiguration Include="Release|x64">
       <Configuration>Release</Configuration>
@@ -36,13 +44,16 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile />
     <ClCompile>
+      <AdditionalOptions>/experimental:newLambdaProcessor %(AdditionalOptions)</AdditionalOptions>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/experimental:newLambdaProcessor %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -51,7 +62,9 @@
     <ClCompile Include="AbstractTexture.cpp" />
     <ClCompile Include="AsyncRequests.cpp" />
     <ClCompile Include="AsyncShaderCompiler.cpp" />
-    <ClCompile Include="AVIDump.cpp" />
+    <ClCompile Include="FrameDump.cpp">
+      <ExcludedFromBuild Condition="'$(Platform)'=='ARM64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="BoundingBox.cpp" />
     <ClCompile Include="BPFunctions.cpp" />
     <ClCompile Include="BPMemory.cpp" />
@@ -63,6 +76,7 @@
     <ClCompile Include="FPSCounter.cpp" />
     <ClCompile Include="FramebufferManager.cpp" />
     <ClCompile Include="FramebufferShaderGen.cpp" />
+    <ClCompile Include="FreeLookCamera.cpp" />
     <ClCompile Include="HiresTextures.cpp" />
     <ClCompile Include="HiresTextures_DDSLoader.cpp" />
     <ClCompile Include="ImageWrite.cpp" />
@@ -81,6 +95,9 @@
     <ClCompile Include="LightingShaderGen.cpp" />
     <ClCompile Include="ShaderCache.cpp" />
     <ClCompile Include="ShaderGenCommon.cpp" />
+    <ClCompile Include="TextureDecoder_Generic.cpp">
+      <ExcludedFromBuild Condition="'$(Platform)'=='x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="UberShaderCommon.cpp" />
     <ClCompile Include="UberShaderPixel.cpp" />
     <ClCompile Include="Statistics.cpp" />
@@ -92,8 +109,13 @@
     <ClCompile Include="TextureConverterShaderGen.cpp" />
     <ClCompile Include="UberShaderVertex.cpp" />
     <ClCompile Include="VertexLoader.cpp" />
+    <ClCompile Include="VertexLoaderARM64.cpp">
+      <ExcludedFromBuild Condition="'$(Platform)'!='ARM64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="VertexLoaderBase.cpp" />
-    <ClCompile Include="VertexLoaderX64.cpp" />
+    <ClCompile Include="VertexLoaderX64.cpp">
+      <ExcludedFromBuild Condition="'$(Platform)'!='x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="VertexLoaderManager.cpp" />
     <ClCompile Include="VertexLoader_Color.cpp" />
     <ClCompile Include="VertexLoader_Normal.cpp" />
@@ -106,7 +128,9 @@
     <ClCompile Include="VideoConfig.cpp" />
     <ClCompile Include="VideoState.cpp" />
     <ClCompile Include="TextureDecoder_Common.cpp" />
-    <ClCompile Include="TextureDecoder_x64.cpp" />
+    <ClCompile Include="TextureDecoder_x64.cpp">
+      <ExcludedFromBuild Condition="'$(Platform)'!='x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="XFMemory.cpp" />
     <ClCompile Include="XFStructs.cpp" />
   </ItemGroup>
@@ -118,7 +142,7 @@
     <ClInclude Include="AbstractTexture.h" />
     <ClInclude Include="AsyncRequests.h" />
     <ClInclude Include="AsyncShaderCompiler.h" />
-    <ClInclude Include="AVIDump.h" />
+    <ClInclude Include="FrameDump.h" />
     <ClInclude Include="BoundingBox.h" />
     <ClInclude Include="BPFunctions.h" />
     <ClInclude Include="BPMemory.h" />
@@ -131,6 +155,7 @@
     <ClInclude Include="FPSCounter.h" />
     <ClInclude Include="FramebufferManager.h" />
     <ClInclude Include="FramebufferShaderGen.h" />
+    <ClInclude Include="FreeLookCamera.h" />
     <ClInclude Include="GXPipelineTypes.h" />
     <ClInclude Include="NetPlayChatUI.h" />
     <ClInclude Include="NetPlayGolfUI.h" />
@@ -164,6 +189,9 @@
     <ClInclude Include="TextureDecoder.h" />
     <ClInclude Include="UberShaderVertex.h" />
     <ClInclude Include="VertexLoader.h" />
+    <ClInclude Include="VertexLoaderARM64.h">
+      <ExcludedFromBuild Condition="'$(Platform)'!='ARM64'">true</ExcludedFromBuild>
+    </ClInclude>
     <ClInclude Include="VertexLoaderBase.h" />
     <ClInclude Include="VertexLoaderManager.h" />
     <ClInclude Include="VertexLoaderUtils.h" />
@@ -185,6 +213,9 @@
     <Text Include="CMakeLists.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="$(ExternalsDir)imgui\imgui.vcxproj">
+      <Project>{4c3b2264-ea73-4a7b-9cfe-65b0fd635ebb}</Project>
+    </ProjectReference>
     <ProjectReference Include="$(ExternalsDir)libpng\png\png.vcxproj">
       <Project>{4c9f135b-a85e-430c-bad4-4c67ef5fc12c}</Project>
     </ProjectReference>
@@ -196,9 +227,6 @@
     </ProjectReference>
     <ProjectReference Include="$(CoreDir)Common\Common.vcxproj">
       <Project>{2e6c348c-c75c-4d94-8d1e-9c1fcbf3efe4}</Project>
-    </ProjectReference>
-    <ProjectReference Include="..\..\..\Externals\imgui\imgui.vcxproj">
-      <Project>{4c3b2264-ea73-4a7b-9cfe-65b0fd635ebb}</Project>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

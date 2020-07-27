@@ -1,22 +1,23 @@
 package org.dolphinemu.dolphinemu.utils;
 
 import android.content.Context;
-import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
-import android.support.v4.app.FragmentActivity;
+
+import androidx.fragment.app.FragmentActivity;
+
 import android.text.TextUtils;
 
+import org.dolphinemu.dolphinemu.NativeLibrary;
 import org.dolphinemu.dolphinemu.activities.EmulationActivity;
 
 import java.util.Date;
 
 public final class StartupHandler
 {
-  public static final String NEW_SESSION = "NEW_SESSION";
   public static final String LAST_CLOSED = "LAST_CLOSED";
-  public static final Long SESSION_TIMEOUT = 21600000L; // 6 hours in milliseconds
+  public static final long SESSION_TIMEOUT = 21600000L; // 6 hours in milliseconds
 
   public static void HandleInit(FragmentActivity parent)
   {
@@ -25,6 +26,10 @@ public final class StartupHandler
 
     // Ask the user if he wants to enable analytics if we haven't yet.
     Analytics.checkAnalyticsInit(parent);
+
+    // Set up and/or sync Android TV channels
+    if (TvUtil.isLeanback(parent))
+      TvUtil.scheduleSyncingChannel(parent);
 
     String[] start_files = null;
     Bundle extras = parent.getIntent().getExtras();
@@ -44,9 +49,7 @@ public final class StartupHandler
     if (start_files != null && start_files.length > 0)
     {
       // Start the emulation activity, send the ISO passed in and finish the main activity
-      Intent emulation_intent = new Intent(parent, EmulationActivity.class);
-      emulation_intent.putExtra(EmulationActivity.EXTRA_SELECTED_GAMES, start_files);
-      parent.startActivity(emulation_intent);
+      EmulationActivity.launchFile(parent, start_files);
       parent.finish();
     }
   }
@@ -68,15 +71,13 @@ public final class StartupHandler
    */
   public static void checkSessionReset(Context context)
   {
-    Long currentTime = new Date(System.currentTimeMillis()).getTime();
+    long currentTime = new Date(System.currentTimeMillis()).getTime();
     SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
-    Long lastOpen = preferences.getLong(LAST_CLOSED, 0);
+    long lastOpen = preferences.getLong(LAST_CLOSED, 0);
     if (currentTime > (lastOpen + SESSION_TIMEOUT))
     {
-      // Passed at emulation start to trigger first open event.
-      SharedPreferences.Editor sPrefsEditor = preferences.edit();
-      sPrefsEditor.putBoolean(NEW_SESSION, true);
-      sPrefsEditor.apply();
+      new AfterDirectoryInitializationRunner().run(context,
+              () -> NativeLibrary.ReportStartToAnalytics());
     }
   }
 }

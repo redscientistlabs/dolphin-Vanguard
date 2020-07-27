@@ -50,8 +50,7 @@ Drums::Drums() : Extension1stParty(_trans("Drums"))
   groups.emplace_back(m_pads = new ControllerEmu::Buttons(_trans("Pads")));
   for (auto& drum_pad_name : drum_pad_names)
   {
-    m_pads->controls.emplace_back(
-        new ControllerEmu::Input(ControllerEmu::Translate, drum_pad_name));
+    m_pads->AddInput(ControllerEmu::Translate, drum_pad_name);
   }
 
   // stick
@@ -61,8 +60,8 @@ Drums::Drums() : Extension1stParty(_trans("Drums"))
 
   // buttons
   groups.emplace_back(m_buttons = new ControllerEmu::Buttons(_trans("Buttons")));
-  m_buttons->controls.emplace_back(new ControllerEmu::Input(ControllerEmu::DoNotTranslate, "-"));
-  m_buttons->controls.emplace_back(new ControllerEmu::Input(ControllerEmu::DoNotTranslate, "+"));
+  m_buttons->AddInput(ControllerEmu::DoNotTranslate, "-");
+  m_buttons->AddInput(ControllerEmu::DoNotTranslate, "+");
 }
 
 void Drums::Update()

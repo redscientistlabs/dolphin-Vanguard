@@ -21,6 +21,10 @@ public interface MainView
 
   void launchFileListActivity();
 
+  void launchOpenFileActivity();
+
+  void launchInstallWAD();
+
   /**
    * To be called when the game file cache is updated.
    */

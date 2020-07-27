@@ -1,5 +1,9 @@
 if (NOT Qt5_DIR AND MSVC)
-set(Qt5_DIR "${CMAKE_SOURCE_DIR}/Externals/Qt5.11.1/5.11.1/msvc2017_64/lib/cmake/Qt5")
+  if(_M_ARM_64)
+    set(Qt5_DIR "${CMAKE_SOURCE_DIR}/Externals/Qt/Qt5.14.1/msvc2019_arm64/lib/cmake/Qt5")
+  else()
+    set(Qt5_DIR "${CMAKE_SOURCE_DIR}/Externals/Qt/Qt5.14.1/msvc2019_64/lib/cmake/Qt5")
+  endif()
 endif()
 
 find_package(Qt5 5.9 REQUIRED COMPONENTS Gui Widgets)
@@ -14,6 +18,8 @@ add_executable(dolphin-emu
   AboutDialog.h
   CheatsManager.cpp
   CheatsManager.h
+  ConvertDialog.cpp
+  ConvertDialog.h
   DiscordHandler.cpp
   DiscordHandler.h
   DiscordJoinRequestDialog.cpp
@@ -51,6 +57,10 @@ add_executable(dolphin-emu
   Config/CheatCodeEditor.h
   Config/CheatWarningWidget.cpp
   Config/CheatWarningWidget.h
+  Config/ControllerInterface/DualShockUDPClientWidget.cpp
+  Config/ControllerInterface/DualShockUDPClientWidget.h
+  Config/ControllerInterface/ControllerInterfaceWindow.cpp
+  Config/ControllerInterface/ControllerInterfaceWindow.h
   Config/ControllersWindow.cpp
   Config/ControllersWindow.h
   Config/FilesystemWidget.cpp
@@ -73,6 +83,8 @@ add_executable(dolphin-emu
   Config/Graphics/GraphicsBool.h
   Config/Graphics/GraphicsChoice.cpp
   Config/Graphics/GraphicsChoice.h
+  Config/Graphics/GraphicsInteger.cpp
+  Config/Graphics/GraphicsInteger.h
   Config/Graphics/GraphicsRadio.cpp
   Config/Graphics/GraphicsRadio.h
   Config/Graphics/GraphicsSlider.cpp
@@ -134,10 +146,16 @@ add_executable(dolphin-emu
   Config/Mapping/MappingWindow.h
   Config/Mapping/WiimoteEmuExtension.cpp
   Config/Mapping/WiimoteEmuExtension.h
+  Config/Mapping/WiimoteEmuExtensionMotionInput.cpp
+  Config/Mapping/WiimoteEmuExtensionMotionInput.h
+  Config/Mapping/WiimoteEmuExtensionMotionSimulation.cpp
+  Config/Mapping/WiimoteEmuExtensionMotionSimulation.h
   Config/Mapping/WiimoteEmuGeneral.cpp
   Config/Mapping/WiimoteEmuGeneral.h
   Config/Mapping/WiimoteEmuMotionControl.cpp
   Config/Mapping/WiimoteEmuMotionControl.h
+  Config/Mapping/WiimoteEmuMotionControlIMU.cpp
+  Config/Mapping/WiimoteEmuMotionControlIMU.h
   Config/NewPatchDialog.cpp
   Config/NewPatchDialog.h
   Config/PatchesWidget.cpp
@@ -160,6 +178,8 @@ add_executable(dolphin-emu
   Debugger/MemoryViewWidget.h
   Debugger/MemoryWidget.cpp
   Debugger/MemoryWidget.h
+  Debugger/NetworkWidget.cpp
+  Debugger/NetworkWidget.h
   Debugger/NewBreakpointDialog.cpp
   Debugger/NewBreakpointDialog.h
   Debugger/PatchInstructionDialog.cpp
@@ -168,6 +188,8 @@ add_executable(dolphin-emu
   Debugger/RegisterColumn.h
   Debugger/RegisterWidget.cpp
   Debugger/RegisterWidget.h
+  Debugger/ThreadWidget.cpp
+  Debugger/ThreadWidget.h
   Debugger/WatchWidget.cpp
   Debugger/WatchWidget.h
   GameList/GameList.cpp
@@ -180,6 +202,8 @@ add_executable(dolphin-emu
   GameList/GridProxyModel.h
   GameList/ListProxyModel.cpp
   GameList/ListProxyModel.h
+  GCMemcardCreateNewDialog.cpp
+  GCMemcardCreateNewDialog.h
   GCMemcardManager.cpp
   GCMemcardManager.h
   QtUtils/BlockUserInputFilter.cpp
@@ -202,12 +226,17 @@ add_executable(dolphin-emu
   QtUtils/DoubleClickEventFilter.h
   QtUtils/ElidedButton.cpp
   QtUtils/ElidedButton.h
+  QtUtils/FileOpenEventFilter.cpp
+  QtUtils/FileOpenEventFilter.h
   QtUtils/FlowLayout.cpp
   QtUtils/FlowLayout.h
   QtUtils/ModalMessageBox.cpp
   QtUtils/ModalMessageBox.h
+  QtUtils/ParallelProgressDialog.h
   QtUtils/ImageConverter.cpp
   QtUtils/ImageConverter.h
+  QtUtils/UTF8CodePointCountValidator.cpp
+  QtUtils/UTF8CodePointCountValidator.h
   QtUtils/WindowActivationEventFilter.cpp
   QtUtils/WindowActivationEventFilter.h
   QtUtils/WinIconHelper.cpp
@@ -278,18 +307,21 @@ PRIVATE
   imgui
 )
 
+if (WIN32)
+  target_link_libraries(dolphin-emu
+  PRIVATE
+	  gdi32.lib
+		shell32.lib
+  )
+endif()
+
 if(WIN32)
   target_sources(dolphin-emu PRIVATE DolphinQt.manifest DolphinQt.rc)
 
-  if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(Dolphin_NAME "DolphinD")
-  else()
-    set(Dolphin_NAME "Dolphin")
-  endif()
-
   set_target_properties(dolphin-emu PROPERTIES
+    DEBUG_POSTFIX    D
+    OUTPUT_NAME      Dolphin
     WIN32_EXECUTABLE TRUE
-    OUTPUT_NAME ${Dolphin_NAME}
   )
 
   target_compile_options(dolphin-emu PRIVATE "-D_SILENCE_CXX17_RESULT_OF_DEPRECATION_WARNING")
@@ -301,47 +333,37 @@ if(WIN32)
 
   # Copy qt.conf
   add_custom_command(TARGET dolphin-emu POST_BUILD
-   COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/qt.conf.win" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/qt.conf"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/qt.conf.win" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/qt.conf"
   )
 
-  # Create QtPlugins directory
+  # Delegate to Qt's official deployment binary on Windows to copy over the necessary Qt-specific libraries, etc.
+  get_target_property(MOC_EXECUTABLE_LOCATION Qt5::moc IMPORTED_LOCATION)
+  get_filename_component(QT_BINARY_DIRECTORY "${MOC_EXECUTABLE_LOCATION}" DIRECTORY)
+  find_program(WINDEPLOYQT_EXE windeployqt HINTS "${QT_BINARY_DIRECTORY}")
+
+  # Note: We set the PATH for the duration of this command so that the
+  #       deployment application is able to locate the Qt libraries to copy.
+  #       if the necessary paths aren't already set beforehand.
+  #
+  #       For example, consider a hypothetical emulation project named Orca.
+  #       Orca supplies its own version of Qt instead of having developers actually
+  #       install the officially supported Qt libraries -- a method that would make
+  #       wrangling around with Qt through CMake much nicer and lessen the external
+  #       library maintenance burden of the project, but alas.
+  #
+  #       In this case, as Qt is not installed through the official binary, this also
+  #       means proper path variables will not be set up, thus the need to ensure they're
+  #       always set up.
+  #
   add_custom_command(TARGET dolphin-emu POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/QtPlugins"
+    COMMAND "${CMAKE_COMMAND}" -E env PATH="${QT_BINARY_DIRECTORY}"
+            "${WINDEPLOYQT_EXE}" --libdir="${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
+                                 --plugindir="${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/QtPlugins"
+                                 $<IF:$<CONFIG:Debug>,--debug,--release>
+                                 --no-translations
+                                 --no-compiler-runtime
+                                 "$<TARGET_FILE:dolphin-emu>"
   )
-
-  # Copy plugins
-  set (Qt5_PLUGINS_DIR "${Qt5_DIR}/../../../plugins")
-  file(GLOB_RECURSE plugins RELATIVE "${Qt5_PLUGINS_DIR}" "${Qt5_PLUGINS_DIR}/*.dll")
-
-  if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    list(FILTER plugins INCLUDE REGEX ".*d.dll")
-  else()
-    list(FILTER plugins EXCLUDE REGEX ".*d.dll")
-  endif()
-
-  foreach(plugin ${plugins})
-    add_custom_command(TARGET dolphin-emu POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different "${Qt5_PLUGINS_DIR}/${plugin}" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/QtPlugins/${plugin}"
-    )
-  endforeach()
-
-  # Copy DLLs
-  set (Qt5_DLL_DIR "${Qt5_DIR}/../../../bin")
-
-  file(GLOB_RECURSE dlls RELATIVE "${Qt5_DLL_DIR}" "${Qt5_DLL_DIR}/*.dll")
-
-  if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    list(FILTER dlls INCLUDE REGEX ".*d.dll")
-  else()
-    list(FILTER dlls EXCLUDE REGEX ".*d.dll")
-  endif()
-
-  foreach(dll ${dlls})
-   add_custom_command(TARGET dolphin-emu POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${Qt5_DLL_DIR}/${dll}" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
-   )
-  endforeach()
-
 endif()
 
 # Handle localization
@@ -438,6 +460,11 @@ if(APPLE)
   # Update library references to make the bundle portable
   include(DolphinPostprocessBundle)
   dolphin_postprocess_bundle(dolphin-emu)
+  # Fix rpath
+  add_custom_command(TARGET dolphin-emu
+    POST_BUILD COMMAND
+    ${CMAKE_INSTALL_NAME_TOOL} -add_rpath "@executable_path/../Frameworks/"
+    $<TARGET_FILE:dolphin-emu>)
 else()
   install(TARGETS dolphin-emu RUNTIME DESTINATION ${bindir})
 endif()

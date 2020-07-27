@@ -26,14 +26,13 @@ struct NetSettings
   PowerPC::CPUCore m_CPUcore;
   bool m_EnableCheats;
   int m_SelectedLanguage;
-  bool m_OverrideGCLanguage;
+  bool m_OverrideRegionSettings;
   bool m_ProgressiveScan;
   bool m_PAL60;
   bool m_DSPHLE;
   bool m_DSPEnableJIT;
   bool m_WriteToMemcard;
   bool m_CopyWiiSave;
-  bool m_ReducePollingRate;
   bool m_OCEnable;
   float m_OCFactor;
   std::array<ExpansionInterface::TEXIDevices, 3> m_EXIDevice;
@@ -172,7 +171,8 @@ enum
 {
   CON_ERR_SERVER_FULL = 1,
   CON_ERR_GAME_RUNNING = 2,
-  CON_ERR_VERSION_MISMATCH = 3
+  CON_ERR_VERSION_MISMATCH = 3,
+  CON_ERR_NAME_TOO_LONG = 4
 };
 
 enum
@@ -198,6 +198,7 @@ enum
 
 constexpr u32 NETPLAY_LZO_IN_LEN = 1024 * 64;
 constexpr u32 NETPLAY_LZO_OUT_LEN = NETPLAY_LZO_IN_LEN + (NETPLAY_LZO_IN_LEN / 16) + 64 + 3;
+constexpr u32 MAX_NAME_LENGTH = 30;
 constexpr size_t CHUNKED_DATA_UNIT_SIZE = 16384;
 constexpr u8 CHANNEL_COUNT = 2;
 constexpr u8 DEFAULT_CHANNEL = 0;

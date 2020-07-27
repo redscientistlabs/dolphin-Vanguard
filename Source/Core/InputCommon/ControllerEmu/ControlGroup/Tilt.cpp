@@ -7,6 +7,7 @@
 #include <string>
 
 #include "Common/Common.h"
+#include "Common/MathUtil.h"
 
 #include "InputCommon/ControlReference/ControlReference.h"
 #include "InputCommon/ControllerEmu/Control/Control.h"
@@ -17,32 +18,40 @@ namespace ControllerEmu
 {
 Tilt::Tilt(const std::string& name_) : ReshapableInput(name_, name_, GroupType::Tilt)
 {
-  controls.emplace_back(std::make_unique<Input>(Translate, _trans("Forward")));
-  controls.emplace_back(std::make_unique<Input>(Translate, _trans("Backward")));
-  controls.emplace_back(std::make_unique<Input>(Translate, _trans("Left")));
-  controls.emplace_back(std::make_unique<Input>(Translate, _trans("Right")));
+  AddInput(Translate, _trans("Forward"));
+  AddInput(Translate, _trans("Backward"));
+  AddInput(Translate, _trans("Left"));
+  AddInput(Translate, _trans("Right"));
 
-  controls.emplace_back(std::make_unique<Input>(Translate, _trans("Modifier")));
+  AddInput(Translate, _trans("Modifier"));
 
   AddSetting(&m_max_angle_setting,
              {_trans("Angle"),
               // i18n: The symbol/abbreviation for degrees (unit of angular measure).
               _trans("°"),
-              // i18n: Refers to emulated wii remote movement.
+              // i18n: Refers to tilting an emulated Wii Remote.
               _trans("Maximum tilt angle.")},
-             90, 0, 180);
+             85, 0, 180);
+
+  AddSetting(&m_max_rotational_velocity,
+             {_trans("Velocity"),
+              // i18n: The symbol/abbreviation for hertz (cycles per second).
+              _trans("Hz"),
+              // i18n: Refers to tilting an emulated Wii Remote.
+              _trans("Peak angular velocity (measured in turns per second).")},
+             7, 1, 50);
 }
 
 Tilt::ReshapeData Tilt::GetReshapableState(bool adjusted)
 {
-  const ControlState y = controls[0]->control_ref->State() - controls[1]->control_ref->State();
-  const ControlState x = controls[3]->control_ref->State() - controls[2]->control_ref->State();
+  const ControlState y = controls[0]->GetState() - controls[1]->GetState();
+  const ControlState x = controls[3]->GetState() - controls[2]->GetState();
 
   // Return raw values. (used in UI)
   if (!adjusted)
     return {x, y};
 
-  const ControlState modifier = controls[4]->control_ref->State();
+  const ControlState modifier = controls[4]->GetState();
 
   return Reshape(x, y, modifier);
 }
@@ -61,6 +70,11 @@ ControlState Tilt::GetGateRadiusAtAngle(double ang) const
 ControlState Tilt::GetDefaultInputRadiusAtAngle(double ang) const
 {
   return SquareStickGate(1.0).GetRadiusAtAngle(ang);
+}
+
+ControlState Tilt::GetMaxRotationalVelocity() const
+{
+  return m_max_rotational_velocity.GetValue() * MathUtil::TAU;
 }
 
 }  // namespace ControllerEmu

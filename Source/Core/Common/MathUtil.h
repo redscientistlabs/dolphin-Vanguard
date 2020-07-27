@@ -5,6 +5,8 @@
 #pragma once
 
 #include <algorithm>
+#include <cmath>
+#include <type_traits>
 #include <vector>
 
 #include "Common/CommonTypes.h"
@@ -17,6 +19,7 @@ namespace MathUtil
 {
 constexpr double TAU = 6.2831853071795865;
 constexpr double PI = TAU / 2;
+constexpr double GRAVITY_ACCELERATION = 9.80665;
 
 template <typename T>
 constexpr auto Sign(const T& val) -> decltype((T{} < val) - (val < T{}))
@@ -69,8 +72,8 @@ struct Rectangle
     return left == r.left && top == r.top && right == r.right && bottom == r.bottom;
   }
 
-  T GetWidth() const { return abs(right - left); }
-  T GetHeight() const { return abs(bottom - top); }
+  constexpr T GetWidth() const { return GetDistance(left, right); }
+  constexpr T GetHeight() const { return GetDistance(top, bottom); }
   // If the rectangle is in a coordinate system with a lower-left origin, use
   // this Clamp.
   void ClampLL(T x1, T y1, T x2, T y2)
@@ -90,6 +93,54 @@ struct Rectangle
     top = std::clamp(top, y1, y2);
     bottom = std::clamp(bottom, y1, y2);
   }
+
+private:
+  constexpr T GetDistance(T a, T b) const
+  {
+    if constexpr (std::is_unsigned<T>())
+      return b > a ? b - a : a - b;
+    else
+      return std::abs(b - a);
+  }
+};
+
+template <typename T>
+class RunningMean
+{
+public:
+  constexpr void Clear() { *this = {}; }
+
+  constexpr void Push(T x) { m_mean = m_mean + (x - m_mean) / ++m_count; }
+
+  constexpr size_t Count() const { return m_count; }
+  constexpr T Mean() const { return m_mean; }
+
+private:
+  size_t m_count = 0;
+  T m_mean{};
+};
+
+template <typename T>
+class RunningVariance
+{
+public:
+  constexpr void Clear() { *this = {}; }
+
+  constexpr void Push(T x)
+  {
+    const auto old_mean = m_running_mean.Mean();
+    m_running_mean.Push(x);
+    m_variance += (x - old_mean) * (x - m_running_mean.Mean());
+  }
+
+  constexpr size_t Count() const { return m_running_mean.Count(); }
+  constexpr T Mean() const { return m_running_mean.Mean(); }
+  constexpr T Variance() const { return m_variance / (Count() - 1); }
+  constexpr T StandardDeviation() const { return std::sqrt(Variance()); }
+
+private:
+  RunningMean<T> m_running_mean;
+  T m_variance{};
 };
 
 }  // namespace MathUtil

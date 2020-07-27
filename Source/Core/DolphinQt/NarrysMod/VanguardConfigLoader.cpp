@@ -13,11 +13,10 @@ namespace ConfigLoaders
 static void LoadFromVanguardSettings(Config::Layer* layer, VanguardSettingsUnmanaged* m_settings)
 {
   layer->Set(Config::MAIN_GC_LANGUAGE, m_settings->m_SelectedLanguage);
-  layer->Set(Config::MAIN_OVERRIDE_GC_LANGUAGE, m_settings->m_OverrideGCLanguage);
+  layer->Set(Config::MAIN_OVERRIDE_REGION_SETTINGS, m_settings->m_SelectedLanguage);
   layer->Set(Config::MAIN_OVERCLOCK_ENABLE, m_settings->m_OCEnable);
   layer->Set(Config::MAIN_OVERCLOCK, m_settings->m_OCFactor);
   layer->Set(Config::MAIN_WII_SD_CARD_WRITABLE, m_settings->m_WriteToMemcard);
-  layer->Set(Config::MAIN_REDUCE_POLLING_RATE, m_settings->m_ReducePollingRate);
 
   layer->Set(Config::SYSCONF_PROGRESSIVE_SCAN, m_settings->m_ProgressiveScan);
   layer->Set(Config::SYSCONF_PAL60, m_settings->m_PAL60);

@@ -4,7 +4,7 @@
 
 #include "UICommon/AutoUpdate.h"
 
-#include <picojson/picojson.h>
+#include <picojson.h>
 #include <string>
 
 #include "Common/CommonPaths.h"
@@ -43,9 +43,9 @@ const char UPDATER_RELOC_FILENAME[] = ".Dolphin Updater.2.app";
 
 #endif
 
+#ifdef OS_SUPPORTS_UPDATER
 const char UPDATER_LOG_FILE[] = "Updater.log";
 
-#ifdef OS_SUPPORTS_UPDATER
 std::string MakeUpdaterCommandLine(const std::map<std::string, std::string>& flags)
 {
 #ifdef __APPLE__
@@ -238,12 +238,16 @@ void AutoUpdateChecker::TriggerUpdate(const AutoUpdateChecker::NewVersionInforma
   INFO_LOG(COMMON, "Updater command line: %s", command_line.c_str());
 
 #ifdef _WIN32
-  STARTUPINFO sinfo = {sizeof(info)};
+  STARTUPINFO sinfo = {sizeof(sinfo)};
   sinfo.dwFlags = STARTF_FORCEOFFFEEDBACK;  // No hourglass cursor after starting the process.
   PROCESS_INFORMATION pinfo;
-  if (!CreateProcessW(UTF8ToUTF16(reloc_updater_path).c_str(),
-                      const_cast<wchar_t*>(UTF8ToUTF16(command_line).c_str()), nullptr, nullptr,
-                      FALSE, 0, nullptr, nullptr, &sinfo, &pinfo))
+  if (CreateProcessW(UTF8ToWString(reloc_updater_path).c_str(), UTF8ToWString(command_line).data(),
+                     nullptr, nullptr, FALSE, 0, nullptr, nullptr, &sinfo, &pinfo))
+  {
+    CloseHandle(pinfo.hThread);
+    CloseHandle(pinfo.hProcess);
+  }
+  else
   {
     ERROR_LOG(COMMON, "Could not start updater process: error=%d", GetLastError());
   }

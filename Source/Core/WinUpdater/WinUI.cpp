@@ -11,8 +11,10 @@
 #include <CommCtrl.h>
 #include <ShObjIdl.h>
 #include <shellapi.h>
+#include <wrl/client.h>
 
-#include "Common/Flag.h"
+#include "Common/Event.h"
+#include "Common/ScopeGuard.h"
 #include "Common/StringUtil.h"
 
 namespace
@@ -21,10 +23,10 @@ HWND window_handle = nullptr;
 HWND label_handle = nullptr;
 HWND total_progressbar_handle = nullptr;
 HWND current_progressbar_handle = nullptr;
-ITaskbarList3* taskbar_list = nullptr;
+Microsoft::WRL::ComPtr<ITaskbarList3> taskbar_list;
 
-Common::Flag running;
-Common::Flag request_stop;
+std::thread ui_thread;
+Common::Event window_created_event;
 
 int GetWindowHeight(HWND hwnd)
 {
@@ -33,10 +35,21 @@ int GetWindowHeight(HWND hwnd)
 
   return rect.bottom - rect.top;
 }
+
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
+  switch (uMsg)
+  {
+  case WM_DESTROY:
+    PostQuitMessage(0);
+    return 0;
+  }
+  return DefWindowProc(hwnd, uMsg, wParam, lParam);
+}
 };  // namespace
 
 constexpr int PROGRESSBAR_FLAGS = WS_VISIBLE | WS_CHILD | PBS_SMOOTH | PBS_SMOOTHREVERSE;
-constexpr int WINDOW_FLAGS = WS_VISIBLE | WS_CLIPCHILDREN;
+constexpr int WINDOW_FLAGS = WS_CLIPCHILDREN;
 constexpr int PADDING_HEIGHT = 5;
 
 namespace UI
@@ -45,8 +58,11 @@ bool InitWindow()
 {
   InitCommonControls();
 
+  // Notify main thread we're done creating the window when we return
+  Common::ScopeGuard ui_guard{[] { window_created_event.Set(); }};
+
   WNDCLASS wndcl = {};
-  wndcl.lpfnWndProc = DefWindowProcW;
+  wndcl.lpfnWndProc = WindowProc;
   wndcl.hbrBackground = GetSysColorBrush(COLOR_MENU);
   wndcl.lpszClassName = L"UPDATER";
 
@@ -60,15 +76,13 @@ bool InitWindow()
   if (!window_handle)
     return false;
 
-  if (FAILED(CoCreateInstance(CLSID_TaskbarList, NULL, CLSCTX_INPROC_SERVER,
-                              IID_PPV_ARGS(&taskbar_list))))
+  if (SUCCEEDED(CoCreateInstance(CLSID_TaskbarList, NULL, CLSCTX_INPROC_SERVER,
+                                 IID_PPV_ARGS(taskbar_list.GetAddressOf()))))
   {
-    taskbar_list = nullptr;
-  }
-  if (taskbar_list && FAILED(taskbar_list->HrInit()))
-  {
-    taskbar_list->Release();
-    taskbar_list = nullptr;
+    if (FAILED(taskbar_list->HrInit()))
+    {
+      taskbar_list.Reset();
+    }
   }
 
   int y = PADDING_HEIGHT;
@@ -124,14 +138,6 @@ bool InitWindow()
   return true;
 }
 
-void Destroy()
-{
-  DestroyWindow(window_handle);
-  DestroyWindow(label_handle);
-  DestroyWindow(total_progressbar_handle);
-  DestroyWindow(current_progressbar_handle);
-}
-
 void SetTotalMarquee(bool marquee)
 {
   SetWindowLong(total_progressbar_handle, GWL_STYLE,
@@ -174,7 +180,7 @@ void ResetCurrentProgress()
 
 void Error(const std::string& text)
 {
-  auto wide_text = UTF8ToUTF16(text);
+  auto wide_text = UTF8ToWString(text);
 
   MessageBox(nullptr,
              (L"A fatal error occured and the updater cannot continue:\n " + wide_text).c_str(),
@@ -194,61 +200,63 @@ void SetCurrentProgress(int current, int total)
 
 void SetDescription(const std::string& text)
 {
-  SetWindowText(label_handle, UTF8ToUTF16(text).c_str());
+  SetWindowText(label_handle, UTF8ToWString(text).c_str());
 }
 
 void MessageLoop()
 {
-  request_stop.Clear();
-  running.Set();
+  HRESULT result = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+
+  Common::ScopeGuard ui_guard{[result] {
+    taskbar_list.Reset();
+    if (SUCCEEDED(result))
+      CoUninitialize();
+  }};
 
   if (!InitWindow())
   {
-    running.Clear();
     MessageBox(nullptr, L"Window init failed!", L"", MB_ICONERROR);
+    // Destroying the parent (if exists) destroys all children windows
+    if (window_handle)
+    {
+      DestroyWindow(window_handle);
+      window_handle = nullptr;
+    }
+    return;
   }
 
   SetTotalMarquee(true);
   SetCurrentMarquee(true);
 
-  while (!request_stop.IsSet())
+  MSG msg;
+  while (GetMessage(&msg, nullptr, 0, 0))
   {
-    MSG msg;
-    while (PeekMessage(&msg, window_handle, 0, 0, PM_REMOVE))
-    {
-      TranslateMessage(&msg);
-      DispatchMessage(&msg);
-    }
+    TranslateMessage(&msg);
+    DispatchMessage(&msg);
   }
-
-  running.Clear();
-
-  Destroy();
 }
 
 void Init()
 {
-  std::thread thread(MessageLoop);
-  thread.detach();
+  ui_thread = std::thread(MessageLoop);
+
+  // Wait for UI thread to finish creating the window (or at least attempting to)
+  window_created_event.Wait();
 }
 
 void Stop()
 {
-  if (!running.IsSet())
-    return;
+  if (window_handle)
+    PostMessage(window_handle, WM_CLOSE, 0, 0);
 
-  request_stop.Set();
-
-  while (running.IsSet())
-  {
-  }
+  ui_thread.join();
 }
 
 void LaunchApplication(std::string path)
 {
   // Hack: Launching the updater over the explorer ensures that admin priviliges are dropped. Why?
   // Ask Microsoft.
-  ShellExecuteW(nullptr, nullptr, L"explorer.exe", UTF8ToUTF16(path).c_str(), nullptr, SW_SHOW);
+  ShellExecuteW(nullptr, nullptr, L"explorer.exe", UTF8ToWString(path).c_str(), nullptr, SW_SHOW);
 }
 
 void Sleep(int sleep)
@@ -259,8 +267,11 @@ void Sleep(int sleep)
 void WaitForPID(u32 pid)
 {
   HANDLE parent_handle = OpenProcess(SYNCHRONIZE, FALSE, static_cast<DWORD>(pid));
-  WaitForSingleObject(parent_handle, INFINITE);
-  CloseHandle(parent_handle);
+  if (parent_handle)
+  {
+    WaitForSingleObject(parent_handle, INFINITE);
+    CloseHandle(parent_handle);
+  }
 }
 
 void SetVisible(bool visible)

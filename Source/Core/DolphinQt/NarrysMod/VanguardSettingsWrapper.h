@@ -14,14 +14,12 @@ public:
   AspectMode m_AspectRatio;
   bool m_EnableCheats;
   int m_SelectedLanguage;
-  bool m_OverrideGCLanguage;
+  bool m_OverrideRegionSettings;
   bool m_ProgressiveScan;
   bool m_PAL60;
   bool m_DSPHLE;
   bool m_DSPEnableJIT;
   bool m_WriteToMemcard;
-  bool m_CopyWiiSave;
-  bool m_ReducePollingRate;
   bool m_OCEnable;
   float m_OCFactor;
   bool m_EFBAccessEnable;
@@ -68,8 +66,6 @@ public:
   bool m_SyncSaveData;
   bool m_SyncCodes;
   bool m_SyncAllWiiSaves;
-  bool m_IsHosting;
-  bool m_HostInputAuthority;
 };
 
 public

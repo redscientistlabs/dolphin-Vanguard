@@ -103,6 +103,9 @@
     <ClCompile Include="SPIRV\SpvBuilder.cpp">
       <Filter>SPIRV</Filter>
     </ClCompile>
+    <ClCompile Include="SPIRV\SpvPostProcess.cpp">
+      <Filter>SPIRV</Filter>
+    </ClCompile>
     <ClCompile Include="SPIRV\SPVRemapper.cpp">
       <Filter>SPIRV</Filter>
     </ClCompile>
@@ -115,11 +118,9 @@
     <ClCompile Include="glslang\MachineIndependent\ParseContextBase.cpp">
       <Filter>glslang\MachineIndependant</Filter>
     </ClCompile>
+    <ClCompile Include="StandAlone\ResourceLimits.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="glslang\Include\ResourceLimits.h">
-      <Filter>glslang\Include</Filter>
-    </ClInclude>
     <ClInclude Include="glslang\Include\revision.h">
       <Filter>glslang\Include</Filter>
     </ClInclude>
@@ -243,6 +244,7 @@
     <ClInclude Include="glslang\MachineIndependent\LiveTraverser.h">
       <Filter>glslang\MachineIndependant</Filter>
     </ClInclude>
+    <ClInclude Include="StandAlone\ResourceLimits.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="glslang">
