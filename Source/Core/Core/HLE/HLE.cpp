@@ -27,12 +27,6 @@ typedef void (*TPatchFunction)();
 
 static std::map<u32, u32> s_original_instructions;
 
-enum
-{
-  HLE_RETURNTYPE_BLR = 0,
-  HLE_RETURNTYPE_RFI = 1,
-};
-
 struct SPatch
 {
   char m_szPatchName[128];
@@ -42,7 +36,7 @@ struct SPatch
 };
 
 // clang-format off
-constexpr std::array<SPatch, 21> OSPatches{{
+constexpr std::array<SPatch, 23> OSPatches{{
     // Placeholder, OSPatches[0] is the "non-existent function" index
     {"FAKE_TO_SKIP_0",               HLE_Misc::UnimplementedFunction,       HookType::Replace, HookFlag::Generic},
 
@@ -58,6 +52,7 @@ constexpr std::array<SPatch, 21> OSPatches{{
     {"OSReport",                     HLE_OS::HLE_GeneralDebugPrint,         HookType::Start,   HookFlag::Debug},
     {"DEBUGPrint",                   HLE_OS::HLE_GeneralDebugPrint,         HookType::Start,   HookFlag::Debug},
     {"WUD_DEBUGPrint",               HLE_OS::HLE_GeneralDebugPrint,         HookType::Start,   HookFlag::Debug},
+    {"__DSP_debug_printf",           HLE_OS::HLE_GeneralDebugPrint,         HookType::Start,   HookFlag::Debug},
     {"vprintf",                      HLE_OS::HLE_GeneralDebugVPrint,        HookType::Start,   HookFlag::Debug},
     {"printf",                       HLE_OS::HLE_GeneralDebugPrint,         HookType::Start,   HookFlag::Debug},
     {"vdprintf",                     HLE_OS::HLE_LogVDPrint,                HookType::Start,   HookFlag::Debug},
@@ -66,6 +61,7 @@ constexpr std::array<SPatch, 21> OSPatches{{
     {"fprintf",                      HLE_OS::HLE_LogFPrint,                 HookType::Start,   HookFlag::Debug},
     {"nlPrintf",                     HLE_OS::HLE_GeneralDebugPrint,         HookType::Start,   HookFlag::Debug},
     {"DWC_Printf",                   HLE_OS::HLE_GeneralDebugPrint,         HookType::Start,   HookFlag::Debug},
+    {"RANK_Printf",                  HLE_OS::HLE_GeneralDebugPrint,         HookType::Start,   HookFlag::Debug},
     {"puts",                         HLE_OS::HLE_GeneralDebugPrint,         HookType::Start,   HookFlag::Debug}, // gcc-optimized printf?
     {"___blank",                     HLE_OS::HLE_GeneralDebugPrint,         HookType::Start,   HookFlag::Debug}, // used for early init things (normally)
     {"__write_console",              HLE_OS::HLE_write_console,             HookType::Start,   HookFlag::Debug}, // used by sysmenu (+more?)
@@ -192,11 +188,13 @@ u32 GetFunctionIndex(u32 address)
 
 u32 GetFirstFunctionIndex(u32 address)
 {
-  u32 index = GetFunctionIndex(address);
-  auto first = std::find_if(
-      s_original_instructions.begin(), s_original_instructions.end(),
-      [=](const auto& entry) { return entry.second == index && entry.first < address; });
-  return first == std::end(s_original_instructions) ? index : 0;
+  const u32 index = GetFunctionIndex(address);
+  // Fixed hooks use a fixed address and don't patch the whole function
+  if (index == 0 || OSPatches[index].flags == HookFlag::Fixed)
+    return index;
+
+  const auto symbol = g_symbolDB.GetSymbolFromAddr(address);
+  return (symbol && symbol->address == address) ? index : 0;
 }
 
 HookType GetFunctionTypeByIndex(u32 index)

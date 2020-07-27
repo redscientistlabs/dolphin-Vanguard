@@ -164,9 +164,8 @@ Joystick::Joystick(/*const LPCDIDEVICEINSTANCE lpddi, */ const LPDIRECTINPUTDEVI
   if (SUCCEEDED(m_device->EnumObjects(DIEnumDeviceObjectsCallback, (LPVOID)&objects, DIDFT_AXIS)))
   {
     const int num_ff_axes =
-        std::count_if(std::begin(objects), std::end(objects), [](DIDEVICEOBJECTINSTANCE& pdidoi) {
-          return pdidoi.dwFlags && DIDOI_FFACTUATOR;
-        });
+        std::count_if(std::begin(objects), std::end(objects),
+                      [](const auto& pdidoi) { return (pdidoi.dwFlags & DIDOI_FFACTUATOR) != 0; });
     InitForceFeedback(m_device, num_ff_axes);
   }
 
@@ -311,6 +310,6 @@ ControlState Joystick::Hat::GetState() const
   if (is_centered)
     return 0;
 
-  return (abs((int)(m_hat / 4500 - m_direction * 2 + 8) % 8 - 4) > 2);
+  return (std::abs(int(m_hat / 4500 - m_direction * 2 + 8) % 8 - 4) > 2);
 }
 }  // namespace ciface::DInput

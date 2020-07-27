@@ -21,6 +21,7 @@
 #include <QTableWidget>
 #include <QVBoxLayout>
 
+#include "Core/ActionReplay.h"
 #include "Core/ConfigManager.h"
 #include "Core/Core.h"
 #include "Core/Debugger/PPCDebugInterface.h"
@@ -222,10 +223,10 @@ void CheatsManager::ConnectWidgets()
 {
   connect(m_button_box, &QDialogButtonBox::rejected, this, &QDialog::reject);
 
-  connect(m_match_new, &QPushButton::pressed, this, &CheatsManager::NewSearch);
-  connect(m_match_next, &QPushButton::pressed, this, &CheatsManager::NextSearch);
-  connect(m_match_refresh, &QPushButton::pressed, this, &CheatsManager::Update);
-  connect(m_match_reset, &QPushButton::pressed, this, &CheatsManager::Reset);
+  connect(m_match_new, &QPushButton::clicked, this, &CheatsManager::NewSearch);
+  connect(m_match_next, &QPushButton::clicked, this, &CheatsManager::NextSearch);
+  connect(m_match_refresh, &QPushButton::clicked, this, &CheatsManager::Update);
+  connect(m_match_reset, &QPushButton::clicked, this, &CheatsManager::Reset);
 
   m_match_table->setContextMenuPolicy(Qt::CustomContextMenu);
   m_watch_table->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -366,6 +367,9 @@ QWidget* CheatsManager::CreateCheatSearch()
 {
   m_match_table = new QTableWidget;
   m_watch_table = new QTableWidget;
+
+  m_match_table->setTabKeyNavigation(false);
+  m_watch_table->setTabKeyNavigation(false);
 
   m_match_table->verticalHeader()->hide();
   m_watch_table->verticalHeader()->hide();
@@ -567,7 +571,7 @@ void CheatsManager::NewSearch()
     return;
 
   Core::RunAsCPUThread([&] {
-    for (u32 i = 0; i < Memory::REALRAM_SIZE - GetTypeSize(); i++)
+    for (u32 i = 0; i < Memory::GetRamSizeReal() - GetTypeSize(); i++)
     {
       if (PowerPC::HostIsRAMAddress(base_address + i) && matches_func(base_address + i))
         m_results.push_back(
@@ -625,8 +629,7 @@ static QString GetResultString(const Result& result)
   case DataType::String:
     return QObject::tr("String Match");
   default:
-    // Make MSVC happy
-    return QStringLiteral("");
+    return {};
   }
 }
 
@@ -722,7 +725,7 @@ void CheatsManager::Reset()
   m_match_table->clear();
   m_watch_table->clear();
   m_match_decimal->setChecked(true);
-  m_result_label->setText(QStringLiteral(""));
+  m_result_label->clear();
 
   Update();
 }

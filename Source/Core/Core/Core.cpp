@@ -4,13 +4,16 @@
 
 #include "Core/Core.h"
 
+#include <algorithm>
 #include <atomic>
 #include <cstring>
-#include <locale>
 #include <mutex>
 #include <queue>
 #include <utility>
 #include <variant>
+
+#include <fmt/chrono.h>
+#include <fmt/format.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -21,15 +24,17 @@
 #include "Common/CPUDetect.h"
 #include "Common/CommonPaths.h"
 #include "Common/CommonTypes.h"
+#include "Common/Event.h"
 #include "Common/FileUtil.h"
 #include "Common/Flag.h"
-#include "Common/Logging/LogManager.h"
+#include "Common/Logging/Log.h"
 #include "Common/MemoryUtil.h"
 #include "Common/MsgHandler.h"
 #include "Common/ScopeGuard.h"
 #include "Common/StringUtil.h"
 #include "Common/Thread.h"
 #include "Common/Timer.h"
+#include "Common/Version.h"
 
 #include "Core/Analytics.h"
 #include "Core/Boot/Boot.h"
@@ -68,9 +73,11 @@
 #include "Core/MemoryWatcher.h"
 #endif
 
+#include "InputCommon/ControlReference/ControlReference.h"
 #include "InputCommon/ControllerInterface/ControllerInterface.h"
 #include "InputCommon/GCAdapter.h"
 
+#include "VideoCommon/AsyncRequests.h"
 #include "VideoCommon/Fifo.h"
 #include "VideoCommon/OnScreenDisplay.h"
 #include "VideoCommon/RenderBase.h"
@@ -92,6 +99,7 @@ static bool s_is_stopping = false;
 static bool s_hardware_initialized = false;
 static bool s_is_started = false;
 static Common::Flag s_is_booting;
+static Common::Event s_done_booting;
 static std::thread s_emu_thread;
 static StateChangedCallbackFunc s_on_state_changed_callback;
 
@@ -99,6 +107,7 @@ static std::thread s_cpu_thread;
 static bool s_request_refresh_info = false;
 static bool s_is_throttler_temp_disabled = false;
 static bool s_frame_step = false;
+static std::atomic<bool> s_stop_frame_step;
 
 #ifdef USE_MEMORYWATCHER
 static std::unique_ptr<MemoryWatcher> s_memory_watcher;
@@ -111,6 +120,7 @@ struct HostJob
 };
 static std::mutex s_host_jobs_lock;
 static std::queue<HostJob> s_host_jobs_queue;
+static Common::Event s_cpu_thread_job_finished;
 
 //Narrysmod - Swap Thread_Local to ThreadLocal helper
 static ThreadLocal<bool> tls_is_cpu_thread(false);
@@ -136,33 +146,31 @@ void FrameUpdateOnCPUThread()
 void OnFrameEnd()
 {
 #ifdef USE_MEMORYWATCHER
-  s_memory_watcher->Step();
+  if (s_memory_watcher)
+    s_memory_watcher->Step();
 #endif
 }
 
 // Display messages and return values
 
 // Formatted stop message
-std::string StopMessage(bool main_thread, const std::string& message)
+std::string StopMessage(bool main_thread, std::string_view message)
 {
-  return StringFromFormat("Stop [%s %i]\t%s", main_thread ? "Main Thread" : "Video Thread",
-                          Common::CurrentThreadId(), message.c_str());
+  return fmt::format("Stop [{} {}]\t{}", main_thread ? "Main Thread" : "Video Thread",
+                     Common::CurrentThreadId(), message);
 }
 
-void DisplayMessage(const std::string& message, int time_in_ms)
+void DisplayMessage(std::string message, int time_in_ms)
 {
   if (!IsRunning())
     return;
 
   // Actually displaying non-ASCII could cause things to go pear-shaped
-  for (const char& c : message)
-  {
-    if (!std::isprint(c, std::locale::classic()))
-      return;
-  }
+  if (!std::all_of(message.begin(), message.end(), IsPrintableCharacter))
+    return;
 
-  OSD::AddMessage(message, time_in_ms);
   Host_UpdateTitle(message);
+  OSD::AddMessage(std::move(message), time_in_ms);
 }
 
 bool IsRunning()
@@ -230,10 +238,13 @@ bool Init(std::unique_ptr<BootParameters> boot, const WindowSystemInfo& wsi)
   Host_UpdateMainFrame();  // Disable any menus or buttons at boot
 
   // Issue any API calls which must occur on the main thread for the graphics backend.
-  g_video_backend->PrepareWindow(wsi);
+  WindowSystemInfo prepared_wsi(wsi);
+  g_video_backend->PrepareWindow(prepared_wsi);
 
   // Start the emu thread
-  s_emu_thread = std::thread(EmuThread, std::move(boot), wsi);
+  s_done_booting.Reset();
+  s_is_booting.Set();
+  s_emu_thread = std::thread(EmuThread, std::move(boot), prepared_wsi);
   return true;
 }
 
@@ -282,12 +293,6 @@ void Stop()  // - Hammertime!
 
     g_video_backend->Video_ExitLoop();
   }
-
-  ResetRumble();
-
-#ifdef USE_MEMORYWATCHER
-  s_memory_watcher.reset();
-#endif
 }
 
 void DeclareAsCPUThread()
@@ -325,7 +330,7 @@ static void CpuThread(const std::optional<std::string>& savestate_path, bool del
     Common::SetCurrentThreadName("CPU-GPU thread");
 
   // This needs to be delayed until after the video backend is ready.
-  DolphinAnalytics::Instance()->ReportGameStart();
+  DolphinAnalytics::Instance().ReportGameStart();
 
   if (_CoreParameter.bFastmem)
     EMM::InstallExceptionHandler();  // Let's run under memory watch
@@ -363,6 +368,11 @@ static void CpuThread(const std::optional<std::string>& savestate_path, bool del
 
   // Enter CPU run loop. When we leave it - we are done.
   CPU::Run();
+
+#ifdef USE_MEMORYWATCHER
+  s_memory_watcher.reset();
+#endif
+
   VanguardClientUnmanaged::GAME_CLOSED();
   s_is_started = false;
 
@@ -409,11 +419,11 @@ static void FifoPlayerThread(const std::optional<std::string>& savestate_path,
 static void EmuThread(std::unique_ptr<BootParameters> boot, WindowSystemInfo wsi)
 {
   const SConfig& core_parameter = SConfig::GetInstance();
-  s_is_booting.Set();
   if (s_on_state_changed_callback)
     s_on_state_changed_callback(State::Starting);
   Common::ScopeGuard flag_guard{[] {
     s_is_booting.Clear();
+    s_done_booting.Set();
     s_is_started = false;
     s_is_stopping = false;
     s_wants_determinism = false;
@@ -440,7 +450,7 @@ static void EmuThread(std::unique_ptr<BootParameters> boot, WindowSystemInfo wsi
   s_frame_step = false;
 
   Movie::Init(*boot);
-  Common::ScopeGuard movie_guard{Movie::Shutdown};
+  Common::ScopeGuard movie_guard{&Movie::Shutdown};
 
   HW::Init();
 
@@ -462,11 +472,7 @@ static void EmuThread(std::unique_ptr<BootParameters> boot, WindowSystemInfo wsi
     HLE::Clear();
   }};
 
-  // Backend info has to be initialized before we can initialize the backend.
-  // This is because when we load the config, we validate it against the current backend info.
-  // We also should have the correct adapter selected for creating the device in Initialize().
-  g_video_backend->InitBackendInfo();
-  g_Config.Refresh();
+  VideoBackendBase::PopulateBackendInfo();
 
   if (!g_video_backend->Initialize(wsi))
   {
@@ -474,8 +480,12 @@ static void EmuThread(std::unique_ptr<BootParameters> boot, WindowSystemInfo wsi
     return;
   }
   Common::ScopeGuard video_guard{[] { g_video_backend->Shutdown(); }};
-  
-  
+
+  // Render a single frame without anything on it to clear the screen.
+  // This avoids the game list being displayed while the core is finishing initializing.
+  g_renderer->BeginUIFrame();
+  g_renderer->EndUIFrame();
+
   if (cpu_info.HTT)
     SConfig::GetInstance().bDSPThread = cpu_info.num_cores > 4;
   else
@@ -501,7 +511,7 @@ static void EmuThread(std::unique_ptr<BootParameters> boot, WindowSystemInfo wsi
   }
   else
   {
-    g_controller_interface.ChangeWindow(wsi.render_surface);
+    g_controller_interface.ChangeWindow(wsi.render_window);
     Pad::LoadConfig();
     Keyboard::LoadConfig();
   }
@@ -533,7 +543,12 @@ static void EmuThread(std::unique_ptr<BootParameters> boot, WindowSystemInfo wsi
       return;
 
     if (init_wiimotes)
+    {
+      Wiimote::ResetAllWiimotes();
       Wiimote::Shutdown();
+    }
+
+    ResetRumble();
 
     Keyboard::Shutdown();
     Pad::Shutdown();
@@ -541,11 +556,12 @@ static void EmuThread(std::unique_ptr<BootParameters> boot, WindowSystemInfo wsi
   }};
 
   AudioCommon::InitSoundStream();
-  Common::ScopeGuard audio_guard{AudioCommon::ShutdownSoundStream};
+  Common::ScopeGuard audio_guard{&AudioCommon::ShutdownSoundStream};
 
   // The hardware is initialized.
   s_hardware_initialized = true;
   s_is_booting.Clear();
+  s_done_booting.Set();
 
 
   // Set execution state to known values (CPU/FIFO/Audio Paused)
@@ -567,7 +583,7 @@ static void EmuThread(std::unique_ptr<BootParameters> boot, WindowSystemInfo wsi
   // Initialise Wii filesystem contents.
   // This is done here after Boot and not in HW to ensure that we operate
   // with the correct title context since save copying requires title directories to exist.
-  Common::ScopeGuard wiifs_guard{Core::CleanUpWiiFileSystemContents};
+  Common::ScopeGuard wiifs_guard{&Core::CleanUpWiiFileSystemContents};
   if (SConfig::GetInstance().bWii)
     Core::InitializeWiiFileSystemContents();
   else
@@ -670,6 +686,12 @@ State GetState()
   return State::Uninitialized;
 }
 
+void WaitUntilDoneBooting()
+{
+  if (s_is_booting.IsSet() || !s_hardware_initialized)
+    s_done_booting.Wait();
+}
+
 static std::string GenerateScreenshotFolderPath()
 {
   const std::string& gameId = SConfig::GetInstance().GetGameID();
@@ -686,15 +708,20 @@ static std::string GenerateScreenshotFolderPath()
 
 static std::string GenerateScreenshotName()
 {
-  std::string path = GenerateScreenshotFolderPath();
-
   // append gameId, path only contains the folder here.
-  path += SConfig::GetInstance().GetGameID();
+  const std::string path_prefix =
+      GenerateScreenshotFolderPath() + SConfig::GetInstance().GetGameID();
 
-  std::string name;
-  for (int i = 1; File::Exists(name = StringFromFormat("%s-%d.png", path.c_str(), i)); ++i)
+  const std::time_t cur_time = std::time(nullptr);
+  const std::string base_name =
+      fmt::format("{}_{:%Y-%m-%d_%H-%M-%S}", path_prefix, *std::localtime(&cur_time));
+
+  // First try a filename without any suffixes, if already exists then append increasing numbers
+  std::string name = fmt::format("{}.png", base_name);
+  if (File::Exists(name))
   {
-    // TODO?
+    for (u32 i = 1; File::Exists(name = fmt::format("{}_{}.png", base_name, i)); ++i)
+      ;
   }
 
   return name;
@@ -712,15 +739,14 @@ void SaveScreenShot(bool wait_for_completion)
     SetState(State::Running);
 }
 
-void SaveScreenShot(const std::string& name, bool wait_for_completion)
+void SaveScreenShot(std::string_view name, bool wait_for_completion)
 {
   const bool bPaused = GetState() == State::Paused;
 
   SetState(State::Paused);
 
-  std::string filePath = GenerateScreenshotFolderPath() + name + ".png";
-
-  g_renderer->SaveScreenshot(filePath, wait_for_completion);
+  g_renderer->SaveScreenshot(fmt::format("{}{}.png", GenerateScreenshotFolderPath(), name),
+                             wait_for_completion);
 
   if (!bPaused)
     SetState(State::Running);
@@ -784,6 +810,45 @@ void RunAsCPUThread(std::function<void()> function)
     PauseAndLock(false, was_unpaused);
 }
 
+void RunOnCPUThread(std::function<void()> function, bool wait_for_completion)
+{
+  // If the CPU thread is not running, assume there is no active CPU thread we can race against.
+  if (!IsRunning() || IsCPUThread())
+  {
+    function();
+    return;
+  }
+
+  // Pause the CPU (set it to stepping mode).
+  const bool was_running = PauseAndLock(true, true);
+
+  // Queue the job function.
+  if (wait_for_completion)
+  {
+    // Trigger the event after executing the function.
+    s_cpu_thread_job_finished.Reset();
+    CPU::AddCPUThreadJob([&function]() {
+      function();
+      s_cpu_thread_job_finished.Set();
+    });
+  }
+  else
+  {
+    CPU::AddCPUThreadJob(std::move(function));
+  }
+
+  // Release the CPU thread, and let it execute the callback.
+  PauseAndLock(false, was_running);
+
+  // If we're waiting for completion, block until the event fires.
+  if (wait_for_completion)
+  {
+    // Periodically yield to the UI thread, so we don't deadlock.
+    while (!s_cpu_thread_job_finished.WaitFor(std::chrono::milliseconds(10)))
+      Host_YieldToUI();
+  }
+}
+
 // Display FPS info
 // This should only be called from VI
 void VideoThrottle()
@@ -805,20 +870,33 @@ void VideoThrottle()
 
 // --- Callbacks for backends / engine ---
 
-// Should be called from GPU thread when a frame is drawn
-void Callback_VideoCopiedToXFB(bool video_update)
+// Called from Renderer::Swap (GPU thread) when a new (non-duplicate)
+// frame is presented to the host screen
+void Callback_FramePresented()
 {
-  if (video_update)
-    s_drawn_frame++;
+  s_drawn_frame++;
+  s_stop_frame_step.store(true);
+}
 
-  Movie::FrameUpdate();
-
+// Called from VideoInterface::Update (CPU thread) at emulated field boundaries
+void Callback_NewField()
+{
   if (s_frame_step)
   {
-    s_frame_step = false;
-    CPU::Break();
-    if (s_on_state_changed_callback)
-      s_on_state_changed_callback(Core::GetState());
+    // To ensure that s_stop_frame_step is up to date, wait for the GPU thread queue to empty,
+    // since it is may contain a swap event (which will call Callback_FramePresented). This hurts
+    // the performance a little, but luckily, performance matters less when using frame stepping.
+    AsyncRequests::GetInstance()->WaitForEmptyQueue();
+
+    // Only stop the frame stepping if a new frame was displayed
+    // (as opposed to the previous frame being displayed for another frame).
+    if (s_stop_frame_step.load())
+    {
+      s_frame_step = false;
+      CPU::Break();
+      if (s_on_state_changed_callback)
+        s_on_state_changed_callback(Core::GetState());
+    }
   }
 }
 
@@ -837,23 +915,25 @@ void UpdateTitle()
                         (VideoInterface::GetTargetRefreshRate() * ElapseTime));
 
   // Settings are shown the same for both extended and summary info
-  std::string SSettings = StringFromFormat(
-      "%s %s | %s | %s", PowerPC::GetCPUName(), _CoreParameter.bCPUThread ? "DC" : "SC",
-      g_video_backend->GetDisplayName().c_str(), _CoreParameter.bDSPHLE ? "HLE" : "LLE");
+  const std::string SSettings =
+      fmt::format("{} {} | {} | {}", PowerPC::GetCPUName(), _CoreParameter.bCPUThread ? "DC" : "SC",
+                  g_video_backend->GetDisplayName(), _CoreParameter.bDSPHLE ? "HLE" : "LLE");
 
   std::string SFPS;
-
   if (Movie::IsPlayingInput())
-    SFPS = StringFromFormat("Input: %u/%u - VI: %u - FPS: %.0f - VPS: %.0f - %.0f%%",
-                            (u32)Movie::GetCurrentInputCount(), (u32)Movie::GetTotalInputCount(),
-                            (u32)Movie::GetCurrentFrame(), FPS, VPS, Speed);
+  {
+    SFPS = fmt::format("Input: {}/{} - VI: {} - FPS: {:.0f} - VPS: {:.0f} - {:.0f}%",
+                       Movie::GetCurrentInputCount(), Movie::GetTotalInputCount(),
+                       Movie::GetCurrentFrame(), FPS, VPS, Speed);
+  }
   else if (Movie::IsRecordingInput())
-    SFPS = StringFromFormat("Input: %u - VI: %u - FPS: %.0f - VPS: %.0f - %.0f%%",
-                            (u32)Movie::GetCurrentInputCount(), (u32)Movie::GetCurrentFrame(), FPS,
-                            VPS, Speed);
+  {
+    SFPS = fmt::format("Input: {} - VI: {} - FPS: {:.0f} - VPS: {:.0f} - {:.0f}%",
+                       Movie::GetCurrentInputCount(), Movie::GetCurrentFrame(), FPS, VPS, Speed);
+  }
   else
   {
-    SFPS = StringFromFormat("FPS: %.0f - VPS: %.0f - %.0f%%", FPS, VPS, Speed);
+    SFPS = fmt::format("FPS: {:.0f} - VPS: {:.0f} - {:.0f}%", FPS, VPS, Speed);
     if (SConfig::GetInstance().m_InterfaceExtendedFPSInfo)
     {
       // Use extended or summary information. The summary information does not print the ticks data,
@@ -873,13 +953,13 @@ void UpdateTitle()
       float TicksPercentage =
           (float)diff / (float)(SystemTimers::GetTicksPerSecond() / 1000000) * 100;
 
-      SFPS += StringFromFormat(" | CPU: ~%i MHz [Real: %i + IdleSkip: %i] / %i MHz (~%3.0f%%)",
-                               (int)(diff), (int)(diff - idleDiff), (int)(idleDiff),
-                               SystemTimers::GetTicksPerSecond() / 1000000, TicksPercentage);
+      SFPS += fmt::format(" | CPU: ~{} MHz [Real: {} + IdleSkip: {}] / {} MHz (~{:3.0f}%)", diff,
+                          diff - idleDiff, idleDiff, SystemTimers::GetTicksPerSecond() / 1000000,
+                          TicksPercentage);
     }
   }
 
-  std::string message = StringFromFormat("%s | %s", SSettings.c_str(), SFPS.c_str());
+  std::string message = fmt::format("{} | {} | {}", Common::scm_rev_str, SSettings, SFPS);
   if (SConfig::GetInstance().m_show_active_title)
   {
     const std::string& title = SConfig::GetInstance().GetTitleDescription();
@@ -990,6 +1070,7 @@ void DoFrameStep()
   if (GetState() == State::Paused)
   {
     // if already paused, frame advance for 1 frame
+    s_stop_frame_step = false;
     s_frame_step = true;
     RequestRefreshInfo();
     SetState(State::Running);
@@ -999,6 +1080,12 @@ void DoFrameStep()
     // if not paused yet, pause immediately instead
     SetState(State::Paused);
   }
+}
+
+void UpdateInputGate(bool require_focus)
+{
+  ControlReference::SetInputGate((!require_focus || Host_RendererHasFocus()) &&
+                                 !Host_UIBlocksControllerState());
 }
 
 }  // namespace Core

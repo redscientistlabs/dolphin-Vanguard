@@ -9,7 +9,6 @@
 #include <QDockWidget>
 
 #include "Common/CommonTypes.h"
-#include "Core/HW/AddressSpace.h"
 
 class MemoryViewWidget;
 class QCheckBox;
@@ -17,6 +16,7 @@ class QLabel;
 class QLineEdit;
 class QPushButton;
 class QRadioButton;
+class QShowEvent;
 class QSplitter;
 
 class MemoryWidget : public QDockWidget
@@ -61,6 +61,7 @@ private:
   void FindValue(bool next);
 
   void closeEvent(QCloseEvent*) override;
+  void showEvent(QShowEvent* event) override;
 
   MemoryViewWidget* m_memory_view;
   QSplitter* m_splitter;

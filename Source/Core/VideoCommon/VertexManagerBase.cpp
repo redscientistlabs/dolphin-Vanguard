@@ -14,6 +14,7 @@
 #include "Common/Logging/Log.h"
 #include "Common/MathUtil.h"
 
+#include "Core/Analytics.h"
 #include "Core/ConfigManager.h"
 
 #include "VideoCommon/BPMemory.h"
@@ -33,6 +34,7 @@
 #include "VideoCommon/VertexLoaderManager.h"
 #include "VideoCommon/VertexShaderManager.h"
 #include "VideoCommon/VideoBackendBase.h"
+#include "VideoCommon/VideoCommon.h"
 #include "VideoCommon/VideoConfig.h"
 #include "VideoCommon/XFMemory.h"
 
@@ -67,16 +69,26 @@ constexpr std::array<PrimitiveType, 8> primitive_from_gx_pr{{
 // by ~9% in opposite directions.
 // Just in case any game decides to take this into account, we do both these
 // tests with a large amount of slop.
-static bool AspectIs4_3(float width, float height)
+static constexpr float ASPECT_RATIO_SLOP = 0.11f;
+
+static bool IsAnamorphicProjection(const Projection::Raw& projection, const Viewport& viewport)
 {
-  float aspect = fabsf(width / height);
-  return fabsf(aspect - 4.0f / 3.0f) < 4.0f / 3.0f * 0.11;  // within 11% of 4:3
+  // If ratio between our projection and viewport aspect ratios is similar to 16:9 / 4:3
+  // we have an anamorphic projection.
+  static constexpr float IDEAL_RATIO = (16 / 9.f) / (4 / 3.f);
+
+  const float projection_ar = projection[2] / projection[0];
+  const float viewport_ar = viewport.wd / viewport.ht;
+
+  return std::abs(std::abs(projection_ar / viewport_ar) - IDEAL_RATIO) <
+         IDEAL_RATIO * ASPECT_RATIO_SLOP;
 }
 
-static bool AspectIs16_9(float width, float height)
+static bool IsNormalProjection(const Projection::Raw& projection, const Viewport& viewport)
 {
-  float aspect = fabsf(width / height);
-  return fabsf(aspect - 16.0f / 9.0f) < 16.0f / 9.0f * 0.11;  // within 11% of 16:9
+  const float projection_ar = projection[2] / projection[0];
+  const float viewport_ar = viewport.wd / viewport.ht;
+  return std::abs(std::abs(projection_ar / viewport_ar) - 1) < ASPECT_RATIO_SLOP;
 }
 
 VertexManagerBase::VertexManagerBase()
@@ -88,12 +100,18 @@ VertexManagerBase::~VertexManagerBase() = default;
 
 bool VertexManagerBase::Initialize()
 {
+  m_index_generator.Init();
   return true;
 }
 
 u32 VertexManagerBase::GetRemainingSize() const
 {
   return static_cast<u32>(m_end_buffer_pointer - m_cur_buffer_pointer);
+}
+
+void VertexManagerBase::AddIndices(int primitive, u32 num_vertices)
+{
+  m_index_generator.AddIndices(primitive, num_vertices);
 }
 
 DataReader VertexManagerBase::PrepareForAdditionalData(int primitive, u32 count, u32 stride,
@@ -120,12 +138,12 @@ DataReader VertexManagerBase::PrepareForAdditionalData(int primitive, u32 count,
 
   // Check for size in buffer, if the buffer gets full, call Flush()
   if (!m_is_flushed &&
-      (count > IndexGenerator::GetRemainingIndices() || count > GetRemainingIndices(primitive) ||
+      (count > m_index_generator.GetRemainingIndices() || count > GetRemainingIndices(primitive) ||
        needed_vertex_bytes > GetRemainingSize()))
   {
     Flush();
 
-    if (count > IndexGenerator::GetRemainingIndices())
+    if (count > m_index_generator.GetRemainingIndices())
       ERROR_LOG(VIDEO, "Too little remaining index values. Use 32-bit or reset them on flush.");
     if (count > GetRemainingIndices(primitive))
       ERROR_LOG(VIDEO, "VertexManager: Buffer not large enough for all indices! "
@@ -145,7 +163,7 @@ DataReader VertexManagerBase::PrepareForAdditionalData(int primitive, u32 count,
       // This buffer isn't getting sent to the GPU. Just allocate it on the cpu.
       m_cur_buffer_pointer = m_base_buffer_pointer = m_cpu_vertex_buffer.data();
       m_end_buffer_pointer = m_base_buffer_pointer + m_cpu_vertex_buffer.size();
-      IndexGenerator::Start(m_cpu_index_buffer.data());
+      m_index_generator.Start(m_cpu_index_buffer.data());
     }
     else
     {
@@ -163,9 +181,9 @@ void VertexManagerBase::FlushData(u32 count, u32 stride)
   m_cur_buffer_pointer += count * stride;
 }
 
-u32 VertexManagerBase::GetRemainingIndices(int primitive)
+u32 VertexManagerBase::GetRemainingIndices(int primitive) const
 {
-  u32 index_len = MAXIBUFFERSIZE - IndexGenerator::GetIndexLen();
+  const u32 index_len = MAXIBUFFERSIZE - m_index_generator.GetIndexLen();
 
   if (g_Config.backend_info.bSupportsPrimitiveRestart)
   {
@@ -221,12 +239,11 @@ u32 VertexManagerBase::GetRemainingIndices(int primitive)
   }
 }
 
-std::pair<size_t, size_t> VertexManagerBase::ResetFlushAspectRatioCount()
+auto VertexManagerBase::ResetFlushAspectRatioCount() -> FlushStatistics
 {
-  std::pair<size_t, size_t> val = std::make_pair(m_flush_count_4_3, m_flush_count_anamorphic);
-  m_flush_count_4_3 = 0;
-  m_flush_count_anamorphic = 0;
-  return val;
+  const auto result = m_flush_statistics;
+  m_flush_statistics = {};
+  return result;
 }
 
 void VertexManagerBase::ResetBuffer(u32 vertex_stride)
@@ -234,7 +251,7 @@ void VertexManagerBase::ResetBuffer(u32 vertex_stride)
   m_base_buffer_pointer = m_cpu_vertex_buffer.data();
   m_cur_buffer_pointer = m_cpu_vertex_buffer.data();
   m_end_buffer_pointer = m_base_buffer_pointer + m_cpu_vertex_buffer.size();
-  IndexGenerator::Start(m_cpu_index_buffer.data());
+  m_index_generator.Start(m_cpu_index_buffer.data());
 }
 
 void VertexManagerBase::CommitBuffer(u32 num_vertices, u32 vertex_stride, u32 num_indices,
@@ -247,7 +264,7 @@ void VertexManagerBase::CommitBuffer(u32 num_vertices, u32 vertex_stride, u32 nu
 void VertexManagerBase::DrawCurrentBatch(u32 base_index, u32 num_indices, u32 base_vertex)
 {
   // If bounding box is enabled, we need to flush any changes first, then invalidate what we have.
-  if (::BoundingBox::active && g_ActiveConfig.bBBoxEnable &&
+  if (BoundingBox::IsEnabled() && g_ActiveConfig.bBBoxEnable &&
       g_ActiveConfig.backend_info.bSupportsBBox)
   {
     g_renderer->BBoxFlush();
@@ -288,7 +305,7 @@ void VertexManagerBase::UploadUtilityVertices(const void* vertices, u32 vertex_s
     m_cur_buffer_pointer += copy_size;
   }
   if (indices)
-    IndexGenerator::AddExternalIndices(indices, num_indices, num_vertices);
+    m_index_generator.AddExternalIndices(indices, num_indices, num_vertices);
 
   CommitBuffer(num_vertices, vertex_stride, num_indices, out_base_vertex, out_base_index);
 }
@@ -338,8 +355,30 @@ void VertexManagerBase::Flush()
 
   m_is_flushed = true;
 
-  // loading a state will invalidate BP, so check for it
-  g_video_backend->CheckInvalidState();
+  if (xfmem.numTexGen.numTexGens != bpmem.genMode.numtexgens ||
+      xfmem.numChan.numColorChans != bpmem.genMode.numcolchans)
+  {
+    ERROR_LOG(VIDEO,
+              "Mismatched configuration between XF and BP stages - %u/%u texgens, %u/%u colors. "
+              "Skipping draw. Please report on the issue tracker.",
+              xfmem.numTexGen.numTexGens, bpmem.genMode.numtexgens.Value(),
+              xfmem.numChan.numColorChans, bpmem.genMode.numcolchans.Value());
+
+    // Analytics reporting so we can discover which games have this problem, that way when we
+    // eventually simulate the behavior we have test cases for it.
+    if (xfmem.numTexGen.numTexGens != bpmem.genMode.numtexgens)
+    {
+      DolphinAnalytics::Instance().ReportGameQuirk(
+          GameQuirk::MISMATCHED_GPU_TEXGENS_BETWEEN_XF_AND_BP);
+    }
+    if (xfmem.numChan.numColorChans != bpmem.genMode.numcolchans)
+    {
+      DolphinAnalytics::Instance().ReportGameQuirk(
+          GameQuirk::MISMATCHED_GPU_COLORS_BETWEEN_XF_AND_BP);
+    }
+
+    return;
+  }
 
 #if defined(_DEBUG) || defined(DEBUGFAST)
   PRIM_LOG("frame%d:\n texgen=%u, numchan=%u, dualtex=%u, ztex=%u, cole=%u, alpe=%u, ze=%u",
@@ -384,18 +423,25 @@ void VertexManagerBase::Flush()
   // Track some stats used elsewhere by the anamorphic widescreen heuristic.
   if (!SConfig::GetInstance().bWii)
   {
-    float* rawProjection = xfmem.projection.rawProjection;
-    bool viewport_is_4_3 = AspectIs4_3(xfmem.viewport.wd, xfmem.viewport.ht);
-    if (AspectIs16_9(rawProjection[2], rawProjection[0]) && viewport_is_4_3)
+    const bool is_perspective = xfmem.projection.type == GX_PERSPECTIVE;
+
+    auto& counts =
+        is_perspective ? m_flush_statistics.perspective : m_flush_statistics.orthographic;
+
+    if (IsAnamorphicProjection(xfmem.projection.rawProjection, xfmem.viewport))
     {
-      // Projection is 16:9 and viewport is 4:3, we are rendering an anamorphic
-      // widescreen picture.
-      m_flush_count_anamorphic++;
+      ++counts.anamorphic_flush_count;
+      counts.anamorphic_vertex_count += m_index_generator.GetIndexLen();
     }
-    else if (AspectIs4_3(rawProjection[2], rawProjection[0]) && viewport_is_4_3)
+    else if (IsNormalProjection(xfmem.projection.rawProjection, xfmem.viewport))
     {
-      // Projection and viewports are both 4:3, we are rendering a normal image.
-      m_flush_count_4_3++;
+      ++counts.normal_flush_count;
+      counts.normal_vertex_count += m_index_generator.GetIndexLen();
+    }
+    else
+    {
+      ++counts.other_flush_count;
+      counts.other_vertex_count += m_index_generator.GetIndexLen();
     }
   }
 
@@ -416,9 +462,9 @@ void VertexManagerBase::Flush()
   {
     // Now the vertices can be flushed to the GPU. Everything following the CommitBuffer() call
     // must be careful to not upload any utility vertices, as the binding will be lost otherwise.
-    const u32 num_indices = IndexGenerator::GetIndexLen();
+    const u32 num_indices = m_index_generator.GetIndexLen();
     u32 base_vertex, base_index;
-    CommitBuffer(IndexGenerator::GetNumVerts(),
+    CommitBuffer(m_index_generator.GetNumVerts(),
                  VertexLoaderManager::GetCurrentVertexFormat()->GetVertexStride(), num_indices,
                  &base_vertex, &base_index);
 
@@ -442,7 +488,7 @@ void VertexManagerBase::Flush()
         g_perf_query->EnableQuery(bpmem.zcontrol.early_ztest ? PQG_ZCOMP_ZCOMPLOC : PQG_ZCOMP);
 
       DrawCurrentBatch(base_index, num_indices, base_vertex);
-      INCSTAT(stats.thisFrame.numDrawCalls);
+      INCSTAT(g_stats.this_frame.num_draw_calls);
 
       if (PerfQueryBase::ShouldEmulate())
         g_perf_query->DisableQuery(bpmem.zcontrol.early_ztest ? PQG_ZCOMP_ZCOMPLOC : PQG_ZCOMP);
@@ -464,6 +510,16 @@ void VertexManagerBase::Flush()
 
 void VertexManagerBase::DoState(PointerWrap& p)
 {
+  if (p.GetMode() == PointerWrap::MODE_READ)
+  {
+    // Flush old vertex data before loading state.
+    Flush();
+
+    // Clear all caches that touch RAM
+    // (? these don't appear to touch any emulation state that gets saved. moved to on load only.)
+    VertexLoaderManager::MarkAllDirty();
+  }
+
   p.Do(m_zslope);
 }
 
@@ -755,12 +811,12 @@ void VertexManagerBase::OnEndFrame()
 
 #if 0
   {
-    std::stringstream ss;
+    std::ostringstream ss;
     std::for_each(m_cpu_accesses_this_frame.begin(), m_cpu_accesses_this_frame.end(), [&ss](u32 idx) { ss << idx << ","; });
     WARN_LOG(VIDEO, "CPU EFB accesses in last frame: %s", ss.str().c_str());
   }
   {
-    std::stringstream ss;
+    std::ostringstream ss;
     std::for_each(m_scheduled_command_buffer_kicks.begin(), m_scheduled_command_buffer_kicks.end(), [&ss](u32 idx) { ss << idx << ","; });
     WARN_LOG(VIDEO, "Scheduled command buffer kicks: %s", ss.str().c_str());
   }

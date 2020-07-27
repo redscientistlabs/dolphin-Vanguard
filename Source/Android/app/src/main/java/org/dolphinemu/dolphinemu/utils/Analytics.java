@@ -1,12 +1,9 @@
 package org.dolphinemu.dolphinemu.utils;
 
-import android.app.AlertDialog;
 import android.content.Context;
-import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.os.Build;
 import android.preference.PreferenceManager;
-import android.support.v4.content.LocalBroadcastManager;
 
 import com.android.volley.Request;
 import com.android.volley.toolbox.StringRequest;
@@ -16,10 +13,10 @@ import org.dolphinemu.dolphinemu.R;
 import org.dolphinemu.dolphinemu.features.settings.model.Settings;
 import org.dolphinemu.dolphinemu.features.settings.utils.SettingsFile;
 
+import androidx.appcompat.app.AlertDialog;
+
 public class Analytics
 {
-  private static DirectoryStateReceiver directoryStateReceiver;
-
   private static final String analyticsAsked =
           Settings.SECTION_ANALYTICS + "_" + SettingsFile.KEY_ANALYTICS_PERMISSION_ASKED;
   private static final String analyticsEnabled =
@@ -35,31 +32,8 @@ public class Analytics
     SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
     if (!preferences.getBoolean(analyticsAsked, false))
     {
-      if (!DirectoryInitialization.areDolphinDirectoriesReady())
-      {
-        // Wait for directories to get initialized
-        IntentFilter statusIntentFilter = new IntentFilter(
-                DirectoryInitialization.BROADCAST_ACTION);
-
-        directoryStateReceiver = new DirectoryStateReceiver(directoryInitializationState ->
-        {
-          if (directoryInitializationState ==
-                  DirectoryInitialization.DirectoryInitializationState.DOLPHIN_DIRECTORIES_INITIALIZED)
-          {
-            LocalBroadcastManager.getInstance(context).unregisterReceiver(directoryStateReceiver);
-            directoryStateReceiver = null;
-            showMessage(context, preferences);
-          }
-        });
-        // Registers the DirectoryStateReceiver and its intent filters
-        LocalBroadcastManager.getInstance(context).registerReceiver(
-                directoryStateReceiver,
-                statusIntentFilter);
-      }
-      else
-      {
-        showMessage(context, preferences);
-      }
+      new AfterDirectoryInitializationRunner().run(context,
+              () -> showMessage(context, preferences));
     }
   }
 
@@ -70,7 +44,7 @@ public class Analytics
     sPrefsEditor.putBoolean(analyticsAsked, true);
     sPrefsEditor.apply();
 
-    new AlertDialog.Builder(context)
+    new AlertDialog.Builder(context, R.style.DolphinDialogBase)
             .setTitle(context.getString(R.string.analytics))
             .setMessage(context.getString(R.string.analytics_desc))
             .setPositiveButton(R.string.yes, (dialogInterface, i) ->

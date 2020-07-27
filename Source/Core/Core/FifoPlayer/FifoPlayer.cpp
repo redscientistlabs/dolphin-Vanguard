@@ -168,6 +168,17 @@ std::unique_ptr<CPUCoreBase> FifoPlayer::GetCPUCore()
   return std::make_unique<CPUCore>(this);
 }
 
+void FifoPlayer::SetFileLoadedCallback(CallbackFunc callback)
+{
+  m_FileLoadedCb = std::move(callback);
+
+  // Trigger the callback immediatly if the file is already loaded.
+  if (GetFile() != nullptr)
+  {
+    m_FileLoadedCb();
+  }
+}
+
 bool FifoPlayer::IsRunningWithFakeVideoInterfaceUpdates() const
 {
   if (!m_File || m_File->GetFrameCount() == 0)
@@ -345,9 +356,9 @@ void FifoPlayer::WriteMemory(const MemoryUpdate& memUpdate)
   u8* mem = nullptr;
 
   if (memUpdate.address & 0x10000000)
-    mem = &Memory::m_pEXRAM[memUpdate.address & Memory::EXRAM_MASK];
+    mem = &Memory::m_pEXRAM[memUpdate.address & Memory::GetExRamMask()];
   else
-    mem = &Memory::m_pRAM[memUpdate.address & Memory::RAM_MASK];
+    mem = &Memory::m_pRAM[memUpdate.address & Memory::GetRamMask()];
 
   std::copy(memUpdate.data.begin(), memUpdate.data.end(), mem);
 }

@@ -32,8 +32,8 @@ constexpr int SLIDER_TICK_COUNT = 100;
 // Escape ampersands and remove ticks
 static QString ToDisplayString(QString&& string)
 {
-  return string.replace(QStringLiteral("&"), QStringLiteral("&&"))
-      .replace(QStringLiteral("`"), QStringLiteral(""));
+  return string.replace(QLatin1Char{'&'}, QStringLiteral("&&"))
+      .replace(QLatin1Char{'`'}, QString{});
 }
 
 bool MappingButton::IsInput() const
@@ -49,14 +49,21 @@ MappingButton::MappingButton(MappingWidget* parent, ControlReference* ref, bool 
   setFixedHeight(minimumSizeHint().height());
 
   // Make sure that long entries don't throw our layout out of whack.
-  setFixedWidth(112);
+  setFixedWidth(WIDGET_MAX_WIDTH);
 
   setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
 
-  setToolTip(
-      tr("Left-click to detect input.\nMiddle-click to clear.\nRight-click for more options."));
+  if (IsInput())
+  {
+    setToolTip(
+        tr("Left-click to detect input.\nMiddle-click to clear.\nRight-click for more options."));
+  }
+  else
+  {
+    setToolTip(tr("Left/Right-click to configure output.\nMiddle-click to clear."));
+  }
 
-  connect(this, &MappingButton::clicked, this, &MappingButton::Detect);
+  connect(this, &MappingButton::clicked, this, &MappingButton::Clicked);
 
   if (indicator)
     connect(parent, &MappingWidget::Update, this, &MappingButton::UpdateIndicator);
@@ -66,7 +73,7 @@ MappingButton::MappingButton(MappingWidget* parent, ControlReference* ref, bool 
 
 void MappingButton::AdvancedPressed()
 {
-  IOWindow io(this, m_parent->GetController(), m_reference,
+  IOWindow io(m_parent, m_parent->GetController(), m_reference,
               m_reference->IsInput() ? IOWindow::Type::Input : IOWindow::Type::Output);
   io.exec();
 
@@ -74,10 +81,13 @@ void MappingButton::AdvancedPressed()
   m_parent->SaveSettings();
 }
 
-void MappingButton::Detect()
+void MappingButton::Clicked()
 {
   if (!m_reference->IsInput())
+  {
+    AdvancedPressed();
     return;
+  }
 
   const auto default_device_qualifier = m_parent->GetController()->GetDefaultDevice();
 
@@ -100,7 +110,7 @@ void MappingButton::Detect()
     return;
 
   m_reference->SetExpression(expression.toStdString());
-  m_parent->GetController()->UpdateReferences(g_controller_interface);
+  m_parent->GetController()->UpdateSingleControlReference(g_controller_interface, m_reference);
 
   ConfigChanged();
   m_parent->SaveSettings();
@@ -111,7 +121,7 @@ void MappingButton::Clear()
   m_reference->range = 100.0 / SLIDER_TICK_COUNT;
 
   m_reference->SetExpression("");
-  m_parent->GetController()->UpdateReferences(g_controller_interface);
+  m_parent->GetController()->UpdateSingleControlReference(g_controller_interface, m_reference);
 
   m_parent->SaveSettings();
   ConfigChanged();
@@ -122,11 +132,9 @@ void MappingButton::UpdateIndicator()
   if (!isActiveWindow())
     return;
 
-  const auto state = m_reference->State();
-
   QFont f = m_parent->font();
 
-  if (state > ControllerEmu::Buttons::ACTIVATION_THRESHOLD)
+  if (m_reference->GetState<bool>())
     f.setBold(true);
 
   setFont(f);
@@ -141,12 +149,6 @@ void MappingButton::mouseReleaseEvent(QMouseEvent* event)
 {
   switch (event->button())
   {
-  case Qt::MouseButton::LeftButton:
-    if (m_reference->IsInput())
-      QPushButton::mouseReleaseEvent(event);
-    else
-      AdvancedPressed();
-    return;
   case Qt::MouseButton::MidButton:
     Clear();
     return;
@@ -154,6 +156,7 @@ void MappingButton::mouseReleaseEvent(QMouseEvent* event)
     AdvancedPressed();
     return;
   default:
+    QPushButton::mouseReleaseEvent(event);
     return;
   }
 }

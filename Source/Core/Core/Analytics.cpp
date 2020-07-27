@@ -1,12 +1,13 @@
 #include "Core/Analytics.h"
 
 #include <array>
-#include <cinttypes>
-#include <mbedtls/sha1.h>
 #include <memory>
 #include <mutex>
 #include <string>
 #include <vector>
+
+#include <fmt/format.h>
+#include <mbedtls/sha1.h>
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -21,7 +22,6 @@
 #include "Common/CPUDetect.h"
 #include "Common/CommonTypes.h"
 #include "Common/Random.h"
-#include "Common/StringUtil.h"
 #include "Common/Timer.h"
 #include "Common/Version.h"
 #include "Core/Config/MainSettings.h"
@@ -53,14 +53,10 @@ DolphinAnalytics::DolphinAnalytics()
   MakeBaseBuilder();
 }
 
-std::shared_ptr<DolphinAnalytics> DolphinAnalytics::Instance()
+DolphinAnalytics& DolphinAnalytics::Instance()
 {
-  std::lock_guard lk{s_instance_mutex};
-  if (!s_instance)
-  {
-    s_instance.reset(new DolphinAnalytics());
-  }
-  return s_instance;
+  static DolphinAnalytics instance;
+  return instance;
 }
 
 void DolphinAnalytics::ReloadConfig()
@@ -91,7 +87,7 @@ void DolphinAnalytics::GenerateNewIdentity()
 {
   const u64 id_high = Common::Random::GenerateValue<u64>();
   const u64 id_low = Common::Random::GenerateValue<u64>();
-  m_unique_id = StringFromFormat("%016" PRIx64 "%016" PRIx64, id_high, id_low);
+  m_unique_id = fmt::format("{:016x}{:016x}", id_high, id_low);
 
   // Save the new id in the configuration.
   SConfig::GetInstance().m_analytics_id = m_unique_id;
@@ -108,7 +104,7 @@ std::string DolphinAnalytics::MakeUniqueId(std::string_view data) const
   std::string out;
   for (int i = 0; i < 8; ++i)
   {
-    out += StringFromFormat("%02hhx", digest[i]);
+    out += fmt::format("{:02x}", digest[i]);
   }
   return out;
 }
@@ -136,10 +132,18 @@ void DolphinAnalytics::ReportGameStart()
 }
 
 // Keep in sync with enum class GameQuirk definition.
-constexpr std::array<const char*, 2> GAME_QUIRKS_NAMES{
-    "icache-matters",
-    "directly-reads-wiimote-input",
-};
+constexpr std::array<const char*, 12> GAME_QUIRKS_NAMES{"icache-matters",
+                                                        "directly-reads-wiimote-input",
+                                                        "uses-DVDLowStopLaser",
+                                                        "uses-DVDLowOffset",
+                                                        "uses-DVDLowReadDiskBca",
+                                                        "uses-DVDLowRequestDiscStatus",
+                                                        "uses-DVDLowRequestRetryNumber",
+                                                        "uses-DVDLowSerMeasControl",
+                                                        "uses-different-partition-command",
+                                                        "uses-di-interrupt-command",
+                                                        "mismatched-gpu-texgens-between-xf-and-bp",
+                                                        "mismatched-gpu-colors-between-xf-and-bp"};
 static_assert(GAME_QUIRKS_NAMES.size() == static_cast<u32>(GameQuirk::COUNT),
               "Game quirks names and enum definition are out of sync.");
 

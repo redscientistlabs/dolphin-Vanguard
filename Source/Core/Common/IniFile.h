@@ -119,6 +119,7 @@ public:
 
   bool Save(const std::string& filename);
 
+  bool Exists(std::string_view section_name) const;
   // Returns true if key exists in section
   bool Exists(std::string_view section_name, std::string_view key) const;
 
@@ -143,8 +144,7 @@ public:
 
   bool GetKeys(std::string_view section_name, std::vector<std::string>* keys) const;
 
-  void SetLines(std::string_view section_name, const std::vector<std::string>& lines);
-  void SetLines(std::string_view section_name, std::vector<std::string>&& lines);
+  void SetLines(std::string_view section_name, std::vector<std::string> lines);
   bool GetLines(std::string_view section_name, std::vector<std::string>* lines,
                 bool remove_comments = true) const;
 
@@ -158,7 +158,7 @@ public:
   // This function is related to parsing data from lines of INI files
   // It's used outside of IniFile, which is why it is exposed publicly
   // In particular it is used in PostProcessing for its configuration
-  static void ParseLine(const std::string& line, std::string* keyOut, std::string* valueOut);
+  static void ParseLine(std::string_view line, std::string* keyOut, std::string* valueOut);
 
   const std::list<Section>& GetSections() const { return sections; }
 

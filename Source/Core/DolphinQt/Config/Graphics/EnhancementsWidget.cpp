@@ -20,12 +20,14 @@
 #include "DolphinQt/Config/Graphics/GraphicsSlider.h"
 #include "DolphinQt/Config/Graphics/GraphicsWindow.h"
 #include "DolphinQt/Config/Graphics/PostProcessingConfigWindow.h"
+#include "DolphinQt/QtUtils/ModalMessageBox.h"
 #include "DolphinQt/Settings.h"
 
 #include "UICommon/VideoUtils.h"
 
 #include "VideoCommon/PostProcessing.h"
 #include "VideoCommon/VideoBackendBase.h"
+#include "VideoCommon/VideoCommon.h"
 #include "VideoCommon/VideoConfig.h"
 
 EnhancementsWidget::EnhancementsWidget(GraphicsWindow* parent)
@@ -48,21 +50,29 @@ void EnhancementsWidget::CreateWidgets()
   auto* enhancements_layout = new QGridLayout();
   enhancements_box->setLayout(enhancements_layout);
 
-  m_ir_combo = new GraphicsChoice({tr("Auto (Multiple of 640x528)"), tr("Native (640x528)"),
-                                   tr("2x Native (1280x1056) for 720p"),
-                                   tr("3x Native (1920x1584) for 1080p"),
-                                   tr("4x Native (2560x2112) for 1440p"),
-                                   tr("5x Native (3200x2640)"), tr("6x Native (3840x3168) for 4K"),
-                                   tr("7x Native (4480x3696)"), tr("8x Native (5120x4224) for 5K")},
-                                  Config::GFX_EFB_SCALE);
+  // Only display the first 8 scales, which most users will not go beyond.
+  QStringList resolution_options{
+      tr("Auto (Multiple of 640x528)"),      tr("Native (640x528)"),
+      tr("2x Native (1280x1056) for 720p"),  tr("3x Native (1920x1584) for 1080p"),
+      tr("4x Native (2560x2112) for 1440p"), tr("5x Native (3200x2640)"),
+      tr("6x Native (3840x3168) for 4K"),    tr("7x Native (4480x3696)"),
+      tr("8x Native (5120x4224) for 5K")};
+  const int visible_resolution_option_count = static_cast<int>(resolution_options.size());
 
-  if (g_Config.iEFBScale > 8)
+  // If the current scale is greater than the max scale in the ini, add sufficient options so that
+  // when the settings are saved we don't lose the user-modified value from the ini.
+  const int max_efb_scale =
+      std::max(Config::Get(Config::GFX_EFB_SCALE), Config::Get(Config::GFX_MAX_EFB_SCALE));
+  for (int scale = static_cast<int>(resolution_options.size()); scale <= max_efb_scale; scale++)
   {
-    m_ir_combo->addItem(tr("Custom"));
-    m_ir_combo->setCurrentIndex(m_ir_combo->count() - 1);
+    resolution_options.append(tr("%1x Native (%2x%3)")
+                                  .arg(QString::number(scale),
+                                       QString::number(static_cast<int>(EFB_WIDTH) * scale),
+                                       QString::number(static_cast<int>(EFB_HEIGHT) * scale)));
   }
 
-  m_ir_combo->setMaxVisibleItems(m_ir_combo->count());
+  m_ir_combo = new GraphicsChoice(resolution_options, Config::GFX_EFB_SCALE);
+  m_ir_combo->setMaxVisibleItems(visible_resolution_option_count);
 
   m_aa_combo = new QComboBox();
   m_af_combo = new GraphicsChoice({tr("1x"), tr("2x"), tr("4x"), tr("8x"), tr("16x")},
@@ -112,8 +122,9 @@ void EnhancementsWidget::CreateWidgets()
   m_3d_mode = new GraphicsChoice({tr("Off"), tr("Side-by-Side"), tr("Top-and-Bottom"),
                                   tr("Anaglyph"), tr("HDMI 3D"), tr("Passive")},
                                  Config::GFX_STEREO_MODE);
-  m_3d_depth = new GraphicsSlider(0, 100, Config::GFX_STEREO_DEPTH);
-  m_3d_convergence = new GraphicsSlider(0, 200, Config::GFX_STEREO_CONVERGENCE, 100);
+  m_3d_depth = new GraphicsSlider(0, Config::GFX_STEREO_DEPTH_MAXIMUM, Config::GFX_STEREO_DEPTH);
+  m_3d_convergence = new GraphicsSlider(0, Config::GFX_STEREO_CONVERGENCE_MAXIMUM,
+                                        Config::GFX_STEREO_CONVERGENCE, 100);
   m_3d_swap_eyes = new GraphicsBool(tr("Swap Eyes"), Config::GFX_STEREO_SWAP_EYES);
 
   stereoscopy_layout->addWidget(new QLabel(tr("Stereoscopic 3D Mode:")), 0, 0);
@@ -133,19 +144,18 @@ void EnhancementsWidget::CreateWidgets()
 
 void EnhancementsWidget::ConnectWidgets()
 {
-  connect(m_aa_combo, static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
+  connect(m_aa_combo, qOverload<int>(&QComboBox::currentIndexChanged),
           [this](int) { SaveSettings(); });
-  connect(m_pp_effect, static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
+  connect(m_pp_effect, qOverload<int>(&QComboBox::currentIndexChanged),
           [this](int) { SaveSettings(); });
-  connect(m_3d_mode, static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
-          [this] {
-            m_block_save = true;
-            LoadPPShaders();
-            m_block_save = false;
+  connect(m_3d_mode, qOverload<int>(&QComboBox::currentIndexChanged), [this] {
+    m_block_save = true;
+    LoadPPShaders();
+    m_block_save = false;
 
-            SaveSettings();
-          });
-  connect(m_configure_pp_effect, &QPushButton::pressed, this,
+    SaveSettings();
+  });
+  connect(m_configure_pp_effect, &QPushButton::clicked, this,
           &EnhancementsWidget::ConfigurePostProcessingShader);
 }
 
@@ -189,7 +199,7 @@ void EnhancementsWidget::LoadPPShaders()
   m_pp_effect->setEnabled(supports_postprocessing);
 
   m_pp_effect->setToolTip(supports_postprocessing ?
-                              QStringLiteral("") :
+                              QString{} :
                               tr("%1 doesn't support this feature.")
                                   .arg(tr(g_video_backend->GetDisplayName().c_str())));
 
@@ -225,17 +235,7 @@ void EnhancementsWidget::LoadSettings()
   LoadPPShaders();
 
   // Stereoscopy
-  bool supports_stereoscopy = g_Config.backend_info.bSupportsGeometryShaders;
-  bool supports_3dvision = g_Config.backend_info.bSupports3DVision;
-
-  bool has_3dvision = m_3d_mode->count() == 7;
-
-  if (has_3dvision && !supports_3dvision)
-    m_3d_mode->removeItem(5);
-
-  if (!has_3dvision && supports_3dvision)
-    m_3d_mode->addItem(tr("NVIDIA 3D Vision"));
-
+  const bool supports_stereoscopy = g_Config.backend_info.bSupportsGeometryShaders;
   m_3d_mode->setEnabled(supports_stereoscopy);
   m_3d_convergence->setEnabled(supports_stereoscopy);
   m_3d_depth->setEnabled(supports_stereoscopy);

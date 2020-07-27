@@ -8,7 +8,6 @@
 #include <bitset>
 #include <cinttypes>
 #include <cstddef>
-#include <cstring>
 #include <map>
 #include <memory>
 #include <optional>
@@ -18,10 +17,10 @@
 #include <utility>
 #include <vector>
 
+#include <fmt/format.h>
 #include <pugixml.hpp>
 
 #include "Common/Assert.h"
-#include "Common/CommonPaths.h"
 #include "Common/CommonTypes.h"
 #include "Common/FileUtil.h"
 #include "Common/HttpRequest.h"
@@ -41,16 +40,16 @@
 #include "DiscIO/DiscExtractor.h"
 #include "DiscIO/Enums.h"
 #include "DiscIO/Filesystem.h"
-#include "DiscIO/Volume.h"
+#include "DiscIO/VolumeDisc.h"
 #include "DiscIO/VolumeFileBlobReader.h"
-#include "DiscIO/VolumeWii.h"
-#include "DiscIO/WiiWad.h"
+#include "DiscIO/VolumeWad.h"
 
 namespace WiiUtils
 {
-static bool ImportWAD(IOS::HLE::Kernel& ios, const DiscIO::WiiWAD& wad)
+static bool ImportWAD(IOS::HLE::Kernel& ios, const DiscIO::VolumeWAD& wad,
+                      IOS::HLE::Device::ES::VerifySignature verify_signature)
 {
-  if (!wad.IsValid())
+  if (!wad.GetTicket().IsValid() || !wad.GetTMD().IsValid())
   {
     PanicAlertT("WAD installation failed: The selected file is not a valid WAD.");
     return false;
@@ -61,29 +60,20 @@ static bool ImportWAD(IOS::HLE::Kernel& ios, const DiscIO::WiiWAD& wad)
 
   IOS::HLE::Device::ES::Context context;
   IOS::HLE::ReturnCode ret;
-  const bool checks_enabled = SConfig::GetInstance().m_enable_signature_checks;
 
-  IOS::ES::TicketReader ticket = wad.GetTicket();
   // Ensure the common key index is correct, as it's checked by IOS.
-  ticket.FixCommonKeyIndex();
+  IOS::ES::TicketReader ticket = wad.GetTicketWithFixedCommonKey();
 
   while ((ret = es->ImportTicket(ticket.GetBytes(), wad.GetCertificateChain(),
-                                 IOS::HLE::Device::ES::TicketImportType::Unpersonalised)) < 0 ||
-         (ret = es->ImportTitleInit(context, tmd.GetBytes(), wad.GetCertificateChain())) < 0)
+                                 IOS::HLE::Device::ES::TicketImportType::Unpersonalised,
+                                 verify_signature)) < 0 ||
+         (ret = es->ImportTitleInit(context, tmd.GetBytes(), wad.GetCertificateChain(),
+                                    verify_signature)) < 0)
   {
-    if (checks_enabled && ret == IOS::HLE::IOSC_FAIL_CHECKVALUE &&
-        AskYesNoT("This WAD has not been signed by Nintendo. Continue to import?"))
-    {
-      SConfig::GetInstance().m_enable_signature_checks = false;
-      continue;
-    }
-
     if (ret != IOS::HLE::IOSC_FAIL_CHECKVALUE)
       PanicAlertT("WAD installation failed: Could not initialise title import (error %d).", ret);
-    SConfig::GetInstance().m_enable_signature_checks = checks_enabled;
     return false;
   }
-  SConfig::GetInstance().m_enable_signature_checks = checks_enabled;
 
   const bool contents_imported = [&]() {
     const u64 title_id = tmd.GetTitleId();
@@ -112,7 +102,7 @@ static bool ImportWAD(IOS::HLE::Kernel& ios, const DiscIO::WiiWAD& wad)
   return true;
 }
 
-bool InstallWAD(IOS::HLE::Kernel& ios, const DiscIO::WiiWAD& wad, InstallType install_type)
+bool InstallWAD(IOS::HLE::Kernel& ios, const DiscIO::VolumeWAD& wad, InstallType install_type)
 {
   if (!wad.GetTMD().IsValid())
     return false;
@@ -151,7 +141,8 @@ bool InstallWAD(IOS::HLE::Kernel& ios, const DiscIO::WiiWAD& wad, InstallType in
   if (previous_temporary_title_id)
     ios.GetES()->DeleteTitleContent(previous_temporary_title_id);
 
-  if (!ImportWAD(ios, wad))
+  // A lot of people use fakesigned WADs, so disable signature checking when installing a WAD.
+  if (!ImportWAD(ios, wad, IOS::HLE::Device::ES::VerifySignature::No))
     return false;
 
   // Keep track of the title ID so this title can be removed to make room for any future install.
@@ -166,8 +157,12 @@ bool InstallWAD(IOS::HLE::Kernel& ios, const DiscIO::WiiWAD& wad, InstallType in
 
 bool InstallWAD(const std::string& wad_path)
 {
+  std::unique_ptr<DiscIO::VolumeWAD> wad = DiscIO::CreateWAD(wad_path);
+  if (!wad)
+    return false;
+
   IOS::HLE::Kernel ios;
-  return InstallWAD(ios, DiscIO::WiiWAD{wad_path}, InstallType::Permanent);
+  return InstallWAD(ios, *wad, InstallType::Permanent);
 }
 
 bool UninstallTitle(u64 title_id)
@@ -232,7 +227,7 @@ std::string SystemUpdater::GetDeviceId()
   u32 ios_device_id;
   if (m_ios.GetES()->GetDeviceId(&ios_device_id) < 0)
     return "";
-  return StringFromFormat("%" PRIu64, (u64(1) << 32) | ios_device_id);
+  return std::to_string((u64(1) << 32) | ios_device_id);
 }
 
 class OnlineSystemUpdater final : public SystemUpdater
@@ -531,10 +526,9 @@ UpdateResult OnlineSystemUpdater::InstallTitleFromNUS(const std::string& prefix_
 std::pair<IOS::ES::TMDReader, std::vector<u8>>
 OnlineSystemUpdater::DownloadTMD(const std::string& prefix_url, const TitleInfo& title)
 {
-  const std::string url =
-      (title.version == 0) ?
-          prefix_url + StringFromFormat("/%016" PRIx64 "/tmd", title.id) :
-          prefix_url + StringFromFormat("/%016" PRIx64 "/tmd.%u", title.id, title.version);
+  const std::string url = (title.version == 0) ?
+                              fmt::format("{}/{:016x}/tmd", prefix_url, title.id) :
+                              fmt::format("{}/{:016x}/tmd.{}", prefix_url, title.id, title.version);
   const Common::HttpRequest::Response response = m_http.Get(url);
   if (!response)
     return {};
@@ -559,7 +553,7 @@ OnlineSystemUpdater::DownloadTMD(const std::string& prefix_url, const TitleInfo&
 std::pair<std::vector<u8>, std::vector<u8>>
 OnlineSystemUpdater::DownloadTicket(const std::string& prefix_url, const TitleInfo& title)
 {
-  const std::string url = prefix_url + StringFromFormat("/%016" PRIx64 "/cetk", title.id);
+  const std::string url = fmt::format("{}/{:016x}/cetk", prefix_url, title.id);
   const Common::HttpRequest::Response response = m_http.Get(url);
   if (!response)
     return {};
@@ -576,7 +570,7 @@ OnlineSystemUpdater::DownloadTicket(const std::string& prefix_url, const TitleIn
 std::optional<std::vector<u8>> OnlineSystemUpdater::DownloadContent(const std::string& prefix_url,
                                                                     const TitleInfo& title, u32 cid)
 {
-  const std::string url = prefix_url + StringFromFormat("/%016" PRIx64 "/%08x", title.id, cid);
+  const std::string url = fmt::format("{}/{:016x}/{:08x}", prefix_url, title.id, cid);
   return m_http.Get(url);
 }
 
@@ -584,8 +578,7 @@ class DiscSystemUpdater final : public SystemUpdater
 {
 public:
   DiscSystemUpdater(UpdateCallback update_callback, const std::string& image_path)
-      : m_update_callback{std::move(update_callback)}, m_volume{DiscIO::CreateVolumeFromFilename(
-                                                           image_path)}
+      : m_update_callback{std::move(update_callback)}, m_volume{DiscIO::CreateDisc(image_path)}
   {
   }
   UpdateResult DoDiscUpdate();
@@ -624,7 +617,7 @@ private:
                             std::string_view path);
 
   UpdateCallback m_update_callback;
-  std::unique_ptr<DiscIO::Volume> m_volume;
+  std::unique_ptr<DiscIO::VolumeDisc> m_volume;
   DiscIO::Partition m_partition;
 };
 
@@ -738,8 +731,9 @@ UpdateResult DiscSystemUpdater::ProcessEntry(u32 type, std::bitset<32> attrs,
     ERROR_LOG(CORE, "Could not find %s", std::string(path).c_str());
     return UpdateResult::DiscReadFailed;
   }
-  const DiscIO::WiiWAD wad{std::move(blob)};
-  return ImportWAD(m_ios, wad) ? UpdateResult::Succeeded : UpdateResult::ImportFailed;
+  const DiscIO::VolumeWAD wad{std::move(blob)};
+  const bool success = ImportWAD(m_ios, wad, IOS::HLE::Device::ES::VerifySignature::Yes);
+  return success ? UpdateResult::Succeeded : UpdateResult::ImportFailed;
 }
 
 UpdateResult DoOnlineUpdate(UpdateCallback update_callback, const std::string& region)
@@ -767,6 +761,18 @@ static NANDCheckResult CheckNAND(IOS::HLE::Kernel& ios, bool repair)
     ERROR_LOG(CORE, "CheckNAND: NAND was used with old versions, so it is likely to be damaged");
     if (repair)
       File::Delete(sys_replace_path);
+    else
+      result.bad = true;
+  }
+
+  // Clean up after a bug fixed in https://github.com/dolphin-emu/dolphin/pull/8802
+  const std::string rfl_db_path = Common::GetMiiDatabasePath(Common::FROM_CONFIGURED_ROOT);
+  const File::FileInfo rfl_db(rfl_db_path);
+  if (rfl_db.Exists() && rfl_db.GetSize() == 0)
+  {
+    ERROR_LOG(CORE, "CheckNAND: RFL_DB.dat exists but is empty");
+    if (repair)
+      File::Delete(rfl_db_path);
     else
       result.bad = true;
   }

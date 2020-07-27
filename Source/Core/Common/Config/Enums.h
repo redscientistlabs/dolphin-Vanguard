@@ -32,6 +32,7 @@ enum class System
   GFX,
   Logger,
   Debugger,
+  DualShockUDPClient,
 };
 
 constexpr std::array<LayerType, 8> SEARCH_ORDER{{

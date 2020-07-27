@@ -7,7 +7,6 @@
 #include <array>
 
 #include <QApplication>
-#include <QDesktopWidget>
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QFileInfo>
@@ -19,6 +18,7 @@
 #include <QPalette>
 #include <QScreen>
 #include <QTimer>
+#include <QWindow>
 
 #include "imgui.h"
 
@@ -32,6 +32,7 @@
 #include "DolphinQt/Resources.h"
 #include "DolphinQt/Settings.h"
 
+#include "VideoCommon/FreeLookCamera.h"
 #include "VideoCommon/RenderBase.h"
 #include "VideoCommon/VertexShaderManager.h"
 #include "VideoCommon/VideoConfig.h"
@@ -40,10 +41,11 @@ RenderWidget::RenderWidget(QWidget* parent) : QWidget(parent)
 {
   setWindowTitle(QStringLiteral("Dolphin"));
   setWindowIcon(Resources::GetAppIcon());
+  setWindowRole(QStringLiteral("renderer"));
   setAcceptDrops(true);
 
   QPalette p;
-  p.setColor(QPalette::Background, Qt::black);
+  p.setColor(QPalette::Window, Qt::black);
   setPalette(p);
 
   connect(Host::GetInstance(), &Host::RequestTitle, this, &RenderWidget::setWindowTitle);
@@ -51,13 +53,12 @@ RenderWidget::RenderWidget(QWidget* parent) : QWidget(parent)
     if (!Config::Get(Config::MAIN_RENDER_WINDOW_AUTOSIZE) || isFullScreen() || isMaximized())
       return;
 
-    resize(w, h);
+    const auto dpr = window()->windowHandle()->screen()->devicePixelRatio();
+
+    resize(w / dpr, h / dpr);
   });
 
   connect(&Settings::Instance(), &Settings::EmulationStateChanged, this, [this](Core::State state) {
-    // Stop filling the background once emulation starts, but fill it until then (Bug 10958)
-    SetFillBackground(Config::Get(Config::MAIN_RENDER_TO_MAIN) &&
-                      state == Core::State::Uninitialized);
     if (state == Core::State::Running)
       SetImGuiKeyMap();
   });
@@ -88,21 +89,12 @@ RenderWidget::RenderWidget(QWidget* parent) : QWidget(parent)
 
   // We need a native window to render into.
   setAttribute(Qt::WA_NativeWindow);
-
-  SetFillBackground(true);
-}
-
-void RenderWidget::SetFillBackground(bool fill)
-{
-  setAutoFillBackground(fill);
-  setAttribute(Qt::WA_OpaquePaintEvent, !fill);
-  setAttribute(Qt::WA_NoSystemBackground, !fill);
-  setAttribute(Qt::WA_PaintOnScreen, !fill);
+  setAttribute(Qt::WA_PaintOnScreen);
 }
 
 QPaintEngine* RenderWidget::paintEngine() const
 {
-  return autoFillBackground() ? QWidget::paintEngine() : nullptr;
+  return nullptr;
 }
 
 void RenderWidget::dragEnterEvent(QDragEnterEvent* event)
@@ -162,8 +154,9 @@ void RenderWidget::showFullScreen()
 {
   QWidget::showFullScreen();
 
-  const auto dpr =
-      QGuiApplication::screens()[QApplication::desktop()->screenNumber(this)]->devicePixelRatio();
+  QScreen* screen = window()->windowHandle()->screen();
+
+  const auto dpr = screen->devicePixelRatio();
 
   emit SizeChanged(width() * dpr, height() * dpr);
 }
@@ -174,8 +167,6 @@ bool RenderWidget::event(QEvent* event)
 
   switch (event->type())
   {
-  case QEvent::Paint:
-    return !autoFillBackground();
   case QEvent::KeyPress:
   {
     QKeyEvent* ke = static_cast<QKeyEvent*>(event);
@@ -221,14 +212,9 @@ bool RenderWidget::event(QEvent* event)
     const QResizeEvent* se = static_cast<QResizeEvent*>(event);
     QSize new_size = se->size();
 
-    auto* desktop = QApplication::desktop();
+    QScreen* screen = window()->windowHandle()->screen();
 
-    int screen_nr = desktop->screenNumber(this);
-
-    if (screen_nr == -1)
-      screen_nr = desktop->screenNumber(parentWidget());
-
-    const auto dpr = desktop->screen(screen_nr)->devicePixelRatio();
+    const auto dpr = screen->devicePixelRatio();
 
     emit SizeChanged(new_size.width() * dpr, new_size.height() * dpr);
     break;
@@ -253,12 +239,12 @@ void RenderWidget::OnFreeLookMouseMove(QMouseEvent* event)
   if (event->buttons() & Qt::RightButton)
   {
     // Camera Pitch and Yaw:
-    VertexShaderManager::RotateView(mouse_move.y() / 200.f, mouse_move.x() / 200.f, 0.f);
+    g_freelook_camera.Rotate(Common::Vec3{mouse_move.y() / 200.f, mouse_move.x() / 200.f, 0.f});
   }
   else if (event->buttons() & Qt::MidButton)
   {
     // Camera Roll:
-    VertexShaderManager::RotateView(0.f, 0.f, mouse_move.x() / 200.f);
+    g_freelook_camera.Rotate({0.f, 0.f, mouse_move.x() / 200.f});
   }
 }
 
@@ -345,6 +331,7 @@ void RenderWidget::SetImGuiKeyMap()
       {ImGuiKey_Z, Qt::Key_Z},
   }};
   auto lock = g_renderer->GetImGuiLock();
-  for (auto entry : key_map)
-    ImGui::GetIO().KeyMap[entry[0]] = entry[1] & 0x1FF;
+
+  for (auto [imgui_key, qt_key] : key_map)
+    ImGui::GetIO().KeyMap[imgui_key] = (qt_key & 0x1FF);
 }

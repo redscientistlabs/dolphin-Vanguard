@@ -16,15 +16,16 @@
 #include <vector>
 
 #include "Common/CommonTypes.h"
+#include "Common/MathUtil.h"
 #include "VideoCommon/AbstractTexture.h"
 #include "VideoCommon/BPMemory.h"
 #include "VideoCommon/TextureConfig.h"
 #include "VideoCommon/TextureDecoder.h"
-#include "VideoCommon/VideoCommon.h"
 
-struct VideoConfig;
 class AbstractFramebuffer;
 class AbstractStagingTexture;
+class PointerWrap;
+struct VideoConfig;
 
 struct TextureAndTLUTFormat
 {
@@ -185,6 +186,17 @@ public:
     u32 GetNumLevels() const { return texture->GetConfig().levels; }
     u32 GetNumLayers() const { return texture->GetConfig().layers; }
     AbstractTextureFormat GetFormat() const { return texture->GetConfig().format; }
+    void DoState(PointerWrap& p);
+  };
+
+  // Minimal version of TCacheEntry just for TexPool
+  struct TexPoolEntry
+  {
+    std::unique_ptr<AbstractTexture> texture;
+    std::unique_ptr<AbstractFramebuffer> framebuffer;
+    int frameCount = FRAMECOUNT_INVALID;
+
+    TexPoolEntry(std::unique_ptr<AbstractTexture> tex, std::unique_ptr<AbstractFramebuffer> fb);
   };
 
   TextureCacheBase();
@@ -192,7 +204,7 @@ public:
 
   bool Initialize();
 
-  void OnConfigChanged(VideoConfig& config);
+  void OnConfigChanged(const VideoConfig& config);
 
   // Removes textures which aren't used for more than TEXTURE_KILL_THRESHOLD frames,
   // frameCount is the current frame number.
@@ -224,14 +236,17 @@ public:
   // Flushes all pending EFB copies to emulated RAM.
   void FlushEFBCopies();
 
+  // Texture Serialization
+  void SerializeTexture(AbstractTexture* tex, const TextureConfig& config, PointerWrap& p);
+  std::optional<TexPoolEntry> DeserializeTexture(PointerWrap& p);
+
+  // Save States
+  void DoState(PointerWrap& p);
+
   // Returns false if the top/bottom row coefficients are zero.
   static bool NeedsCopyFilterInShader(const EFBCopyFilterCoefficients& coefficients);
 
 protected:
-  // Applies a palette to an EFB copy/texture.
-  bool ConvertTexture(TCacheEntry* entry, TCacheEntry* unconverted, const void* palette,
-                      TLUTFormat format);
-
   // Decodes the specified data to the GPU texture specified by entry.
   // Returns false if the configuration is not supported.
   // width, height are the size of the image in pixels.
@@ -260,15 +275,6 @@ protected:
   static std::bitset<8> valid_bind_points;
 
 private:
-  // Minimal version of TCacheEntry just for TexPool
-  struct TexPoolEntry
-  {
-    std::unique_ptr<AbstractTexture> texture;
-    std::unique_ptr<AbstractFramebuffer> framebuffer;
-    int frameCount = FRAMECOUNT_INVALID;
-
-    TexPoolEntry(std::unique_ptr<AbstractTexture> tex, std::unique_ptr<AbstractFramebuffer> fb);
-  };
   using TexAddrCache = std::multimap<u32, TCacheEntry*>;
   using TexHashCache = std::multimap<u64, TCacheEntry*>;
   using TexPool = std::unordered_multimap<TextureConfig, TexPoolEntry>;
@@ -280,6 +286,8 @@ private:
   TCacheEntry* GetXFBFromCache(u32 address, u32 width, u32 height, u32 stride, u64 hash);
 
   TCacheEntry* ApplyPaletteToEntry(TCacheEntry* entry, u8* palette, TLUTFormat tlutfmt);
+
+  TCacheEntry* ReinterpretEntry(const TCacheEntry* existing_entry, TextureFormat new_format);
 
   TCacheEntry* DoPartialTextureUpdates(TCacheEntry* entry_to_update, u8* palette,
                                        TLUTFormat tlutfmt);
@@ -321,6 +329,10 @@ private:
   // Returns an EFB copy staging texture to the pool, so it can be re-used.
   void ReleaseEFBCopyStagingTexture(std::unique_ptr<AbstractStagingTexture> tex);
 
+  bool CheckReadbackTexture(u32 width, u32 height, AbstractTextureFormat format);
+  void DoSaveState(PointerWrap& p);
+  void DoLoadState(PointerWrap& p);
+
   TexAddrCache textures_by_address;
   TexHashCache textures_by_hash;
   TexPool texture_pool;
@@ -356,6 +368,11 @@ private:
   // List of pending EFB copies. It is important that the order is preserved for these,
   // so that overlapping textures are written to guest RAM in the order they are issued.
   std::vector<TCacheEntry*> m_pending_efb_copies;
+
+  // Staging texture used for readbacks.
+  // We store this in the class so that the same staging texture can be used for multiple
+  // readbacks, saving the overhead of allocating a new buffer every time.
+  std::unique_ptr<AbstractStagingTexture> m_readback_texture;
 };
 
 extern std::unique_ptr<TextureCacheBase> g_texture_cache;

@@ -41,12 +41,12 @@ void AbstractStagingTexture::ReadTexels(const MathUtil::Rectangle<int>& rect, vo
   if (!PrepareForAccess())
     return;
 
-  // Narrysmod - Assert to return
+  // Vanguard - Assert to return
   if (!(rect.left >= 0 && static_cast<u32>(rect.right) <= m_config.width && rect.top >= 0 &&
       static_cast<u32>(rect.bottom) <= m_config.height))
   {
     std::string log_message = StringFromFormat("BAD READTEXELS");
-    GENERIC_LOG(LogTypes::COMMON, LogTypes::LERROR, "%s", log_message.c_str());
+    ERROR_LOG(COMMON, "%s", log_message.c_str());
     return;
   }
 
@@ -80,7 +80,7 @@ void AbstractStagingTexture::ReadTexel(u32 x, u32 y, void* out_ptr)
   if (!PrepareForAccess())
     return;
 
-  // Narrysmod - Assert to return
+  // Vanguard - Assert to return
   if (!(x < m_config.width && y < m_config.height))
     return;
 
@@ -100,7 +100,7 @@ void AbstractStagingTexture::WriteTexels(const MathUtil::Rectangle<int>& rect, c
       static_cast<u32>(rect.bottom) <= m_config.height))
   {
     std::string log_message = StringFromFormat("BAD WRITETEXELS");
-    GENERIC_LOG(LogTypes::COMMON, LogTypes::LERROR, "%s", log_message.c_str());
+    ERROR_LOG(COMMON, "%s", log_message.c_str());
     return;
   }
 
@@ -133,7 +133,7 @@ void AbstractStagingTexture::WriteTexel(u32 x, u32 y, const void* in_ptr)
   if (!PrepareForAccess())
     return;
 
-  //Narrysmod - Assert to return
+  //Vanguard - Assert to return
   if (!(x < m_config.width && y < m_config.height))
     return;
 

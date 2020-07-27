@@ -31,6 +31,7 @@ enum
   D_MAPS_IDX,
   D_CACHE_IDX,
   D_COVERCACHE_IDX,
+  D_REDUMPCACHE_IDX,
   D_SHADERCACHE_IDX,
   D_SHADERS_IDX,
   D_STATESAVES_IDX,
@@ -69,6 +70,7 @@ enum
   F_MEMORYWATCHERLOCATIONS_IDX,
   F_MEMORYWATCHERSOCKET_IDX,
   F_WIISDCARD_IDX,
+  F_DUALSHOCKUDPCLIENTCONFIG_IDX,
   NUM_PATH_INDICES
 };
 
@@ -172,7 +174,7 @@ bool SetCurrentDir(const std::string& directory);
 std::string CreateTempDir();
 
 // Get a filename that can hopefully be atomically renamed to the given path.
-std::string GetTempFilenameForAtomicWrite(const std::string& path);
+std::string GetTempFilenameForAtomicWrite(std::string path);
 
 // Gets a set user directory path
 // Don't call prior to setting the base user directory

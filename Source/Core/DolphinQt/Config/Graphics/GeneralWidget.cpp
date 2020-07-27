@@ -38,7 +38,7 @@ GeneralWidget::GeneralWidget(X11Utils::XRRConfiguration* xrr_config, GraphicsWin
   LoadSettings();
   ConnectWidgets();
   AddDescriptions();
-  emit BackendChanged(QString::fromStdString(SConfig::GetInstance().m_strVideoBackend));
+  emit BackendChanged(QString::fromStdString(Config::Get(Config::MAIN_GFX_BACKEND)));
 
   connect(parent, &GraphicsWindow::BackendChanged, this, &GeneralWidget::OnBackendChanged);
   connect(&Settings::Instance(), &Settings::EmulationStateChanged, this,
@@ -97,23 +97,23 @@ void GeneralWidget::CreateWidgets()
   m_options_box->setLayout(m_options_layout);
 
   m_options_layout->addWidget(m_show_fps, 0, 0);
-  m_options_layout->addWidget(m_show_ping, 0, 1);
+  m_options_layout->addWidget(m_log_render_time, 0, 1);
 
-  m_options_layout->addWidget(m_log_render_time, 1, 0);
+  m_options_layout->addWidget(m_render_main_window, 1, 0);
   m_options_layout->addWidget(m_autoadjust_window_size, 1, 1);
 
   m_options_layout->addWidget(m_show_messages, 2, 0);
-  m_options_layout->addWidget(m_render_main_window, 2, 1);
+  m_options_layout->addWidget(m_show_ping, 2, 1);
 
   // Other
   auto* shader_compilation_box = new QGroupBox(tr("Shader Compilation"));
   auto* shader_compilation_layout = new QGridLayout();
 
   const std::array<const char*, 4> modes = {{
-      "Synchronous",
-      "Synchronous (Ubershaders)",
-      "Asynchronous (Ubershaders)",
-      "Asynchronous (Skip Drawing)",
+      QT_TR_NOOP("Synchronous"),
+      QT_TR_NOOP("Synchronous (Ubershaders)"),
+      QT_TR_NOOP("Asynchronous (Ubershaders)"),
+      QT_TR_NOOP("Asynchronous (Skip Drawing)"),
   }};
   for (size_t i = 0; i < modes.size(); i++)
   {
@@ -138,43 +138,42 @@ void GeneralWidget::CreateWidgets()
 void GeneralWidget::ConnectWidgets()
 {
   // Video Backend
-  connect(m_backend_combo, static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
-          this, &GeneralWidget::SaveSettings);
-  connect(m_adapter_combo, static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
-          this, [](int index) {
-            g_Config.iAdapter = index;
-            Config::SetBaseOrCurrent(Config::GFX_ADAPTER, index);
-          });
+  connect(m_backend_combo, qOverload<int>(&QComboBox::currentIndexChanged), this,
+          &GeneralWidget::SaveSettings);
+  connect(m_adapter_combo, qOverload<int>(&QComboBox::currentIndexChanged), this, [](int index) {
+    g_Config.iAdapter = index;
+    Config::SetBaseOrCurrent(Config::GFX_ADAPTER, index);
+  });
 }
 
 void GeneralWidget::LoadSettings()
 {
   // Video Backend
   m_backend_combo->setCurrentIndex(m_backend_combo->findData(
-      QVariant(QString::fromStdString(SConfig::GetInstance().m_strVideoBackend))));
+      QVariant(QString::fromStdString(Config::Get(Config::MAIN_GFX_BACKEND)))));
 }
 
 void GeneralWidget::SaveSettings()
 {
   // Video Backend
   const auto current_backend = m_backend_combo->currentData().toString().toStdString();
-  if (SConfig::GetInstance().m_strVideoBackend != current_backend)
+  if (Config::Get(Config::MAIN_GFX_BACKEND) != current_backend)
   {
-    if (current_backend == "Software Renderer")
+    auto warningMessage =
+        g_available_video_backends[m_backend_combo->currentIndex()]->GetWarningMessage();
+    if (warningMessage)
     {
       ModalMessageBox confirm_sw(this);
 
       confirm_sw.setIcon(QMessageBox::Warning);
       confirm_sw.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
       confirm_sw.setWindowTitle(tr("Confirm backend change"));
-      confirm_sw.setText(tr("The software renderer is significantly slower than other "
-                            "backends and is only recommended for debugging purposes.\n\nDo you "
-                            "really want to enable software rendering? If unsure, select 'No'."));
+      confirm_sw.setText(tr(warningMessage->c_str()));
 
       if (confirm_sw.exec() != QMessageBox::Yes)
       {
         m_backend_combo->setCurrentIndex(m_backend_combo->findData(
-            QVariant(QString::fromStdString(SConfig::GetInstance().m_strVideoBackend))));
+            QVariant(QString::fromStdString(Config::Get(Config::MAIN_GFX_BACKEND)))));
         return;
       }
     }
@@ -187,7 +186,8 @@ void GeneralWidget::OnEmulationStateChanged(bool running)
   m_backend_combo->setEnabled(!running);
   m_render_main_window->setEnabled(!running);
 
-  m_adapter_combo->setEnabled(!running);
+  const bool supports_adapters = !g_Config.backend_info.Adapters.empty();
+  m_adapter_combo->setEnabled(!running && supports_adapters);
 }
 
 void GeneralWidget::AddDescriptions()
@@ -299,7 +299,7 @@ void GeneralWidget::OnBackendChanged(const QString& backend_name)
   m_adapter_combo->setEnabled(supports_adapters && !Core::IsRunning());
 
   m_adapter_combo->setToolTip(supports_adapters ?
-                                  QStringLiteral("") :
+                                  QString{} :
                                   tr("%1 doesn't support this feature.")
                                       .arg(tr(g_video_backend->GetDisplayName().c_str())));
 }

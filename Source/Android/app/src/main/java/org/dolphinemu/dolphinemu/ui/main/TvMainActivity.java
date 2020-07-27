@@ -3,15 +3,17 @@ package org.dolphinemu.dolphinemu.ui.main;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
-import android.support.v17.leanback.app.BrowseFragment;
-import android.support.v17.leanback.app.BrowseSupportFragment;
-import android.support.v17.leanback.widget.ArrayObjectAdapter;
-import android.support.v17.leanback.widget.HeaderItem;
-import android.support.v17.leanback.widget.ListRow;
-import android.support.v17.leanback.widget.ListRowPresenter;
-import android.support.v4.app.FragmentActivity;
-import android.support.v4.app.FragmentManager;
-import android.support.v4.content.ContextCompat;
+
+import androidx.annotation.NonNull;
+import androidx.leanback.app.BrowseSupportFragment;
+import androidx.leanback.widget.ArrayObjectAdapter;
+import androidx.leanback.widget.HeaderItem;
+import androidx.leanback.widget.ListRow;
+import androidx.leanback.widget.ListRowPresenter;
+import androidx.fragment.app.FragmentActivity;
+import androidx.fragment.app.FragmentManager;
+import androidx.core.content.ContextCompat;
+
 import android.widget.Toast;
 
 import org.dolphinemu.dolphinemu.R;
@@ -56,8 +58,6 @@ public final class TvMainActivity extends FragmentActivity implements MainView
     {
       StartupHandler.HandleInit(this);
     }
-    // Setup and/or sync channels
-    TvUtil.scheduleSyncingChannel(getApplicationContext());
   }
 
   @Override
@@ -65,6 +65,7 @@ public final class TvMainActivity extends FragmentActivity implements MainView
   {
     super.onResume();
     mPresenter.addDirIfNeeded(this);
+    GameFileCacheService.startRescan(this);
   }
 
   @Override
@@ -98,7 +99,7 @@ public final class TvMainActivity extends FragmentActivity implements MainView
             .commit();
 
     // Set display parameters for the BrowseFragment
-    mBrowseFragment.setHeadersState(BrowseFragment.HEADERS_ENABLED);
+    mBrowseFragment.setHeadersState(BrowseSupportFragment.HEADERS_ENABLED);
     mBrowseFragment.setBrandColor(ContextCompat.getColor(this, R.color.dolphin_blue_dark));
     buildRowsAdapter();
 
@@ -140,7 +141,21 @@ public final class TvMainActivity extends FragmentActivity implements MainView
   @Override
   public void launchFileListActivity()
   {
-    FileBrowserHelper.openDirectoryPicker(this);
+    FileBrowserHelper.openDirectoryPicker(this, FileBrowserHelper.GAME_EXTENSIONS);
+  }
+
+  @Override
+  public void launchOpenFileActivity()
+  {
+    FileBrowserHelper.openFilePicker(this, MainPresenter.REQUEST_GAME_FILE, false,
+            FileBrowserHelper.GAME_EXTENSIONS);
+  }
+
+  @Override
+  public void launchInstallWAD()
+  {
+    FileBrowserHelper.openFilePicker(this, MainPresenter.REQUEST_WAD_FILE, false,
+            FileBrowserHelper.WAD_EXTENSION);
   }
 
   @Override
@@ -162,20 +177,38 @@ public final class TvMainActivity extends FragmentActivity implements MainView
   @Override
   protected void onActivityResult(int requestCode, int resultCode, Intent result)
   {
+    super.onActivityResult(requestCode, resultCode, result);
     switch (requestCode)
     {
-      case MainPresenter.REQUEST_ADD_DIRECTORY:
+      case MainPresenter.REQUEST_DIRECTORY:
         // If the user picked a file, as opposed to just backing out.
         if (resultCode == MainActivity.RESULT_OK)
         {
-          mPresenter.onDirectorySelected(FileBrowserHelper.getSelectedDirectory(result));
+          mPresenter.onDirectorySelected(FileBrowserHelper.getSelectedPath(result));
+        }
+        break;
+
+      case MainPresenter.REQUEST_GAME_FILE:
+        // If the user picked a file, as opposed to just backing out.
+        if (resultCode == MainActivity.RESULT_OK)
+        {
+          EmulationActivity.launchFile(this, FileBrowserHelper.getSelectedFiles(result));
+        }
+        break;
+
+      case MainPresenter.REQUEST_WAD_FILE:
+        // If the user picked a file, as opposed to just backing out.
+        if (resultCode == MainActivity.RESULT_OK)
+        {
+          mPresenter.installWAD(FileBrowserHelper.getSelectedPath(result));
         }
         break;
     }
   }
 
   @Override
-  public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults)
+  public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
+          @NonNull int[] grantResults)
   {
     switch (requestCode)
     {
@@ -268,6 +301,14 @@ public final class TvMainActivity extends FragmentActivity implements MainView
     rowItems.add(new TvSettingsItem(R.id.menu_refresh,
             R.drawable.ic_refresh_tv,
             R.string.grid_menu_refresh));
+
+    rowItems.add(new TvSettingsItem(R.id.menu_open_file,
+            R.drawable.ic_play,
+            R.string.grid_menu_open_file));
+
+    rowItems.add(new TvSettingsItem(R.id.menu_install_wad,
+            R.drawable.ic_folder,
+            R.string.grid_menu_install_wad));
 
     // Create a header for this row.
     HeaderItem header =

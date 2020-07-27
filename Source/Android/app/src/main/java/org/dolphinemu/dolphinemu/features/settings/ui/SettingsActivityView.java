@@ -69,8 +69,10 @@ public interface SettingsActivityView
   /**
    * Called by a containing Fragment to tell the Activity that a setting was changed;
    * unless this has been called, the Activity will not save to disk.
+   *
+   * @param key Key of the modified setting.
    */
-  void onSettingChanged();
+  void onSettingChanged(String key);
 
   /**
    * Called by a containing Fragment to tell the containing Activity that a GCPad's setting
@@ -118,6 +120,11 @@ public interface SettingsActivityView
    * Show a hint to the user that the app needs the external storage to be mounted
    */
   void showExternalStorageNotMountedHint();
+
+  /**
+   * Tell the user that there is junk in the game INI and ask if they want to delete the whole file.
+   */
+  void showGameIniJunkDeletionQuestion();
 
   /**
    * Start the DirectoryInitialization and listen for the result.
