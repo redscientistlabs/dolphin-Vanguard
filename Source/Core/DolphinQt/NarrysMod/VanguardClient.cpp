@@ -634,8 +634,11 @@ void VanguardClient::OnMessageReceived(Object ^ sender, NetCoreEventArgs ^ e)
     {
       VanguardSettingsWrapper ^ settings = GetConfigFromJson(settingStr);
       if (settings != nullptr)
-        AddLayer(ConfigLoaders::GenerateVanguardConfigLoader(
-            &VanguardSettings::GetVanguardSettingFromVanguardSettingsWrapper(settings)));
+      {
+        auto _settings = VanguardSettings::GetVanguardSettingFromVanguardSettingsWrapper(settings);
+        AddLayer(ConfigLoaders::GenerateVanguardConfigLoader(&_settings));
+      }
+        
     }
     e->setReturnValue(LoadState(converted_path));
   }
