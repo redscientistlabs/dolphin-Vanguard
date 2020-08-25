@@ -27,6 +27,7 @@ using namespace cli;
 using namespace System;
 using namespace Text;
 using namespace RTCV;
+using namespace RTCV::CorruptCore::Extensions;
 using namespace NetCore;
 using namespace CorruptCore;
 using namespace Vanguard;
@@ -651,7 +652,7 @@ void VanguardClient::OnMessageReceived(Object ^ sender, NetCoreEventArgs ^ e)
         Helpers::utf8StringToSystemString(SConfig::GetInstance().GetTitleDescription());
 
     char replaceChar = L'-';
-    String ^ prefix = CorruptCore_Extensions::MakeSafeFilename(gameName, replaceChar);
+    String ^ prefix = StringExtensions::MakeSafeFilename(gameName, replaceChar);
     prefix = prefix->Substring(prefix->LastIndexOf('\\') + 1);
 
     String ^ path = nullptr;
