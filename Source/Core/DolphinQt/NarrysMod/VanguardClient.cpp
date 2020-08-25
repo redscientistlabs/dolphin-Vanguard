@@ -424,7 +424,7 @@ void VanguardClientUnmanaged::LOAD_GAME_DONE()
         Helpers::utf8StringToSystemString(SConfig::GetInstance().GetTitleDescription());
 
     char replaceChar = L'-';
-    gameDone->Set(VSPEC::GAMENAME, CorruptCore_Extensions::MakeSafeFilename(gameName, replaceChar));
+    gameDone->Set(VSPEC::GAMENAME, StringExtensions::MakeSafeFilename(gameName, replaceChar));
 
     String ^ syncsettings =
         VanguardClient::GetConfigAsJson(VanguardSettings::GetVanguardSettingsFromDolphin());
