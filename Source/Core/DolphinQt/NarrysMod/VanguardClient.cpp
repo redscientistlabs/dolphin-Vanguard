@@ -440,7 +440,7 @@ void VanguardClientUnmanaged::LOAD_GAME_DONE()
                                 NetcoreCommands::RESET_GAME_PROTECTION_IF_RUNNING, true);
     }
 
-    RtcCore::LOAD_GAME_DONE();
+    RtcCore::InvokeLoadGameDone();
   }
   catch (Exception ^ e)
   {
@@ -459,7 +459,7 @@ void VanguardClientUnmanaged::GAME_CLOSED()
 
   // We need to do this or else the thread hangs when you try and X down through the game itself
   // rather than the hex editor
-  RtcCore::GAME_CLOSED(true);
+  RtcCore::InvokeGameClosed(true);
 }
 
 void VanguardClientUnmanaged::EMULATOR_CLOSING()
@@ -469,7 +469,7 @@ void VanguardClientUnmanaged::EMULATOR_CLOSING()
 
   // Make sure we call this from the main thread
   VanguardClient::StopClient();
-  RtcCore::GAME_CLOSED(true);
+  RtcCore::InvokeGameClosed(true);
 }
 
 bool VanguardClientUnmanaged::RTC_OSD_ENABLED()
@@ -717,7 +717,7 @@ void VanguardClient::OnMessageReceived(Object ^ sender, NetCoreEventArgs ^ e)
 
 
     VanguardClient::StopClient();
-    RtcCore::GAME_CLOSED(true);
+    RtcCore::InvokeGameClosed(true);
 
     // Prep dolphin so when the game closes it exits
     auto g = gcnew SyncObjectSingleton::GenericDelegate(&PrepShutdown);
@@ -727,7 +727,7 @@ void VanguardClient::OnMessageReceived(Object ^ sender, NetCoreEventArgs ^ e)
     g = gcnew SyncObjectSingleton::GenericDelegate(&StopGame);
     SyncObjectSingleton::FormExecute(g);
 
-    RtcCore::KILL_HEX_EDITOR();
+    RtcCore::InvokeKillHexEditor();
 
   }
   break;
