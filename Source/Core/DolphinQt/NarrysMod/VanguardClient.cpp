@@ -124,9 +124,9 @@ static PartialSpec ^
 {
   PartialSpec ^ partial = e->partialSpec;
 
-  LocalNetCoreRouter::Route(NetcoreCommands::CORRUPTCORE,
-                            NetcoreCommands::REMOTE_PUSHVANGUARDSPECUPDATE, partial, true);
-  LocalNetCoreRouter::Route(NetcoreCommands::UI, NetcoreCommands::REMOTE_PUSHVANGUARDSPECUPDATE,
+  LocalNetCoreRouter::Route(Commands::Basic::CorruptCore,
+                            Commands::Remote::PushVanguardSpecUpdate, partial, true);
+  LocalNetCoreRouter::Route(Commands::Basic::UI, Commands::Remote::PushVanguardSpecUpdate,
                             partial, true);
 }
 
@@ -142,9 +142,9 @@ void VanguardClient::RegisterVanguardSpec()
   if (attached)
     VanguardConnector::PushVanguardSpecRef(AllSpec::VanguardSpec);
 
-  LocalNetCoreRouter::Route(NetcoreCommands::CORRUPTCORE, NetcoreCommands::REMOTE_PUSHVANGUARDSPEC,
+  LocalNetCoreRouter::Route(Commands::Basic::CorruptCore, Commands::Remote::PushVanguardSpec,
                             emuSpecTemplate, true);
-  LocalNetCoreRouter::Route(NetcoreCommands::UI, NetcoreCommands::REMOTE_PUSHVANGUARDSPEC,
+  LocalNetCoreRouter::Route(Commands::Basic::UI, Commands::Remote::PushVanguardSpec,
                             emuSpecTemplate, true);
   AllSpec::VanguardSpec->SpecUpdated +=
       gcnew EventHandler<SpecUpdateEventArgs ^>(&VanguardClient::SpecUpdated);
@@ -336,8 +336,8 @@ static array<MemoryDomainProxy ^> ^
   if (updateSpecs)
   {
     AllSpec::VanguardSpec->Update(VSPEC::MEMORYDOMAINS_INTERFACES, newInterfaces, true, true);
-    LocalNetCoreRouter::Route(NetcoreCommands::CORRUPTCORE,
-                              NetcoreCommands::REMOTE_EVENT_DOMAINSUPDATED, domainsChanged, true);
+    LocalNetCoreRouter::Route(Commands::Basic::CorruptCore,
+                              Commands::Remote::EventDomainsUpdated, domainsChanged, true);
   }
 
   return domainsChanged;
@@ -436,8 +436,8 @@ void VanguardClientUnmanaged::LOAD_GAME_DONE()
 
     if (oldGame != gameName)
     {
-      LocalNetCoreRouter::Route(NetcoreCommands::UI,
-                                NetcoreCommands::RESET_GAME_PROTECTION_IF_RUNNING, true);
+      LocalNetCoreRouter::Route(Commands::Basic::UI,
+                                Commands::Basic::ResetGameProtectionIfRunning, true);
     }
 
     RtcCore::InvokeLoadGameDone();
