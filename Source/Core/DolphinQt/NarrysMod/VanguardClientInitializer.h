@@ -9,5 +9,6 @@ public:
   static inline MainWindow* win = nullptr;
 
 private:
+  static void ConfigureVisualStyles();
   static void StartVanguardClient();
 };
