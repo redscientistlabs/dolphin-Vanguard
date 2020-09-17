@@ -124,9 +124,9 @@ static PartialSpec ^
 {
   PartialSpec ^ partial = e->partialSpec;
 
-  LocalNetCoreRouter::Route(Commands::Basic::CorruptCore,
+  LocalNetCoreRouter::Route(Endpoints::CorruptCore,
                             Commands::Remote::PushVanguardSpecUpdate, partial, true);
-  LocalNetCoreRouter::Route(Commands::Basic::UI, Commands::Remote::PushVanguardSpecUpdate,
+  LocalNetCoreRouter::Route(Endpoints::UI, Commands::Remote::PushVanguardSpecUpdate,
                             partial, true);
 }
 
@@ -142,9 +142,9 @@ void VanguardClient::RegisterVanguardSpec()
   if (attached)
     VanguardConnector::PushVanguardSpecRef(AllSpec::VanguardSpec);
 
-  LocalNetCoreRouter::Route(Commands::Basic::CorruptCore, Commands::Remote::PushVanguardSpec,
+  LocalNetCoreRouter::Route(Endpoints::CorruptCore, Commands::Remote::PushVanguardSpec,
                             emuSpecTemplate, true);
-  LocalNetCoreRouter::Route(Commands::Basic::UI, Commands::Remote::PushVanguardSpec,
+  LocalNetCoreRouter::Route(Endpoints::UI, Commands::Remote::PushVanguardSpec,
                             emuSpecTemplate, true);
   AllSpec::VanguardSpec->SpecUpdated +=
       gcnew EventHandler<SpecUpdateEventArgs ^>(&VanguardClient::SpecUpdated);
@@ -345,7 +345,7 @@ static array<MemoryDomainProxy ^> ^
   if (updateSpecs)
   {
     AllSpec::VanguardSpec->Update(VSPEC::MEMORYDOMAINS_INTERFACES, newInterfaces, true, true);
-    LocalNetCoreRouter::Route(Commands::Basic::CorruptCore,
+    LocalNetCoreRouter::Route(Endpoints::CorruptCore,
                               Commands::Remote::EventDomainsUpdated, domainsChanged, true);
   }
 
@@ -369,7 +369,7 @@ static void STEP_CORRUPT()  // errors trapped by CPU_STEP
 {
   if (!VanguardClient::enableRTC)
     return;
-  RtcClock::STEP_CORRUPT(true, true);
+  RtcClock::StepCorrupt(true, true);
 }
 
 #pragma region Hooks
@@ -388,7 +388,7 @@ void VanguardClientUnmanaged::LOAD_GAME_START(std::string romPath)
   if (!VanguardClient::enableRTC)
     return;
   StepActions::ClearStepBlastUnits();
-  RtcClock::RESET_COUNT();
+  RtcClock::ResetCount();
 
   if (romPath == "")
   {
@@ -445,11 +445,11 @@ void VanguardClientUnmanaged::LOAD_GAME_DONE()
 
     if (oldGame != gameName)
     {
-      LocalNetCoreRouter::Route(Commands::Basic::UI,
+      LocalNetCoreRouter::Route(Endpoints::UI,
                                 Commands::Basic::ResetGameProtectionIfRunning, true);
     }
 
-    RtcCore::LOAD_GAME_DONE();
+    RtcCore::InvokeLoadGameDone();
   }
   catch (Exception ^ e)
   {
@@ -468,7 +468,7 @@ void VanguardClientUnmanaged::GAME_CLOSED()
 
   // We need to do this or else the thread hangs when you try and X down through the game itself
   // rather than the hex editor
-  RtcCore::GAME_CLOSED(true);
+  RtcCore::InvokeGameClosed(true);
 }
 
 void VanguardClientUnmanaged::EMULATOR_CLOSING()
@@ -478,7 +478,7 @@ void VanguardClientUnmanaged::EMULATOR_CLOSING()
 
   // Make sure we call this from the main thread
   VanguardClient::StopClient();
-  RtcCore::GAME_CLOSED(true);
+  RtcCore::InvokeGameClosed(true);
 }
 
 bool VanguardClientUnmanaged::RTC_OSD_ENABLED()
@@ -590,7 +590,7 @@ void VanguardClient::LoadRom(String ^ filename)
 bool VanguardClient::LoadState(std::string filename)
 {
   StepActions::ClearStepBlastUnits();
-  RtcClock::RESET_COUNT();
+  RtcClock::ResetCount();
   State::LoadAs(filename);
   return true;
 }
@@ -727,7 +727,7 @@ void VanguardClient::OnMessageReceived(Object ^ sender, NetCoreEventArgs ^ e)
 
 
     VanguardClient::StopClient();
-    RtcCore::GAME_CLOSED(true);
+    RtcCore::InvokeGameClosed(true);
 
     // Prep dolphin so when the game closes it exits
     auto g = gcnew SyncObjectSingleton::GenericDelegate(&PrepShutdown);
@@ -737,7 +737,7 @@ void VanguardClient::OnMessageReceived(Object ^ sender, NetCoreEventArgs ^ e)
     g = gcnew SyncObjectSingleton::GenericDelegate(&StopGame);
     SyncObjectSingleton::FormExecute(g);
 
-    RtcCore::KILL_HEX_EDITOR();
+    RtcCore::InvokeKillHexEditor();
 
   }
   break;

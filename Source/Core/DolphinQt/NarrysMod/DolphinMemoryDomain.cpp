@@ -25,7 +25,6 @@ using namespace Diagnostics;
 #define SRAM_OFFSET 0x80000000
 #define ARAM_OFFSET 0x80000000
 #define EXRAM_OFFSET 0x90000000
-
 #define WORD_SIZE 4
 #define BIG_ENDIAN true
 
