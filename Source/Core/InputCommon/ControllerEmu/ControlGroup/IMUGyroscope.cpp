@@ -4,6 +4,7 @@
 
 #include "InputCommon/ControllerEmu/ControlGroup/IMUGyroscope.h"
 
+#include <algorithm>
 #include <memory>
 
 #include "Common/Common.h"
@@ -24,8 +25,8 @@ static constexpr auto MAXIMUM_CALIBRATION_DURATION = std::chrono::hours(1);
 // This is made slightly lower than the UI update frequency of 30.
 static constexpr auto WORST_ACCEPTABLE_CALIBRATION_UPDATE_FREQUENCY = 25;
 
-IMUGyroscope::IMUGyroscope(std::string name, std::string ui_name)
-    : ControlGroup(std::move(name), std::move(ui_name), GroupType::IMUGyroscope)
+IMUGyroscope::IMUGyroscope(std::string name_, std::string ui_name_)
+    : ControlGroup(std::move(name_), std::move(ui_name_), GroupType::IMUGyroscope)
 {
   AddInput(Translate, _trans("Pitch Up"));
   AddInput(Translate, _trans("Pitch Down"));
@@ -124,7 +125,8 @@ auto IMUGyroscope::GetRawState() const -> StateData
 
 std::optional<IMUGyroscope::StateData> IMUGyroscope::GetState() const
 {
-  if (controls[0]->control_ref->BoundCount() == 0)
+  if (std::all_of(controls.begin(), controls.end(),
+                  [](const auto& control) { return control->control_ref->BoundCount() == 0; }))
   {
     // Set calibration to zero.
     m_calibration = {};

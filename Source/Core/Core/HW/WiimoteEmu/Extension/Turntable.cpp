@@ -5,9 +5,9 @@
 #include "Core/HW/WiimoteEmu/Extension/Turntable.h"
 
 #include <array>
-#include <cassert>
 #include <cstring>
 
+#include "Common/Assert.h"
 #include "Common/BitUtils.h"
 #include "Common/Common.h"
 #include "Common/CommonTypes.h"
@@ -137,13 +137,6 @@ void Turntable::Update()
   Common::BitCastPtr<DataFormat>(&m_reg.controller_data) = tt_data;
 }
 
-bool Turntable::IsButtonPressed() const
-{
-  u16 buttons = 0;
-  m_buttons->GetState(&buttons, turntable_button_bitmasks.data());
-  return buttons != 0;
-}
-
 void Turntable::Reset()
 {
   EncryptedExtension::Reset();
@@ -170,7 +163,7 @@ ControllerEmu::ControlGroup* Turntable::GetGroup(TurntableGroup group)
   case TurntableGroup::Crossfade:
     return m_crossfade;
   default:
-    assert(false);
+    ASSERT(false);
     return nullptr;
   }
 }

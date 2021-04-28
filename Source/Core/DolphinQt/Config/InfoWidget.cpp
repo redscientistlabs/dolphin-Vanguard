@@ -17,6 +17,7 @@
 
 #include "DiscIO/Blob.h"
 #include "DiscIO/Enums.h"
+#include "DiscIO/Volume.h"
 
 #include "DolphinQt/Config/InfoWidget.h"
 #include "DolphinQt/QtUtils/ImageConverter.h"
@@ -25,6 +26,8 @@
 
 InfoWidget::InfoWidget(const UICommon::GameFile& game) : m_game(game)
 {
+  m_volume = DiscIO::CreateVolume(m_game.GetFilePath());
+
   QVBoxLayout* layout = new QVBoxLayout();
 
   layout->addWidget(CreateFileDetails());
@@ -35,6 +38,8 @@ InfoWidget::InfoWidget(const UICommon::GameFile& game) : m_game(game)
 
   setLayout(layout);
 }
+
+InfoWidget::~InfoWidget() = default;
 
 QGroupBox* InfoWidget::CreateFileDetails()
 {
@@ -54,10 +59,9 @@ QGroupBox* InfoWidget::CreateFileDetails()
   }
   else
   {
-    const QString file_format =
-        QStringLiteral("%1 (%2)")
-            .arg(QString::fromStdString(DiscIO::GetName(m_game.GetBlobType(), true)))
-            .arg(QString::fromStdString(file_size));
+    const QString file_format = QStringLiteral("%1 (%2)")
+                                    .arg(QString::fromStdString(m_game.GetFileFormatName()))
+                                    .arg(QString::fromStdString(file_size));
     layout->addRow(tr("File Format:"), CreateValueDisplay(file_format));
 
     QString compression = QString::fromStdString(m_game.GetCompressionMethod());
@@ -93,7 +97,7 @@ QGroupBox* InfoWidget::CreateGameDetails()
   QLineEdit* internal_name =
       CreateValueDisplay(is_disc_based ? tr("%1 (Disc %2, Revision %3)")
                                              .arg(game_name.isEmpty() ? UNKNOWN_NAME : game_name)
-                                             .arg(m_game.GetDiscNumber())
+                                             .arg(m_game.GetDiscNumber() + 1)
                                              .arg(m_game.GetRevision()) :
                                          tr("%1 (Revision %3)")
                                              .arg(game_name.isEmpty() ? UNKNOWN_NAME : game_name)
@@ -121,6 +125,17 @@ QGroupBox* InfoWidget::CreateGameDetails()
 
   if (!m_game.GetApploaderDate().empty())
     layout->addRow(tr("Apploader Date:"), CreateValueDisplay(m_game.GetApploaderDate()));
+
+  if (m_volume)
+  {
+    const DiscIO::Partition partition = m_volume->GetGamePartition();
+    const IOS::ES::TMDReader& tmd = m_volume->GetTMD(partition);
+    if (tmd.IsValid())
+    {
+      const auto ios = fmt::format("IOS{}", static_cast<u32>(tmd.GetIOSId()));
+      layout->addRow(tr("IOS Version:"), CreateValueDisplay(ios));
+    }
+  }
 
   group->setLayout(layout);
   return group;

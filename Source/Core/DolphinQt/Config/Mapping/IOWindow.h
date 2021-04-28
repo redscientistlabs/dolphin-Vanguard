@@ -4,17 +4,20 @@
 
 #pragma once
 
+#include <memory>
+#include <string>
+
+#include <QComboBox>
 #include <QDialog>
 #include <QString>
 #include <QSyntaxHighlighter>
 
 #include "Common/Flag.h"
-#include "InputCommon/ControllerInterface/Device.h"
+#include "InputCommon/ControllerInterface/CoreDevice.h"
 
 class ControlReference;
 class MappingWidget;
 class QAbstractButton;
-class QComboBox;
 class QDialogButtonBox;
 class QLineEdit;
 class QTableWidget;
@@ -30,17 +33,27 @@ namespace ControllerEmu
 class EmulatedController;
 }
 
+class InputStateLineEdit;
+
 class ControlExpressionSyntaxHighlighter final : public QSyntaxHighlighter
 {
   Q_OBJECT
 public:
-  ControlExpressionSyntaxHighlighter(QTextDocument* parent, QLineEdit* result);
+  explicit ControlExpressionSyntaxHighlighter(QTextDocument* parent);
 
 protected:
   void highlightBlock(const QString& text) final override;
+};
 
-private:
-  QLineEdit* const m_result_text;
+class QComboBoxWithMouseWheelDisabled : public QComboBox
+{
+  Q_OBJECT
+public:
+  explicit QComboBoxWithMouseWheelDisabled(QWidget* parent = nullptr) : QComboBox(parent) {}
+
+protected:
+  // Consumes event while doing nothing
+  void wheelEvent(QWheelEvent* event) override;
 };
 
 class IOWindow final : public QDialog
@@ -74,6 +87,14 @@ private:
   void UpdateOptionList();
   void UpdateDeviceList();
 
+  enum class UpdateMode
+  {
+    Normal,
+    Force,
+  };
+
+  void UpdateExpression(std::string new_expression, UpdateMode mode = UpdateMode::Normal);
+
   // Main Layout
   QVBoxLayout* m_main_layout;
 
@@ -100,14 +121,14 @@ private:
 
   // Textarea
   QPlainTextEdit* m_expression_text;
-  QLineEdit* m_parse_text;
+  InputStateLineEdit* m_parse_text;
 
   // Buttonbox
   QDialogButtonBox* m_button_box;
   QPushButton* m_clear_button;
-  QPushButton* m_apply_button;
 
   ControlReference* m_reference;
+  std::string m_original_expression;
   ControllerEmu::EmulatedController* m_controller;
 
   ciface::Core::DeviceQualifier m_devq;

@@ -2,11 +2,11 @@
 // Licensed under GPLv2+
 // Refer to the license.txt file included.
 
-#include <cassert>
+#include "Core/HW/WiimoteCommon/DataReport.h"
 
+#include "Common/Assert.h"
 #include "Common/BitUtils.h"
 #include "Common/MathUtil.h"
-#include "Core/HW/WiimoteCommon/DataReport.h"
 
 namespace WiimoteCommon
 {
@@ -308,7 +308,7 @@ std::unique_ptr<DataReportManipulator> MakeDataReportManipulator(InputReportID r
     ptr = std::make_unique<ReportInterleave2>();
     break;
   default:
-    assert(false);
+    ASSERT(false);
     break;
   }
 
@@ -324,7 +324,7 @@ DataReportBuilder::DataReportBuilder(InputReportID rpt_id) : m_data(rpt_id)
 void DataReportBuilder::SetMode(InputReportID rpt_id)
 {
   m_data.report_id = rpt_id;
-  m_manip = MakeDataReportManipulator(rpt_id, GetDataPtr() + HEADER_SIZE);
+  m_manip = MakeDataReportManipulator(rpt_id, GetDataPtr() + sizeof(m_data.report_id));
 }
 
 InputReportID DataReportBuilder::GetMode() const
@@ -405,7 +405,7 @@ u8* DataReportBuilder::GetDataPtr()
 
 u32 DataReportBuilder::GetDataSize() const
 {
-  return m_manip->GetDataSize() + HEADER_SIZE;
+  return m_manip->GetDataSize() + sizeof(m_data.report_id);
 }
 
 u8* DataReportBuilder::GetIRDataPtr()

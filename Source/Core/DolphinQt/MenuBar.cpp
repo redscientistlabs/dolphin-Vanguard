@@ -5,8 +5,10 @@
 #include "DolphinQt/MenuBar.h"
 
 #include <cinttypes>
+#include <future>
 
 #include <QAction>
+#include <QActionGroup>
 #include <QDesktopServices>
 #include <QFileDialog>
 #include <QFontDialog>
@@ -51,6 +53,7 @@
 #include "DolphinQt/AboutDialog.h"
 #include "DolphinQt/Host.h"
 #include "DolphinQt/QtUtils/ModalMessageBox.h"
+#include "DolphinQt/QtUtils/ParallelProgressDialog.h"
 #include "DolphinQt/Settings.h"
 #include "DolphinQt/Updater.h"
 
@@ -229,7 +232,7 @@ void MenuBar::AddToolsMenu()
   m_show_cheat_manager =
       tools_menu->addAction(tr("&Cheats Manager"), this, [this] { emit ShowCheatsManager(); });
 
-  connect(&Settings::Instance(), &Settings::EnableCheatsChanged, [this](bool enabled) {
+  connect(&Settings::Instance(), &Settings::EnableCheatsChanged, this, [this](bool enabled) {
     m_show_cheat_manager->setEnabled(Core::GetState() != Core::State::Uninitialized && enabled);
   });
 
@@ -267,7 +270,7 @@ void MenuBar::AddToolsMenu()
 
   m_boot_sysmenu->setEnabled(false);
 
-  connect(&Settings::Instance(), &Settings::NANDRefresh, [this] { UpdateToolsMenu(false); });
+  connect(&Settings::Instance(), &Settings::NANDRefresh, this, [this] { UpdateToolsMenu(false); });
 
   m_perform_online_update_menu = tools_menu->addMenu(tr("Perform Online System Update"));
   m_perform_online_update_for_current_region = m_perform_online_update_menu->addAction(
@@ -506,7 +509,13 @@ void MenuBar::AddViewMenu()
   AddShowRegionsMenu(view_menu);
 
   view_menu->addSeparator();
-  view_menu->addAction(tr("Purge Game List Cache"), this, &MenuBar::PurgeGameListCache);
+  QAction* const purge_action =
+      view_menu->addAction(tr("Purge Game List Cache"), this, &MenuBar::PurgeGameListCache);
+  purge_action->setEnabled(false);
+  connect(&Settings::Instance(), &Settings::GameListRefreshRequested, purge_action,
+          [purge_action] { purge_action->setEnabled(false); });
+  connect(&Settings::Instance(), &Settings::GameListRefreshStarted, purge_action,
+          [purge_action] { purge_action->setEnabled(true); });
   view_menu->addSeparator();
   view_menu->addAction(tr("Search"), this, &MenuBar::ShowSearch, QKeySequence::Find);
 }
@@ -522,6 +531,7 @@ void MenuBar::AddOptionsMenu()
   m_controllers_action =
       options_menu->addAction(tr("&Controller Settings"), this, &MenuBar::ConfigureControllers);
   options_menu->addAction(tr("&Hotkey Settings"), this, &MenuBar::ConfigureHotkeys);
+  options_menu->addAction(tr("&Free Look Settings"), this, &MenuBar::ConfigureFreelook);
 
   options_menu->addSeparator();
 
@@ -695,20 +705,29 @@ void MenuBar::AddShowRegionsMenu(QMenu* view_menu)
       {tr("Show World"), &SConfig::GetInstance().m_ListWorld},
       {tr("Show Unknown"), &SConfig::GetInstance().m_ListUnknown}};
 
-  QActionGroup* region_group = new QActionGroup(this);
-  QMenu* region_menu = view_menu->addMenu(tr("Show Regions"));
-  region_group->setExclusive(false);
+  QMenu* const region_menu = view_menu->addMenu(tr("Show Regions"));
+  const QAction* const show_all_regions = region_menu->addAction(tr("Show All"));
+  const QAction* const hide_all_regions = region_menu->addAction(tr("Hide All"));
+  region_menu->addSeparator();
 
   for (const auto& key : region_map.keys())
   {
-    bool* config = region_map[key];
-    QAction* action = region_group->addAction(region_menu->addAction(key));
-    action->setCheckable(true);
-    action->setChecked(*config);
-    connect(action, &QAction::toggled, [this, config, key](bool value) {
-      *config = value;
-      emit GameListRegionVisibilityToggled(key, value);
-    });
+    bool* const config = region_map[key];
+    QAction* const menu_item = region_menu->addAction(key);
+    menu_item->setCheckable(true);
+    menu_item->setChecked(*config);
+
+    const auto set_visibility = [this, config, key, menu_item](bool visibility) {
+      menu_item->setChecked(visibility);
+      *config = visibility;
+      emit GameListRegionVisibilityToggled(key, visibility);
+    };
+    const auto set_visible = std::bind(set_visibility, true);
+    const auto set_hidden = std::bind(set_visibility, false);
+
+    connect(menu_item, &QAction::toggled, set_visibility);
+    connect(show_all_regions, &QAction::triggered, menu_item, set_visible);
+    connect(hide_all_regions, &QAction::triggered, menu_item, set_hidden);
   }
 }
 
@@ -1006,12 +1025,8 @@ void MenuBar::UpdateToolsMenu(bool emulation_started)
     m_perform_online_update_for_current_region->setEnabled(tmd.IsValid());
   }
 
-  const auto ios = IOS::HLE::GetIOS();
-  const auto bt = ios ? std::static_pointer_cast<IOS::HLE::Device::BluetoothEmu>(
-                            ios->GetDeviceByName("/dev/usb/oh1/57e/305")) :
-                        nullptr;
-  const bool enable_wiimotes =
-      emulation_started && bt && !SConfig::GetInstance().m_bt_passthrough_enabled;
+  const auto bt = WiiUtils::GetBluetoothEmuDevice();
+  const bool enable_wiimotes = emulation_started && bt != nullptr;
 
   for (std::size_t i = 0; i < m_wii_remotes.size(); i++)
   {
@@ -1052,19 +1067,39 @@ void MenuBar::ImportWiiSave()
   if (file.isEmpty())
     return;
 
-  bool cancelled = false;
   auto can_overwrite = [&] {
-    bool yes = ModalMessageBox::question(
-                   this, tr("Save Import"),
-                   tr("Save data for this title already exists in the NAND. Consider backing up "
-                      "the current data before overwriting.\nOverwrite now?")) == QMessageBox::Yes;
-    cancelled = !yes;
-    return yes;
+    return ModalMessageBox::question(
+               this, tr("Save Import"),
+               tr("Save data for this title already exists in the NAND. Consider backing up "
+                  "the current data before overwriting.\nOverwrite now?")) == QMessageBox::Yes;
   };
-  if (WiiSave::Import(file.toStdString(), can_overwrite))
-    ModalMessageBox::information(this, tr("Save Import"), tr("Successfully imported save files."));
-  else if (!cancelled)
-    ModalMessageBox::critical(this, tr("Save Import"), tr("Failed to import save files."));
+
+  const auto result = WiiSave::Import(file.toStdString(), can_overwrite);
+  switch (result)
+  {
+  case WiiSave::CopyResult::Success:
+    ModalMessageBox::information(this, tr("Save Import"), tr("Successfully imported save file."));
+    break;
+  case WiiSave::CopyResult::CorruptedSource:
+    ModalMessageBox::critical(this, tr("Save Import"),
+                              tr("Failed to import save file. The given file appears to be "
+                                 "corrupted or is not a valid Wii save."));
+    break;
+  case WiiSave::CopyResult::TitleMissing:
+    ModalMessageBox::critical(
+        this, tr("Save Import"),
+        tr("Failed to import save file. Please launch the game once, then try again."));
+    break;
+  case WiiSave::CopyResult::Cancelled:
+    break;
+  default:
+    ModalMessageBox::critical(
+        this, tr("Save Import"),
+        tr("Failed to import save file. Your NAND may be corrupt, or something is preventing "
+           "access to files within it. Try repairing your NAND (Tools -> Manage NAND -> Check "
+           "NAND...), then import the save again."));
+    break;
+  }
 }
 
 void MenuBar::ExportWiiSaves()
@@ -1262,48 +1297,26 @@ void MenuBar::GenerateSymbolsFromRSO()
 
 void MenuBar::GenerateSymbolsFromRSOAuto()
 {
-  constexpr std::array<std::string_view, 2> search_for = {".elf", ".plf"};
-  const AddressSpace::Accessors* accessors =
-      AddressSpace::GetAccessors(AddressSpace::Type::Effective);
-  std::vector<std::pair<u32, std::string>> matches;
+  ParallelProgressDialog progress(tr("Modules found: %1").arg(0), tr("Cancel"), 0, 0, this);
+  progress.GetRaw()->setWindowTitle(tr("Detecting RSO Modules"));
+  progress.GetRaw()->setMinimumDuration(1000 * 10);
+  progress.GetRaw()->setWindowModality(Qt::WindowModal);
 
-  // Find filepath to elf/plf commonly used by RSO modules
-  for (const auto& str : search_for)
-  {
-    u32 next = 0;
-    while (true)
-    {
-      auto found_addr =
-          accessors->Search(next, reinterpret_cast<const u8*>(str.data()), str.size() + 1, true);
+  auto future = std::async(std::launch::async, [&progress, this]() -> RSOVector {
+    progress.SetValue(0);
+    auto matches = DetectRSOModules(progress);
+    progress.Reset();
 
-      if (!found_addr.has_value())
-        break;
-      next = *found_addr + 1;
+    return matches;
+  });
+  progress.GetRaw()->exec();
 
-      // Get the beginning of the string
-      found_addr = accessors->Search(*found_addr, reinterpret_cast<const u8*>(""), 1, false);
-      if (!found_addr.has_value())
-        continue;
-
-      // Get the string reference
-      const u32 ref_addr = *found_addr + 1;
-      const std::array<u8, 4> ref = {static_cast<u8>(ref_addr >> 24),
-                                     static_cast<u8>(ref_addr >> 16),
-                                     static_cast<u8>(ref_addr >> 8), static_cast<u8>(ref_addr)};
-      found_addr = accessors->Search(ref_addr, ref.data(), ref.size(), false);
-      if (!found_addr.has_value() || *found_addr < 16)
-        continue;
-
-      // Go to the beginning of the RSO header
-      matches.emplace_back(*found_addr - 16, PowerPC::HostGetString(ref_addr, 128));
-    }
-  }
+  auto matches = future.get();
 
   QStringList items;
   for (const auto& match : matches)
   {
     const QString item = QLatin1String("%1 %2");
-
     items << item.arg(QString::number(match.first, 16), QString::fromStdString(match.second));
   }
 
@@ -1331,6 +1344,107 @@ void MenuBar::GenerateSymbolsFromRSOAuto()
   {
     ModalMessageBox::warning(this, tr("Error"), tr("Failed to load RSO module at %1").arg(address));
   }
+}
+
+RSOVector MenuBar::DetectRSOModules(ParallelProgressDialog& progress)
+{
+  constexpr std::array<std::string_view, 2> search_for = {".elf", ".plf"};
+
+  const AddressSpace::Accessors* accessors =
+      AddressSpace::GetAccessors(AddressSpace::Type::Effective);
+
+  RSOVector matches;
+
+  // Find filepath to elf/plf commonly used by RSO modules
+  for (const auto& str : search_for)
+  {
+    u32 next = 0;
+    while (true)
+    {
+      if (progress.WasCanceled())
+      {
+        return matches;
+      }
+
+      auto found_addr =
+          accessors->Search(next, reinterpret_cast<const u8*>(str.data()), str.size() + 1, true);
+
+      if (!found_addr.has_value())
+        break;
+
+      next = *found_addr + 1;
+
+      // Non-null data can precede the module name.
+      // Get the maximum name length that a module could have.
+      auto get_max_module_name_len = [found_addr] {
+        constexpr u32 MODULE_NAME_MAX_LENGTH = 260;
+        u32 len = 0;
+
+        for (; len < MODULE_NAME_MAX_LENGTH; ++len)
+        {
+          const auto res = PowerPC::HostRead_U8(*found_addr - (len + 1));
+          if (!std::isprint(res))
+          {
+            break;
+          }
+        }
+
+        return len;
+      };
+
+      if (progress.WasCanceled())
+      {
+        return matches;
+      }
+
+      const auto max_name_length = get_max_module_name_len();
+      auto found = false;
+      u32 module_name_length = 0;
+
+      // Look for the Module Name Offset Field based on each possible length
+      for (u32 i = 0; i < max_name_length; ++i)
+      {
+        if (progress.WasCanceled())
+        {
+          return matches;
+        }
+
+        const auto lookup_addr = (*found_addr - max_name_length) + i;
+
+        const std::array<u8, 4> ref = {
+            static_cast<u8>(lookup_addr >> 24), static_cast<u8>(lookup_addr >> 16),
+            static_cast<u8>(lookup_addr >> 8), static_cast<u8>(lookup_addr)};
+
+        // Get the field (Module Name Offset) that point to the string
+        const auto module_name_offset_addr =
+            accessors->Search(lookup_addr, ref.data(), ref.size(), false);
+        if (!module_name_offset_addr.has_value())
+          continue;
+
+        // The next 4 bytes should be the module name length
+        module_name_length = accessors->ReadU32(*module_name_offset_addr + 4);
+        if (module_name_length == max_name_length - i + str.length())
+        {
+          found_addr = module_name_offset_addr;
+          found = true;
+          break;
+        }
+      }
+
+      if (!found)
+        continue;
+
+      const auto module_name_offset = accessors->ReadU32(*found_addr);
+
+      // Go to the beginning of the RSO header
+      matches.emplace_back(*found_addr - 16,
+                           PowerPC::HostGetString(module_name_offset, module_name_length));
+
+      progress.SetLabelText(tr("Modules found: %1").arg(matches.size()));
+    }
+  }
+
+  return matches;
 }
 
 void MenuBar::LoadSymbolMap()
@@ -1588,10 +1702,10 @@ void MenuBar::SearchInstruction()
         QString::fromStdString(PPCTables::GetInstructionName(PowerPC::HostRead_U32(addr)));
     if (op == ins_name)
     {
-      NOTICE_LOG(POWERPC, "Found %s at %08x", op.toStdString().c_str(), addr);
+      NOTICE_LOG_FMT(POWERPC, "Found {} at {:08x}", op.toStdString(), addr);
       found = true;
     }
   }
   if (!found)
-    NOTICE_LOG(POWERPC, "Opcode %s not found", op.toStdString().c_str());
+    NOTICE_LOG_FMT(POWERPC, "Opcode {} not found", op.toStdString());
 }

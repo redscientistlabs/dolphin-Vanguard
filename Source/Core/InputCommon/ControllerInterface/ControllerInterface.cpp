@@ -37,6 +37,8 @@
 
 ControllerInterface g_controller_interface;
 
+static thread_local ciface::InputChannel tls_input_channel = ciface::InputChannel::Host;
+
 void ControllerInterface::Initialize(const WindowSystemInfo& wsi)
 {
   if (m_is_init)
@@ -140,6 +142,19 @@ void ControllerInterface::RefreshDevices()
   InvokeDevicesChangedCallbacks();
 }
 
+void ControllerInterface::PlatformPopulateDevices(std::function<void()> callback)
+{
+  if (!m_is_init)
+    return;
+
+  m_is_populating_devices = true;
+
+  callback();
+
+  m_is_populating_devices = false;
+  InvokeDevicesChangedCallbacks();
+}
+
 // Remove all devices and call library cleanup functions
 void ControllerInterface::Shutdown()
 {
@@ -222,7 +237,7 @@ void ControllerInterface::AddDevice(std::shared_ptr<ciface::Core::Device> device
       device->SetId(id);
     }
 
-    NOTICE_LOG(SERIALINTERFACE, "Added device: %s", device->GetQualifiedName().c_str());
+    NOTICE_LOG_FMT(SERIALINTERFACE, "Added device: {}", device->GetQualifiedName());
     m_devices.emplace_back(std::move(device));
   }
 
@@ -237,7 +252,7 @@ void ControllerInterface::RemoveDevice(std::function<bool(const ciface::Core::De
     auto it = std::remove_if(m_devices.begin(), m_devices.end(), [&callback](const auto& dev) {
       if (callback(dev.get()))
       {
-        NOTICE_LOG(SERIALINTERFACE, "Removed device: %s", dev->GetQualifiedName().c_str());
+        NOTICE_LOG_FMT(SERIALINTERFACE, "Removed device: {}", dev->GetQualifiedName());
         return true;
       }
       return false;
@@ -259,6 +274,16 @@ void ControllerInterface::UpdateInput()
     for (const auto& d : m_devices)
       d->UpdateInput();
   }
+}
+
+void ControllerInterface::SetCurrentInputChannel(ciface::InputChannel input_channel)
+{
+  tls_input_channel = input_channel;
+}
+
+ciface::InputChannel ControllerInterface::GetCurrentInputChannel()
+{
+  return tls_input_channel;
 }
 
 void ControllerInterface::SetAspectRatioAdjustment(float value)

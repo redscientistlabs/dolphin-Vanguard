@@ -1,5 +1,8 @@
 package org.dolphinemu.dolphinemu.ui.platform;
 
+import androidx.annotation.Nullable;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
+
 /**
  * Abstraction for a screen representing a single platform's games.
  */
@@ -22,7 +25,17 @@ public interface PlatformGamesView
   void onItemClick(String gameId);
 
   /**
+   * Shows or hides the loading indicator.
+   */
+  void setRefreshing(boolean refreshing);
+
+  /**
    * To be called when the game file cache is updated.
    */
   void showGames();
+
+  /**
+   * Re-fetches game metadata from the game file cache.
+   */
+  void refetchMetadata();
 }

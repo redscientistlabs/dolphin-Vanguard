@@ -20,35 +20,35 @@
 #include "Core/IOS/Network/Socket.h"
 #include "Core/IOS/Uids.h"
 
-namespace IOS::HLE::Device
+namespace IOS::HLE
 {
-NetKDRequest::NetKDRequest(Kernel& ios, const std::string& device_name)
+NetKDRequestDevice::NetKDRequestDevice(Kernel& ios, const std::string& device_name)
     : Device(ios, device_name), config{ios.GetFS()}
 {
 }
 
-NetKDRequest::~NetKDRequest()
+NetKDRequestDevice::~NetKDRequestDevice()
 {
   WiiSockMan::GetInstance().Clean();
 }
 
-IPCCommandResult NetKDRequest::IOCtl(const IOCtlRequest& request)
+std::optional<IPCReply> NetKDRequestDevice::IOCtl(const IOCtlRequest& request)
 {
   s32 return_value = 0;
   switch (request.request)
   {
   case IOCTL_NWC24_SUSPEND_SCHEDULAR:
     // NWC24iResumeForCloseLib  from NWC24SuspendScheduler (Input: none, Output: 32 bytes)
-    INFO_LOG(IOS_WC24, "NET_KD_REQ: IOCTL_NWC24_SUSPEND_SCHEDULAR - NI");
+    INFO_LOG_FMT(IOS_WC24, "NET_KD_REQ: IOCTL_NWC24_SUSPEND_SCHEDULAR - NI");
     WriteReturnValue(0, request.buffer_out);  // no error
     break;
 
   case IOCTL_NWC24_EXEC_TRY_SUSPEND_SCHEDULAR:  // NWC24iResumeForCloseLib
-    INFO_LOG(IOS_WC24, "NET_KD_REQ: IOCTL_NWC24_EXEC_TRY_SUSPEND_SCHEDULAR - NI");
+    INFO_LOG_FMT(IOS_WC24, "NET_KD_REQ: IOCTL_NWC24_EXEC_TRY_SUSPEND_SCHEDULAR - NI");
     break;
 
   case IOCTL_NWC24_EXEC_RESUME_SCHEDULAR:  // NWC24iResumeForCloseLib
-    INFO_LOG(IOS_WC24, "NET_KD_REQ: IOCTL_NWC24_EXEC_RESUME_SCHEDULAR - NI");
+    INFO_LOG_FMT(IOS_WC24, "NET_KD_REQ: IOCTL_NWC24_EXEC_RESUME_SCHEDULAR - NI");
     WriteReturnValue(0, request.buffer_out);  // no error
     break;
 
@@ -56,30 +56,30 @@ IPCCommandResult NetKDRequest::IOCtl(const IOCtlRequest& request)
     WriteReturnValue(0, request.buffer_out);
     Memory::Write_U32(0, request.buffer_out + 4);
     return_value = 0;
-    INFO_LOG(IOS_WC24, "NET_KD_REQ: IOCTL_NWC24_STARTUP_SOCKET - NI");
+    INFO_LOG_FMT(IOS_WC24, "NET_KD_REQ: IOCTL_NWC24_STARTUP_SOCKET - NI");
     break;
 
   case IOCTL_NWC24_CLEANUP_SOCKET:
-    INFO_LOG(IOS_WC24, "NET_KD_REQ: IOCTL_NWC24_CLEANUP_SOCKET");
+    INFO_LOG_FMT(IOS_WC24, "NET_KD_REQ: IOCTL_NWC24_CLEANUP_SOCKET");
     WiiSockMan::GetInstance().Clean();
     break;
 
   case IOCTL_NWC24_LOCK_SOCKET:  // WiiMenu
-    INFO_LOG(IOS_WC24, "NET_KD_REQ: IOCTL_NWC24_LOCK_SOCKET - NI");
+    INFO_LOG_FMT(IOS_WC24, "NET_KD_REQ: IOCTL_NWC24_LOCK_SOCKET - NI");
     break;
 
   case IOCTL_NWC24_UNLOCK_SOCKET:
-    INFO_LOG(IOS_WC24, "NET_KD_REQ: IOCTL_NWC24_UNLOCK_SOCKET - NI");
+    INFO_LOG_FMT(IOS_WC24, "NET_KD_REQ: IOCTL_NWC24_UNLOCK_SOCKET - NI");
     break;
 
   case IOCTL_NWC24_REQUEST_REGISTER_USER_ID:
-    INFO_LOG(IOS_WC24, "NET_KD_REQ: IOCTL_NWC24_REQUEST_REGISTER_USER_ID");
+    INFO_LOG_FMT(IOS_WC24, "NET_KD_REQ: IOCTL_NWC24_REQUEST_REGISTER_USER_ID");
     WriteReturnValue(0, request.buffer_out);
     Memory::Write_U32(0, request.buffer_out + 4);
     break;
 
   case IOCTL_NWC24_REQUEST_GENERATED_USER_ID:  // (Input: none, Output: 32 bytes)
-    INFO_LOG(IOS_WC24, "NET_KD_REQ: IOCTL_NWC24_REQUEST_GENERATED_USER_ID");
+    INFO_LOG_FMT(IOS_WC24, "NET_KD_REQ: IOCTL_NWC24_REQUEST_GENERATED_USER_ID");
     if (config.CreationStage() == NWC24::NWC24Config::NWC24_IDCS_INITIAL)
     {
       const std::string settings_file_path =
@@ -133,11 +133,11 @@ IPCCommandResult NetKDRequest::IOCtl(const IOCtlRequest& request)
     break;
 
   case IOCTL_NWC24_GET_SCHEDULAR_STAT:
-    INFO_LOG(IOS_WC24, "NET_KD_REQ: IOCTL_NWC24_GET_SCHEDULAR_STAT - NI");
+    INFO_LOG_FMT(IOS_WC24, "NET_KD_REQ: IOCTL_NWC24_GET_SCHEDULAR_STAT - NI");
     break;
 
   case IOCTL_NWC24_SAVE_MAIL_NOW:
-    INFO_LOG(IOS_WC24, "NET_KD_REQ: IOCTL_NWC24_SAVE_MAIL_NOW - NI");
+    INFO_LOG_FMT(IOS_WC24, "NET_KD_REQ: IOCTL_NWC24_SAVE_MAIL_NOW - NI");
     break;
 
   case IOCTL_NWC24_REQUEST_SHUTDOWN:
@@ -146,11 +146,11 @@ IPCCommandResult NetKDRequest::IOCtl(const IOCtlRequest& request)
         request.buffer_out == 0 || request.buffer_out % 4 != 0 || request.buffer_out_size < 4)
     {
       return_value = IPC_EINVAL;
-      ERROR_LOG(IOS_WC24, "NET_KD_REQ: IOCTL_NWC24_REQUEST_SHUTDOWN = IPC_EINVAL");
+      ERROR_LOG_FMT(IOS_WC24, "NET_KD_REQ: IOCTL_NWC24_REQUEST_SHUTDOWN = IPC_EINVAL");
       break;
     }
 
-    INFO_LOG(IOS_WC24, "NET_KD_REQ: IOCTL_NWC24_REQUEST_SHUTDOWN");
+    INFO_LOG_FMT(IOS_WC24, "NET_KD_REQ: IOCTL_NWC24_REQUEST_SHUTDOWN");
     [[maybe_unused]] const u32 event = Memory::Read_U32(request.buffer_in);
     // TODO: Advertise shutdown event
     // TODO: Shutdown USB keyboard LEDs if event == 3
@@ -169,10 +169,10 @@ IPCCommandResult NetKDRequest::IOCtl(const IOCtlRequest& request)
     request.Log(GetDeviceName(), Common::Log::IOS_WC24);
   }
 
-  return GetDefaultReply(return_value);
+  return IPCReply(return_value);
 }
 
-u8 NetKDRequest::GetAreaCode(const std::string& area) const
+u8 NetKDRequestDevice::GetAreaCode(const std::string& area) const
 {
   static const std::map<std::string, u8> regions = {
       {"JPN", 0}, {"USA", 1}, {"EUR", 2}, {"AUS", 2}, {"BRA", 1}, {"TWN", 3}, {"ROC", 3},
@@ -186,7 +186,7 @@ u8 NetKDRequest::GetAreaCode(const std::string& area) const
   return 7;  // Unknown
 }
 
-u8 NetKDRequest::GetHardwareModel(const std::string& model) const
+u8 NetKDRequestDevice::GetHardwareModel(const std::string& model) const
 {
   static const std::map<std::string, u8> models = {
       {"RVL", MODEL_RVL},
@@ -214,8 +214,8 @@ static u64 u64_insert_byte(u64 value, u8 shift, u8 byte)
   return (value & ~mask) | inst;
 }
 
-s32 NetKDRequest::NWC24MakeUserID(u64* nwc24_id, u32 hollywood_id, u16 id_ctr, u8 hardware_model,
-                                  u8 area_code)
+s32 NetKDRequestDevice::NWC24MakeUserID(u64* nwc24_id, u32 hollywood_id, u16 id_ctr,
+                                        u8 hardware_model, u8 area_code)
 {
   const u8 table2[8] = {0x1, 0x5, 0x0, 0x4, 0x2, 0x3, 0x6, 0x7};
   const u8 table1[16] = {0x4, 0xB, 0x7, 0x9, 0xF, 0x1, 0xD, 0x3,
@@ -266,4 +266,4 @@ s32 NetKDRequest::NWC24MakeUserID(u64* nwc24_id, u32 hollywood_id, u16 id_ctr, u
 
   return NWC24::WC24_OK;
 }
-}  // namespace IOS::HLE::Device
+}  // namespace IOS::HLE

@@ -21,9 +21,12 @@ public interface MainView
 
   void launchFileListActivity();
 
-  void launchOpenFileActivity();
+  void launchOpenFileActivity(int requestCode);
 
-  void launchInstallWAD();
+  /**
+   * Shows or hides the loading indicator.
+   */
+  void setRefreshing(boolean refreshing);
 
   /**
    * To be called when the game file cache is updated.

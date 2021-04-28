@@ -5,10 +5,10 @@
 #include "Core/HW/WiimoteEmu/Extension/Guitar.h"
 
 #include <array>
-#include <cassert>
 #include <cstring>
 #include <map>
 
+#include "Common/Assert.h"
 #include "Common/BitUtils.h"
 #include "Common/Common.h"
 #include "Common/CommonTypes.h"
@@ -138,15 +138,6 @@ void Guitar::Update()
   Common::BitCastPtr<DataFormat>(&m_reg.controller_data) = guitar_data;
 }
 
-bool Guitar::IsButtonPressed() const
-{
-  u16 buttons = 0;
-  m_buttons->GetState(&buttons, guitar_button_bitmasks.data());
-  m_frets->GetState(&buttons, guitar_fret_bitmasks.data());
-  m_strum->GetState(&buttons, guitar_strum_bitmasks.data());
-  return buttons != 0;
-}
-
 void Guitar::Reset()
 {
   EncryptedExtension::Reset();
@@ -173,7 +164,7 @@ ControllerEmu::ControlGroup* Guitar::GetGroup(GuitarGroup group)
   case GuitarGroup::SliderBar:
     return m_slider_bar;
   default:
-    assert(false);
+    ASSERT(false);
     return nullptr;
   }
 }

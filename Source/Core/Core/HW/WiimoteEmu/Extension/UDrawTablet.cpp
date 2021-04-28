@@ -5,8 +5,8 @@
 #include "Core/HW/WiimoteEmu/Extension/UDrawTablet.h"
 
 #include <array>
-#include <cassert>
 
+#include "Common/Assert.h"
 #include "Common/BitUtils.h"
 #include "Common/Common.h"
 #include "Common/CommonTypes.h"
@@ -119,13 +119,6 @@ void UDrawTablet::Reset()
   m_reg.calibration.fill(0xff);
 }
 
-bool UDrawTablet::IsButtonPressed() const
-{
-  u8 buttons = 0;
-  m_buttons->GetState(&buttons, udraw_tablet_button_bitmasks.data());
-  return buttons != 0;
-}
-
 ControllerEmu::ControlGroup* UDrawTablet::GetGroup(UDrawTabletGroup group)
 {
   switch (group)
@@ -137,7 +130,7 @@ ControllerEmu::ControlGroup* UDrawTablet::GetGroup(UDrawTabletGroup group)
   case UDrawTabletGroup::Touch:
     return m_touch;
   default:
-    assert(false);
+    ASSERT(false);
     return nullptr;
   }
 }

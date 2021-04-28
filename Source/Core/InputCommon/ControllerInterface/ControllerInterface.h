@@ -12,13 +12,13 @@
 
 #include "Common/Matrix.h"
 #include "Common/WindowSystemInfo.h"
-#include "InputCommon/ControllerInterface/Device.h"
+#include "InputCommon/ControllerInterface/CoreDevice.h"
 
 // enable disable sources
 #ifdef _WIN32
 #define CIFACE_USE_WIN32
 #endif
-#if defined(HAVE_X11) && HAVE_X11
+#ifdef HAVE_X11
 #define CIFACE_USE_XLIB
 #endif
 #if defined(__APPLE__)
@@ -31,6 +31,23 @@
 #define CIFACE_USE_PIPES
 #endif
 #define CIFACE_USE_DUALSHOCKUDPCLIENT
+
+namespace ciface
+{
+// A thread local "input channel" is maintained to handle the state of relative inputs.
+// This allows simultaneous use of relative inputs across different input contexts.
+// e.g. binding relative mouse movements to both GameCube controllers and FreeLook.
+// These operate at different rates and processing one would break the other without separate state.
+enum class InputChannel
+{
+  Host,
+  SerialInterface,
+  Bluetooth,
+  FreeLook,
+  Count,
+};
+
+}  // namespace ciface
 
 //
 // ControllerInterface
@@ -50,6 +67,7 @@ public:
   void Shutdown();
   void AddDevice(std::shared_ptr<ciface::Core::Device> device);
   void RemoveDevice(std::function<bool(const ciface::Core::Device*)> callback);
+  void PlatformPopulateDevices(std::function<void()> callback);
   bool IsInit() const { return m_is_init; }
   void UpdateInput();
 
@@ -65,6 +83,9 @@ public:
   void UnregisterDevicesChangedCallback(const HotplugCallbackHandle& handle);
   void InvokeDevicesChangedCallbacks() const;
 
+  static void SetCurrentInputChannel(ciface::InputChannel);
+  static ciface::InputChannel GetCurrentInputChannel();
+
 private:
   std::list<std::function<void()>> m_devices_changed_callbacks;
   mutable std::mutex m_callbacks_mutex;
@@ -73,5 +94,38 @@ private:
   WindowSystemInfo m_wsi;
   std::atomic<float> m_aspect_ratio_adjustment = 1;
 };
+
+namespace ciface
+{
+template <typename T>
+class RelativeInputState
+{
+public:
+  void Update()
+  {
+    const auto channel = int(ControllerInterface::GetCurrentInputChannel());
+
+    m_value[channel] = m_delta[channel];
+    m_delta[channel] = {};
+  }
+
+  T GetValue() const
+  {
+    const auto channel = int(ControllerInterface::GetCurrentInputChannel());
+
+    return m_value[channel];
+  }
+
+  void Move(T delta)
+  {
+    for (auto& d : m_delta)
+      d += delta;
+  }
+
+private:
+  std::array<T, int(InputChannel::Count)> m_value;
+  std::array<T, int(InputChannel::Count)> m_delta;
+};
+}  // namespace ciface
 
 extern ControllerInterface g_controller_interface;

@@ -31,6 +31,7 @@
 
 namespace
 {
+bool s_update_triggered = false;
 #ifdef _WIN32
 
 const char UPDATER_FILENAME[] = "Updater.exe";
@@ -167,24 +168,24 @@ void AutoUpdateChecker::CheckForUpdate()
   auto resp = req.Get(url);
   if (!resp)
   {
-    ERROR_LOG(COMMON, "Auto-update request failed");
+    ERROR_LOG_FMT(COMMON, "Auto-update request failed");
     return;
   }
-  std::string contents(reinterpret_cast<char*>(resp->data()), resp->size());
-  INFO_LOG(COMMON, "Auto-update JSON response: %s", contents.c_str());
+  const std::string contents(reinterpret_cast<char*>(resp->data()), resp->size());
+  INFO_LOG_FMT(COMMON, "Auto-update JSON response: {}", contents);
 
   picojson::value json;
-  std::string err = picojson::parse(json, contents);
+  const std::string err = picojson::parse(json, contents);
   if (!err.empty())
   {
-    ERROR_LOG(COMMON, "Invalid JSON received from auto-update service: %s", err.c_str());
+    ERROR_LOG_FMT(COMMON, "Invalid JSON received from auto-update service: {}", err);
     return;
   }
   picojson::object obj = json.get<picojson::object>();
 
   if (obj["status"].get<std::string>() != "outdated")
   {
-    INFO_LOG(COMMON, "Auto-update status: we are up to date.");
+    INFO_LOG_FMT(COMMON, "Auto-update status: we are up to date.");
     return;
   }
 
@@ -205,6 +206,14 @@ void AutoUpdateChecker::CheckForUpdate()
 void AutoUpdateChecker::TriggerUpdate(const AutoUpdateChecker::NewVersionInformation& info,
                                       AutoUpdateChecker::RestartMode restart_mode)
 {
+  // Check to make sure we don't already have an update triggered
+  if (s_update_triggered)
+  {
+    WARN_LOG_FMT(COMMON, "Auto-update: received a redundant trigger request, ignoring");
+    return;
+  }
+
+  s_update_triggered = true;
 #ifdef OS_SUPPORTS_UPDATER
   std::map<std::string, std::string> updater_flags;
   updater_flags["this-manifest-url"] = info.this_manifest_url;
@@ -233,9 +242,8 @@ void AutoUpdateChecker::TriggerUpdate(const AutoUpdateChecker::NewVersionInforma
 #endif
 
   // Run the updater!
-  std::string command_line = MakeUpdaterCommandLine(updater_flags);
-
-  INFO_LOG(COMMON, "Updater command line: %s", command_line.c_str());
+  const std::string command_line = MakeUpdaterCommandLine(updater_flags);
+  INFO_LOG_FMT(COMMON, "Updater command line: {}", command_line);
 
 #ifdef _WIN32
   STARTUPINFO sinfo = {sizeof(sinfo)};
@@ -249,12 +257,12 @@ void AutoUpdateChecker::TriggerUpdate(const AutoUpdateChecker::NewVersionInforma
   }
   else
   {
-    ERROR_LOG(COMMON, "Could not start updater process: error=%d", GetLastError());
+    ERROR_LOG_FMT(COMMON, "Could not start updater process: error={}", GetLastError());
   }
 #else
   if (popen(command_line.c_str(), "r") == nullptr)
   {
-    ERROR_LOG(COMMON, "Could not start updater process: error=%d", errno);
+    ERROR_LOG_FMT(COMMON, "Could not start updater process: error={}", errno);
   }
 #endif
 

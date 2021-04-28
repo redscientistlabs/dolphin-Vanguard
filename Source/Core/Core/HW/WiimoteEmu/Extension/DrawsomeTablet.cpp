@@ -5,8 +5,8 @@
 #include "Core/HW/WiimoteEmu/Extension/DrawsomeTablet.h"
 
 #include <array>
-#include <cassert>
 
+#include "Common/Assert.h"
 #include "Common/BitUtils.h"
 #include "Common/Common.h"
 #include "Common/CommonTypes.h"
@@ -92,12 +92,6 @@ void DrawsomeTablet::Reset()
   m_reg.calibration.fill(0xff);
 }
 
-bool DrawsomeTablet::IsButtonPressed() const
-{
-  // Device has no buttons.
-  return false;
-}
-
 ControllerEmu::ControlGroup* DrawsomeTablet::GetGroup(DrawsomeTabletGroup group)
 {
   switch (group)
@@ -107,7 +101,7 @@ ControllerEmu::ControlGroup* DrawsomeTablet::GetGroup(DrawsomeTabletGroup group)
   case DrawsomeTabletGroup::Touch:
     return m_touch;
   default:
-    assert(false);
+    ASSERT(false);
     return nullptr;
   }
 }

@@ -15,22 +15,25 @@
 #include "Common/Config/Config.h"
 #include "Common/Thread.h"
 
+#include "Core/Config/FreeLookSettings.h"
 #include "Core/Config/GraphicsSettings.h"
 #include "Core/Config/UISettings.h"
 #include "Core/ConfigManager.h"
 #include "Core/Core.h"
+#include "Core/FreeLookManager.h"
 #include "Core/Host.h"
 #include "Core/HotkeyManager.h"
 #include "Core/IOS/IOS.h"
 #include "Core/IOS/USB/Bluetooth/BTBase.h"
+#include "Core/IOS/USB/Bluetooth/BTReal.h"
 #include "Core/State.h"
+#include "Core/WiiUtils.h"
 
 #include "DolphinQt/Settings.h"
 
 #include "InputCommon/ControlReference/ControlReference.h"
 #include "InputCommon/ControllerInterface/ControllerInterface.h"
 
-#include "VideoCommon/FreeLookCamera.h"
 #include "VideoCommon/OnScreenDisplay.h"
 #include "VideoCommon/RenderBase.h"
 #include "VideoCommon/VertexShaderManager.h"
@@ -134,12 +137,18 @@ static void HandleFrameStepHotkeys()
 
 void HotkeyScheduler::Run()
 {
+  Common::SetCurrentThreadName("HotkeyScheduler");
+
   while (!m_stop_requested.IsSet())
   {
-    Common::SleepCurrentThread(1000 / 60);
+    Common::SleepCurrentThread(5);
 
-    if (Core::GetState() == Core::State::Uninitialized || Core::GetState() == Core::State::Paused)
-      g_controller_interface.UpdateInput();
+    g_controller_interface.SetCurrentInputChannel(ciface::InputChannel::FreeLook);
+    g_controller_interface.UpdateInput();
+    FreeLook::UpdateInput();
+
+    g_controller_interface.SetCurrentInputChannel(ciface::InputChannel::Host);
+    g_controller_interface.UpdateInput();
 
     if (!HotkeyManagerEmu::IsEnabled())
       continue;
@@ -224,15 +233,8 @@ void HotkeyScheduler::Run()
         emit ToggleReadOnlyMode();
 
       // Wiimote
-      if (SConfig::GetInstance().m_bt_passthrough_enabled)
-      {
-        const auto ios = IOS::HLE::GetIOS();
-        auto device = ios ? ios->GetDeviceByName("/dev/usb/oh1/57e/305") : nullptr;
-
-        if (device != nullptr)
-          std::static_pointer_cast<IOS::HLE::Device::BluetoothBase>(device)->UpdateSyncButtonState(
-              IsHotkey(HK_TRIGGER_SYNC_BUTTON, true));
-      }
+      if (auto bt = WiiUtils::GetBluetoothRealDevice())
+        bt->UpdateSyncButtonState(IsHotkey(HK_TRIGGER_SYNC_BUTTON, true));
 
       if (SConfig::GetInstance().bEnableDebugging)
       {
@@ -389,6 +391,15 @@ void HotkeyScheduler::Run()
           break;
         }
       }
+
+      if (IsHotkey(HK_TOGGLE_SKIP_EFB_ACCESS))
+      {
+        const bool new_value = !Config::Get(Config::GFX_HACK_EFB_ACCESS_ENABLE);
+        Config::SetCurrent(Config::GFX_HACK_EFB_ACCESS_ENABLE, new_value);
+        OSD::AddMessage(
+            StringFromFormat("%s EFB Access from CPU", new_value ? "Skip" : "Don't skip"));
+      }
+
       if (IsHotkey(HK_TOGGLE_EFBCOPIES))
       {
         const bool new_value = !Config::Get(Config::GFX_HACK_SKIP_EFB_COPY_TO_RAM);
@@ -526,57 +537,13 @@ void HotkeyScheduler::Run()
       Config::SetCurrent(Config::GFX_STEREO_CONVERGENCE,
                          std::min(stereo_convergence + 5, Config::GFX_STEREO_CONVERGENCE_MAXIMUM));
 
-    // Freelook
-    static float fl_speed = 1.0;
-
+    // Free Look
     if (IsHotkey(HK_FREELOOK_TOGGLE))
     {
-      const bool new_value = !Config::Get(Config::GFX_FREE_LOOK);
-      Config::SetCurrent(Config::GFX_FREE_LOOK, new_value);
-      OSD::AddMessage(StringFromFormat("Freelook: %s", new_value ? "Enabled" : "Disabled"));
+      const bool new_value = !Config::Get(Config::FREE_LOOK_ENABLED);
+      Config::SetCurrent(Config::FREE_LOOK_ENABLED, new_value);
+      OSD::AddMessage(StringFromFormat("Free Look: %s", new_value ? "Enabled" : "Disabled"));
     }
-
-    if (IsHotkey(HK_FREELOOK_DECREASE_SPEED, true))
-      fl_speed /= 1.1f;
-
-    if (IsHotkey(HK_FREELOOK_INCREASE_SPEED, true))
-      fl_speed *= 1.1f;
-
-    if (IsHotkey(HK_FREELOOK_RESET_SPEED, true))
-      fl_speed = 1.0;
-
-    if (IsHotkey(HK_FREELOOK_UP, true))
-      g_freelook_camera.MoveVertical(-fl_speed);
-
-    if (IsHotkey(HK_FREELOOK_DOWN, true))
-      g_freelook_camera.MoveVertical(fl_speed);
-
-    if (IsHotkey(HK_FREELOOK_LEFT, true))
-      g_freelook_camera.MoveHorizontal(fl_speed);
-
-    if (IsHotkey(HK_FREELOOK_RIGHT, true))
-      g_freelook_camera.MoveHorizontal(-fl_speed);
-
-    if (IsHotkey(HK_FREELOOK_ZOOM_IN, true))
-      g_freelook_camera.Zoom(fl_speed);
-
-    if (IsHotkey(HK_FREELOOK_ZOOM_OUT, true))
-      g_freelook_camera.Zoom(-fl_speed);
-
-    if (IsHotkey(HK_FREELOOK_INCREASE_FOV_X, true))
-      g_freelook_camera.IncreaseFovX(g_freelook_camera.GetFovStepSize());
-
-    if (IsHotkey(HK_FREELOOK_DECREASE_FOV_X, true))
-      g_freelook_camera.IncreaseFovX(-1.0f * g_freelook_camera.GetFovStepSize());
-
-    if (IsHotkey(HK_FREELOOK_INCREASE_FOV_Y, true))
-      g_freelook_camera.IncreaseFovY(g_freelook_camera.GetFovStepSize());
-
-    if (IsHotkey(HK_FREELOOK_DECREASE_FOV_Y, true))
-      g_freelook_camera.IncreaseFovY(-1.0f * g_freelook_camera.GetFovStepSize());
-
-    if (IsHotkey(HK_FREELOOK_RESET, true))
-      g_freelook_camera.Reset();
 
     // Savestates
     for (u32 i = 0; i < State::NUM_STATES; i++)

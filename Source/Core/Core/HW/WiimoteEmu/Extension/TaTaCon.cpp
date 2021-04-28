@@ -5,9 +5,9 @@
 #include "Core/HW/WiimoteEmu/Extension/TaTaCon.h"
 
 #include <array>
-#include <cassert>
 #include <cstring>
 
+#include "Common/Assert.h"
 #include "Common/BitUtils.h"
 #include "Common/Common.h"
 #include "Common/CommonTypes.h"
@@ -62,14 +62,6 @@ void TaTaCon::Update()
   Common::BitCastPtr<DataFormat>(&m_reg.controller_data) = tatacon_data;
 }
 
-bool TaTaCon::IsButtonPressed() const
-{
-  u8 state = 0;
-  m_center->GetState(&state, center_bitmasks.data());
-  m_rim->GetState(&state, rim_bitmasks.data());
-  return state != 0;
-}
-
 void TaTaCon::Reset()
 {
   m_reg = {};
@@ -88,7 +80,7 @@ ControllerEmu::ControlGroup* TaTaCon::GetGroup(TaTaConGroup group)
   case TaTaConGroup::Rim:
     return m_rim;
   default:
-    assert(false);
+    ASSERT(false);
     return nullptr;
   }
 }
