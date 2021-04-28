@@ -528,32 +528,30 @@ enum COMMANDS
 
 inline COMMANDS CheckCommand(String ^ inString)
 {
-  if (inString == "LOADSAVESTATE")
+  if (String::Compare(inString, NetCore::Commands::Basic::LoadSavestate) == 0)
     return LOADSAVESTATE;
-  if (inString == "SAVESAVESTATE")
+  if (String::Compare(inString, NetCore::Commands::Basic::SaveSavestate) == 0)
     return SAVESAVESTATE;
-  if (inString == "REMOTE_LOADROM")
+  if (String::Compare(inString, NetCore::Commands::Remote::LoadROM) == 0)
     return REMOTE_LOADROM;
-  if (inString == "REMOTE_CLOSEGAME")
+  if (String::Compare(inString, NetCore::Commands::Remote::CloseGame) == 0)
     return REMOTE_CLOSEGAME;
-  if (inString == "REMOTE_ALLSPECSSENT")
+  if (String::Compare(inString, NetCore::Commands::Remote::AllSpecSent) == 0)
     return REMOTE_ALLSPECSSENT;
-  if (inString == "REMOTE_DOMAIN_GETDOMAINS")
+  if (String::Compare(inString, NetCore::Commands::Remote::DomainGetDomains) == 0)
     return REMOTE_DOMAIN_GETDOMAINS;
-  if (inString == "REMOTE_KEY_SETSYSTEMCORE")
+  if (String::Compare(inString, NetCore::Commands::Remote::KeySetSystemCore) == 0)
     return REMOTE_KEY_SETSYSTEMCORE;
-  if (inString == "REMOTE_KEY_SETSYNCSETTINGS")
+  if (String::Compare(inString, NetCore::Commands::Remote::KeySetSyncSettings) == 0)
     return REMOTE_KEY_SETSYNCSETTINGS;
-  if (inString == "REMOTE_EVENT_EMU_MAINFORM_CLOSE")
+  if (String::Compare(inString, NetCore::Commands::Remote::EventEmuMainFormClose) == 0)
     return REMOTE_EVENT_EMU_MAINFORM_CLOSE;
-  if (inString == "REMOTE_EVENT_EMUSTARTED")
+  if (String::Compare(inString, NetCore::Commands::Remote::EventEmuStarted) == 0)
     return REMOTE_EVENT_EMUSTARTED;
-  if (inString == "REMOTE_ISNORMALADVANCE")
+  if (String::Compare(inString, NetCore::Commands::Remote::IsNormalAdvance) == 0)
     return REMOTE_ISNORMALADVANCE;
-  if (inString == "REMOTE_EVENT_CLOSEEMULATOR")
+  if (String::Compare(inString, NetCore::Commands::Remote::EventCloseEmulator) == 0)
     return REMOTE_EVENT_CLOSEEMULATOR;
-  if (inString == "REMOTE_ALLSPECSSENT")
-    return REMOTE_ALLSPECSSENT;
   return UNKNOWN;
 }
 

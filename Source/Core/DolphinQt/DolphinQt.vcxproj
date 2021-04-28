@@ -57,14 +57,14 @@
     </Link>
     <ClCompile>
       <AdditionalIncludeDirectories>$(ProjectDir)VideoInterface;$(ProjectDir)GameList;$(ProjectDir)Debugger;$(ProjectDir)Settings;$(ProjectDir)Config;$(ProjectDir)Config\Mapping;$(ProjectDir)Config\Graphics;$(ProjectDir)NetPlay;$(ProjectDir)QtUtils;$(ProjectDir)TAS;$(ProjectDir)FIFO;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/Zc:twoPhase- %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/Zc:twoPhase- %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/Zc:twoPhase-; %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/Zc:twoPhase-; %(AdditionalOptions)</AdditionalOptions>
       <CompileAsManaged Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
       </CompileAsManaged>
       <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='Release|x64'">stdcpp17</LanguageStandard>
       <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdcpp17</LanguageStandard>
-      <ConformanceMode Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ConformanceMode>
-      <ConformanceMode Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ConformanceMode>
+      <ConformanceMode Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ConformanceMode>
+      <ConformanceMode Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ConformanceMode>
     </ClCompile>
     <Manifest>
       <AdditionalManifestFiles>DolphinQt.manifest;%(AdditionalManifestFiles)</AdditionalManifestFiles>
