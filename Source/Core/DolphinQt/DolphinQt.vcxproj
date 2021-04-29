@@ -23,7 +23,7 @@
     <ClCompile>
       <!-- 5054  operator '+': deprecated between enumerations of different types (in Qt headers) -->
       <DisableSpecificWarnings>5054;%(DisableSpecificWarnings)</DisableSpecificWarnings>
-      <AdditionalOptions>/CLRTHREADATTRIBUTE:STA %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>%(AdditionalOptions)</AdditionalOptions>
       <AdditionalIncludeDirectories>$(ProjectDir)Config\Graphics;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories>$(ProjectDir)Config;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories>$(ProjectDir)Config\ControllerInterface;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
@@ -41,6 +41,7 @@
       <AdditionalDependencies>avrt.lib;iphlpapi.lib;winmm.lib;setupapi.lib;rpcrt4.lib;comctl32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalDependencies Condition="'$(Platform)'=='x64'">opengl32.lib;avcodec.lib;avformat.lib;avutil.lib;swresample.lib;swscale.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories Condition="'$(Platform)'=='x64'">$(ExternalsDir)ffmpeg\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/CLRTHREADATTRIBUTE:STA %(AdditionalOptions)</AdditionalOptions>
     </Link>
     <Manifest>
       <AdditionalManifestFiles>DolphinQt.manifest;%(AdditionalManifestFiles)</AdditionalManifestFiles>
@@ -131,7 +132,7 @@
     <ClCompile Include="Debugger\CodeWidget.cpp" />
     <ClCompile Include="Debugger\JITWidget.cpp" />
     <ClCompile Include="Debugger\MemoryViewWidget.cpp" />
-     <ClCompile Include="NarrysMod\DolphinMemoryDomain.cpp">
+    <ClCompile Include="NarrysMod\DolphinMemoryDomain.cpp">
       <SupportJustMyCode Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</SupportJustMyCode>
       <CompileAsManaged Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</CompileAsManaged>
       <RuntimeTypeInfo Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</RuntimeTypeInfo>
@@ -498,7 +499,7 @@
     <ProjectReference Include="$(DolphinRootDir)Languages\Languages.vcxproj">
       <Project>{0e033be3-2e08-428e-9ae9-bc673efa12b5}</Project>
     </ProjectReference>
-        <ProjectReference Include="..\..\..\..\RTCV\Source\Libraries\Common\Common.csproj">
+    <ProjectReference Include="..\..\..\..\RTCV\Source\Libraries\Common\Common.csproj">
       <Project>{a31c17e1-2eab-434f-a022-20193f2ceab7}</Project>
     </ProjectReference>
     <ProjectReference Include="..\..\..\..\RTCV\Source\Libraries\CorruptCore\CorruptCore.csproj">
