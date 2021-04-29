@@ -3,7 +3,7 @@
 #include <memory>
 
 #include "Common/Config/Config.h"
-#include "NarrysMod/VanguardClient.h"
+#include "../NarrysMod/VanguardClient.h"
 
 
 namespace NetPlay

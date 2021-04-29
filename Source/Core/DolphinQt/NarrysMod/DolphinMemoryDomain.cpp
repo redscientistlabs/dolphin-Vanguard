@@ -8,6 +8,8 @@
 #include "DolphinMemoryDomain.h"
 #include "Core/PowerPC/PPCCache.h"
 #include "Core/PowerPC/Jit64Common/Jit64PowerPCState.h"
+#include <DolphinQt/VanguardUnmanagedWrapper.cpp/VanguardUnmanagedWrapper.h>
+
 
 using namespace cli;
 using namespace System;
@@ -67,7 +69,7 @@ unsigned char SRAM::PeekByte(long long addr)
   {
     // Convert the address
     addr += SRAM_OFFSET;
-    return Memory::Read_U8(static_cast<u32>(addr));
+    return UnmanagedRead(addr);
   }
   return 0;
 }
@@ -88,8 +90,7 @@ void SRAM::PokeByte(long long addr, unsigned char val)
   {
     // Convert the address
     addr += SRAM_OFFSET;
-    Memory::Write_U8(val, static_cast<u32>(addr));
-    PowerPC::ppcState.iCache.Invalidate(addr);
+    UnmanagedWrite(addr, val);
   }
 }
 
@@ -119,7 +120,8 @@ unsigned char EXRAM::PeekByte(long long addr)
   {
     // Convert the address
     addr += EXRAM_OFFSET;
-    return Memory::Read_U8(static_cast<u32>(addr));
+    return UnmanagedRead(addr);
+    //return Memory::Read_U8(static_cast<u32>(addr));
   }
   return 0;
 }
@@ -140,8 +142,7 @@ void EXRAM::PokeByte(long long addr, unsigned char val)
   {
     // Convert the address
     addr += EXRAM_OFFSET;
-    Memory::Write_U8(val, static_cast<u32>(addr));
-    PowerPC::ppcState.iCache.Invalidate(addr);
+    UnmanagedWrite(addr, val);
   }
 }
 

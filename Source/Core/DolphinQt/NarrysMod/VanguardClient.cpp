@@ -13,14 +13,15 @@
 
 #include "DolphinMemoryDomain.h"
 #include "DolphinQT/MainWindow.h"
-#include "NarrysMod/Helpers.hpp"
-#include "NarrysMod/VanguardClient.h"
-#include "NarrysMod/VanguardClientInitializer.h"
-#include "NarrysMod/VanguardConfigLoader.h"
-#include "NarrysMod/VanguardSettingsWrapper.h"
+#include "../NarrysMod/Helpers.hpp"
+#include "../NarrysMod/VanguardClient.h"
+#include "../NarrysMod/VanguardClientInitializer.h"
+#include "../NarrysMod/VanguardConfigLoader.h"
+#include "../NarrysMod/VanguardSettingsWrapper.h"
 
 #include <msclr/marshal_cppstd.h>
 #include <QGuiApplication>
+#include <DolphinQt/VanguardUnmanagedWrapper.cpp/VanguardUnmanagedWrapper.h>
 
 ref class VanguardSettingsWrapper;
 using namespace cli;
@@ -92,7 +93,7 @@ static void EmuThreadExecute(IntPtr callbackPtr)
 {
   std::function<void(void)> nativeCallback =
       static_cast<void(__stdcall*)(void)>(callbackPtr.ToPointer());
-  Core::RunAsCPUThread(nativeCallback);
+  UnmanagedEmuThreadExecute(nativeCallback);
 }
 
 static PartialSpec ^
@@ -396,8 +397,32 @@ void VanguardClientUnmanaged::LOAD_GAME_START(std::string romPath)
     GAME_TO_LOAD = "";
   }
 
-  String ^ gameName = Helpers::utf8StringToSystemString(romPath);
+  String ^ gameName = utf8StringToSystemString(romPath);
   AllSpec::VanguardSpec->Update(VSPEC::OPENROMFILENAME, gameName, true, true);
+}
+
+//lifted from dolphin so that we dont call unmanaged
+System::String ^
+    utf8StringToSystemString(std::string utf8String) {
+      size_t count = utf8String.length();
+      if (count == 0)
+        return System::String::Empty;
+      array<uchar> ^ bytes = gcnew array<uchar>(count);
+      {
+        pin_ptr<uchar> pinnedBytes = &bytes[0];
+        memcpy(pinnedBytes, utf8String.c_str(), count);
+      }
+      return System::Text::Encoding::UTF8->GetString(bytes);
+    }
+
+// lifted from dolphin so that we dont call unmanaged
+    std::string systemStringToUtf8String(System::String ^ sString)
+{
+  if (System::String::IsNullOrEmpty(sString))
+    return std::string("");
+  array<uchar> ^ bytes = System::Text::Encoding::UTF8->GetBytes(sString);
+  pin_ptr<uchar> pinnedBytes(&bytes[0]);
+  return std::string(reinterpret_cast<char*>(static_cast<uchar*>(pinnedBytes)), bytes->Length);
 }
 
 void VanguardClientUnmanaged::LOAD_GAME_DONE()
@@ -430,7 +455,7 @@ void VanguardClientUnmanaged::LOAD_GAME_DONE()
 
     String ^ oldGame = AllSpec::VanguardSpec->Get<String ^>(VSPEC::GAMENAME);
     String ^ gameName =
-        Helpers::utf8StringToSystemString(SConfig::GetInstance().GetTitleDescription());
+        utf8StringToSystemString(SConfig::GetInstance().GetTitleDescription());
 
     char replaceChar = L'-';
     gameDone->Set(VSPEC::GAMENAME, StringExtensions::MakeSafeFilename(gameName, replaceChar));
@@ -568,7 +593,7 @@ void VanguardClient::LoadRom(String ^ filename)
     // Clear out any old settings
     Config::ClearCurrentVanguardLayer();
 
-    const std::string& path = Helpers::systemStringToUtf8String(filename);
+    const std::string& path = systemStringToUtf8String(filename);
     loading = true;
 
     SetState(Core::State::Paused);
@@ -589,16 +614,16 @@ bool VanguardClient::LoadState(std::string filename)
 {
   StepActions::ClearStepBlastUnits();
   RtcClock::ResetCount();
-  State::LoadAs(filename);
+  UnmanagedLoad(filename);
   return true;
 }
 
 bool VanguardClient::SaveState(String ^ filename, bool wait)
 {
-  if (Core::IsRunningAndStarted())
+  if (UnmanagedIsRunningAndStarted())
   {
-    const std::string converted_filename = Helpers::systemStringToUtf8String(filename);
-    State::SaveAs(converted_filename, wait);
+    const std::string converted_filename = systemStringToUtf8String(filename);
+    UnmanagedSaveAs(converted_filename, wait);
     return true;
   }
   return false;
@@ -631,10 +656,10 @@ void VanguardClient::OnMessageReceived(Object ^ sender, NetCoreEventArgs ^ e)
   case LOADSAVESTATE: {
     array<Object ^> ^ cmd = static_cast<array<Object ^> ^>(advancedMessage->objectValue);
     String ^ path = static_cast<String ^>(cmd[0]);
-    std::string converted_path = Helpers::systemStringToUtf8String(path);
+    std::string converted_path = systemStringToUtf8String(path);
 
     // Clear out any old settings
-    Config::ClearCurrentVanguardLayer();
+    UnmanagedClearCurrentVanguardLayer();
 
     // Load up the sync settings
     String ^ settingStr = AllSpec::VanguardSpec->Get<String ^>(VSPEC::SYNCSETTINGS);
