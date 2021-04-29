@@ -9,7 +9,7 @@ Download link: http://redscientist.com/rtc
 
 # Dolphin - A GameCube and Wii Emulator
 
-[Homepage](https://dolphin-emu.org/) | [Project Site](https://github.com/dolphin-emu/dolphin) | [Forums](https://forums.dolphin-emu.org/) | [Wiki](https://wiki.dolphin-emu.org/) | [Issue Tracker](https://bugs.dolphin-emu.org/projects/emulator/issues) | [Coding Style](https://github.com/dolphin-emu/dolphin/blob/master/Contributing.md) | [Transifex Page](https://www.transifex.com/projects/p/dolphin-emu/)
+[Homepage](https://dolphin-emu.org/) | [Project Site](https://github.com/dolphin-emu/dolphin) | [Buildbot](https://dolphin.ci) | [Forums](https://forums.dolphin-emu.org/) | [Wiki](https://wiki.dolphin-emu.org/) | [Issue Tracker](https://bugs.dolphin-emu.org/projects/emulator/issues) | [Coding Style](https://github.com/dolphin-emu/dolphin/blob/master/Contributing.md) | [Transifex Page](https://www.transifex.com/projects/p/dolphin-emu/)
 
 Dolphin is an emulator for running GameCube and Wii games on Windows,
 Linux, macOS, and recent Android devices. It's licensed under the terms
@@ -22,9 +22,9 @@ Please read the [FAQ](https://dolphin-emu.org/docs/faq/) before using Dolphin.
 ### Desktop
 
 * OS
-    * Windows (7 SP1 or higher is officially supported, but Vista SP2 might also work).
+    * Windows (7 SP1 or higher).
     * Linux.
-    * macOS (10.10 Yosemite or higher).
+    * macOS (10.12 Sierra or higher).
     * Unix-like systems other than Linux are not officially supported but might work.
 * Processor
     * A CPU with SSE2 support.
@@ -48,11 +48,11 @@ Dolphin can only be installed on devices that satisfy the above requirements. At
 ## Building for Windows
 
 Use the solution file `Source/dolphin-emu.sln` to build Dolphin on Windows.
-Visual Studio 2017 15.7 is a hard requirement. Other compilers might be
+Visual Studio 2019 16.3 or later is a hard requirement. Other compilers might be
 able to build Dolphin on Windows but have not been tested and are not
-recommended to be used. Git and Windows 10 SDK 10.0.17134.0 must be installed when building.
+recommended to be used. Git and Windows 10 SDK must be installed when building.
 
-Make sure to check out the Qt submodule before building:
+Make sure to pull submodules before building:
 ```sh
 git submodule update --init
 ```
@@ -150,12 +150,13 @@ see where it's stored) if you don't plan to reinstall Dolphin.
 * -A, --audio_emulation=<str> Low level (LLE) or high level (HLE) audio
 
 Available DSP emulation engines are HLE (High Level Emulation) and
-LLE (Low Level Emulation). HLE is fast but often less accurate while LLE is
-slow but close to perfect. Note that LLE has two submodes (Interpreter and
-Recompiler), which cannot be selected from the command line.
+LLE (Low Level Emulation). HLE is faster but less accurate whereas
+LLE is slower but close to perfect. Note that LLE has two submodes (Interpreter and Recompiler)
+but they cannot be selected from the command line.
 
-Available video backends are "D3D" (only available on Windows) and
-"OGL". There's also "Software Renderer", which uses the CPU for rendering and
+Available video backends are "D3D" and "D3D12" (they are only available on Windows), "OGL", and "Vulkan".
+There's also "Null", which will not render anything, and
+"Software Renderer", which uses the CPU for rendering and
 is intended for debugging purposes only.
 
 ## Sys Files
@@ -167,8 +168,8 @@ is intended for debugging purposes only.
 * `GC/dsp_coef.bin`: DSP dumps
 * `GC/dsp_rom.bin`: DSP dumps
 * `Wii/clientca.pem`: Wii network certificate
-* `Wii/clientcacakey.pem`: Wii network certificate
-* `Wii/rootca.pem`: Wii network certificate
+* `Wii/clientcakey.pem`: Wii network certificate key
+* `Wii/rootca.pem`: Wii network certificate issuer / CA
 
 The DSP dumps included with Dolphin have been written from scratch and do not
 contain any copyrighted material. They should work for most purposes, however

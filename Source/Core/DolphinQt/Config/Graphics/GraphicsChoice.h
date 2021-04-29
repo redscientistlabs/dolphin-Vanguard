@@ -4,18 +4,18 @@
 
 #pragma once
 
-#include <QComboBox>
+#include "DolphinQt/Config/ToolTipControls/ToolTipComboBox.h"
 
 #include "Common/Config/Config.h"
 
-class GraphicsChoice : public QComboBox
+class GraphicsChoice : public ToolTipComboBox
 {
   Q_OBJECT
 public:
-  GraphicsChoice(const QStringList& options, const Config::ConfigInfo<int>& setting);
+  GraphicsChoice(const QStringList& options, const Config::Info<int>& setting);
 
 private:
   void Update(int choice);
 
-  Config::ConfigInfo<int> m_setting;
+  Config::Info<int> m_setting;
 };

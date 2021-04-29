@@ -34,6 +34,8 @@ CodeWidget::CodeWidget(QWidget* parent) : QDockWidget(parent)
 
   setAllowedAreas(Qt::AllDockWidgetAreas);
 
+  CreateWidgets();
+
   auto& settings = Settings::GetQSettings();
 
   restoreGeometry(settings.value(QStringLiteral("codewidget/geometry")).toByteArray());
@@ -41,7 +43,7 @@ CodeWidget::CodeWidget(QWidget* parent) : QDockWidget(parent)
   // according to Settings
   setFloating(settings.value(QStringLiteral("codewidget/floating")).toBool());
 
-  connect(&Settings::Instance(), &Settings::CodeVisibilityChanged,
+  connect(&Settings::Instance(), &Settings::CodeVisibilityChanged, this,
           [this](bool visible) { setHidden(!visible); });
 
   connect(Host::GetInstance(), &Host::UpdateDisasmDialog, this, [this] {
@@ -52,20 +54,17 @@ CodeWidget::CodeWidget(QWidget* parent) : QDockWidget(parent)
 
   connect(Host::GetInstance(), &Host::NotifyMapLoaded, this, &CodeWidget::UpdateSymbols);
 
-  connect(&Settings::Instance(), &Settings::DebugModeToggled,
+  connect(&Settings::Instance(), &Settings::DebugModeToggled, this,
           [this](bool enabled) { setHidden(!enabled || !Settings::Instance().IsCodeVisible()); });
 
   connect(&Settings::Instance(), &Settings::EmulationStateChanged, this, &CodeWidget::Update);
 
-  CreateWidgets();
   ConnectWidgets();
 
   m_code_splitter->restoreState(
       settings.value(QStringLiteral("codewidget/codesplitter")).toByteArray());
   m_box_splitter->restoreState(
       settings.value(QStringLiteral("codewidget/boxsplitter")).toByteArray());
-
-  Update();
 }
 
 CodeWidget::~CodeWidget()
@@ -75,12 +74,17 @@ CodeWidget::~CodeWidget()
   settings.setValue(QStringLiteral("codewidget/geometry"), saveGeometry());
   settings.setValue(QStringLiteral("codewidget/floating"), isFloating());
   settings.setValue(QStringLiteral("codewidget/codesplitter"), m_code_splitter->saveState());
-  settings.setValue(QStringLiteral("codewidget/boxplitter"), m_box_splitter->saveState());
+  settings.setValue(QStringLiteral("codewidget/boxsplitter"), m_box_splitter->saveState());
 }
 
 void CodeWidget::closeEvent(QCloseEvent*)
 {
   Settings::Instance().SetCodeVisible(false);
+}
+
+void CodeWidget::showEvent(QShowEvent* event)
+{
+  Update();
 }
 
 void CodeWidget::CreateWidgets()
@@ -153,6 +157,7 @@ void CodeWidget::CreateWidgets()
 void CodeWidget::ConnectWidgets()
 {
   connect(m_search_address, &QLineEdit::textChanged, this, &CodeWidget::OnSearchAddress);
+  connect(m_search_address, &QLineEdit::returnPressed, this, &CodeWidget::OnSearchAddress);
   connect(m_search_symbols, &QLineEdit::textChanged, this, &CodeWidget::OnSearchSymbols);
 
   connect(m_symbols_list, &QListWidget::itemPressed, this, &CodeWidget::OnSelectSymbol);
@@ -165,6 +170,7 @@ void CodeWidget::ConnectWidgets()
   connect(m_code_view, &CodeViewWidget::SymbolsChanged, this, &CodeWidget::UpdateSymbols);
   connect(m_code_view, &CodeViewWidget::BreakpointsChanged, this,
           [this] { emit BreakpointsChanged(); });
+  connect(m_code_view, &CodeViewWidget::UpdateCodeWidget, this, &CodeWidget::Update);
 
   connect(m_code_view, &CodeViewWidget::RequestPPCComparison, this,
           &CodeWidget::RequestPPCComparison);
@@ -265,6 +271,9 @@ void CodeWidget::SetAddress(u32 address, CodeViewWidget::SetAddressUpdate update
 
 void CodeWidget::Update()
 {
+  if (!isVisible())
+    return;
+
   const Common::Symbol* symbol = g_symbolDB.GetSymbolFromAddr(m_code_view->GetAddress());
 
   UpdateCallstack();
@@ -308,9 +317,9 @@ void CodeWidget::UpdateCallstack()
 
 void CodeWidget::UpdateSymbols()
 {
-  QString selection = m_symbols_list->selectedItems().isEmpty() ?
-                          QStringLiteral("") :
-                          m_symbols_list->selectedItems()[0]->text();
+  const QString selection = m_symbols_list->selectedItems().isEmpty() ?
+                                QString{} :
+                                m_symbols_list->selectedItems()[0]->text();
   m_symbols_list->clear();
 
   for (const auto& symbol : g_symbolDB.Symbols())

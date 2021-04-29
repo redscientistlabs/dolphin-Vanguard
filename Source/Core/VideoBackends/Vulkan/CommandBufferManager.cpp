@@ -9,6 +9,7 @@
 
 #include "Common/Assert.h"
 #include "Common/MsgHandler.h"
+#include "Common/Thread.h"
 
 #include "VideoBackends/Vulkan/VulkanContext.h"
 
@@ -185,6 +186,8 @@ bool CommandBufferManager::CreateSubmitThread()
 {
   m_submit_loop = std::make_unique<Common::BlockingLoop>();
   m_submit_thread = std::thread([this]() {
+    Common::SetCurrentThreadName("Vulkan CommandBufferManager SubmitThread");
+
     m_submit_loop->Run([this]() {
       PendingCommandBufferSubmit submit;
       {
@@ -280,7 +283,7 @@ void CommandBufferManager::SubmitCommandBuffer(bool submit_on_worker_thread,
     if (res != VK_SUCCESS)
     {
       LOG_VULKAN_ERROR(res, "vkEndCommandBuffer failed: ");
-      PanicAlert("Failed to end command buffer");
+      PanicAlertFmt("Failed to end command buffer");
     }
   }
 
@@ -355,7 +358,7 @@ void CommandBufferManager::SubmitCommandBuffer(u32 command_buffer_index,
   if (res != VK_SUCCESS)
   {
     LOG_VULKAN_ERROR(res, "vkQueueSubmit failed: ");
-    PanicAlert("Failed to submit command buffer.");
+    PanicAlertFmt("Failed to submit command buffer.");
   }
 
   // Do we have a swap chain to present?
@@ -371,13 +374,25 @@ void CommandBufferManager::SubmitCommandBuffer(u32 command_buffer_index,
                                      &present_image_index,
                                      nullptr};
 
-    res = vkQueuePresentKHR(g_vulkan_context->GetPresentQueue(), &present_info);
-    if (res != VK_SUCCESS)
+    m_last_present_result = vkQueuePresentKHR(g_vulkan_context->GetPresentQueue(), &present_info);
+    if (m_last_present_result != VK_SUCCESS)
     {
       // VK_ERROR_OUT_OF_DATE_KHR is not fatal, just means we need to recreate our swap chain.
-      if (res != VK_ERROR_OUT_OF_DATE_KHR && res != VK_SUBOPTIMAL_KHR)
-        LOG_VULKAN_ERROR(res, "vkQueuePresentKHR failed: ");
-      m_present_failed_flag.Set();
+      if (m_last_present_result != VK_ERROR_OUT_OF_DATE_KHR &&
+          m_last_present_result != VK_SUBOPTIMAL_KHR &&
+          m_last_present_result != VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT)
+      {
+        LOG_VULKAN_ERROR(m_last_present_result, "vkQueuePresentKHR failed: ");
+      }
+
+      // Don't treat VK_SUBOPTIMAL_KHR as fatal on Android. Android 10+ requires prerotation.
+      // See https://twitter.com/Themaister/status/1207062674011574273
+#ifdef VK_USE_PLATFORM_ANDROID_KHR
+      if (m_last_present_result != VK_SUBOPTIMAL_KHR)
+        m_last_present_failed.Set();
+#else
+      m_last_present_failed.Set();
+#endif
     }
   }
 

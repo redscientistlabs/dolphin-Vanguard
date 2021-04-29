@@ -7,12 +7,13 @@
 // This backend tries not to do anything in the backend,
 // but everything in VideoCommon.
 
+#include "VideoBackends/Null/NullRender.h"
+#include "VideoBackends/Null/NullVertexManager.h"
 #include "VideoBackends/Null/PerfQuery.h"
-#include "VideoBackends/Null/Render.h"
 #include "VideoBackends/Null/TextureCache.h"
-#include "VideoBackends/Null/VertexManager.h"
 #include "VideoBackends/Null/VideoBackend.h"
 
+#include "Common/Common.h"
 #include "Common/MsgHandler.h"
 
 #include "VideoCommon/FramebufferManager.h"
@@ -51,6 +52,7 @@ void VideoBackend::InitBackendInfo()
   g_Config.backend_info.bSupportsBackgroundCompiling = false;
   g_Config.backend_info.bSupportsLogicOp = false;
   g_Config.backend_info.bSupportsLargePoints = false;
+  g_Config.backend_info.bSupportsDepthReadback = false;
   g_Config.backend_info.bSupportsPartialDepthCopies = false;
   g_Config.backend_info.bSupportsShaderBinaries = false;
   g_Config.backend_info.bSupportsPipelineCacheData = false;
@@ -75,7 +77,7 @@ bool VideoBackend::Initialize(const WindowSystemInfo& wsi)
       !g_renderer->Initialize() || !g_framebuffer_manager->Initialize() ||
       !g_texture_cache->Initialize())
   {
-    PanicAlert("Failed to initialize renderer classes");
+    PanicAlertFmt("Failed to initialize renderer classes");
     Shutdown();
     return false;
   }
@@ -96,5 +98,11 @@ void VideoBackend::Shutdown()
   g_renderer.reset();
 
   ShutdownShared();
+}
+
+std::string VideoBackend::GetDisplayName() const
+{
+  // i18n: Null is referring to the null video backend, which renders nothing
+  return _trans("Null");
 }
 }  // namespace Null

@@ -41,6 +41,7 @@
 #define MAPS_DIR "Maps"
 #define CACHE_DIR "Cache"
 #define COVERCACHE_DIR "GameCovers"
+#define REDUMPCACHE_DIR "Redump"
 #define SHADERCACHE_DIR "Shaders"
 #define STATESAVES_DIR "StateSaves"
 #define SCREENSHOTS_DIR "ScreenShots"
@@ -68,6 +69,7 @@
 #define WFSROOT_DIR "WFS"
 #define BACKUP_DIR "Backup"
 #define RESOURCEPACK_DIR "ResourcePacks"
+#define DYNAMICINPUT_DIR "DynamicInputTextures"
 
 // This one is only used to remove it if it was present
 #define SHADERCACHE_LEGACY_DIR "ShaderCache"
@@ -84,6 +86,8 @@
 #define GFX_CONFIG "GFX.ini"
 #define DEBUGGER_CONFIG "Debugger.ini"
 #define LOGGER_CONFIG "Logger.ini"
+#define DUALSHOCKUDPCLIENT_CONFIG "DSUClient.ini"
+#define FREELOOK_CONFIG "FreeLook.ini"
 
 // Files in the directory returned by GetUserPath(D_LOGS_IDX)
 #define MAIN_LOG "dolphin.log"

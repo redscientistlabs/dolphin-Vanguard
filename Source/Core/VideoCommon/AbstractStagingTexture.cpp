@@ -46,7 +46,7 @@ void AbstractStagingTexture::ReadTexels(const MathUtil::Rectangle<int>& rect, vo
       static_cast<u32>(rect.bottom) <= m_config.height))
   {
     std::string log_message = StringFromFormat("BAD READTEXELS");
-    GENERIC_LOG(LogTypes::COMMON, LogTypes::LERROR, "%s", log_message.c_str());
+   // GENERIC_LOG(LogTypes::COMMON, LogTypes::LERROR, "%s", log_message.c_str());
     return;
   }
 
@@ -100,7 +100,7 @@ void AbstractStagingTexture::WriteTexels(const MathUtil::Rectangle<int>& rect, c
       static_cast<u32>(rect.bottom) <= m_config.height))
   {
     std::string log_message = StringFromFormat("BAD WRITETEXELS");
-    GENERIC_LOG(LogTypes::COMMON, LogTypes::LERROR, "%s", log_message.c_str());
+   // GENERIC_LOG(LogTypes::COMMON, LogTypes::LERROR, "%s", log_message.c_str());
     return;
   }
 

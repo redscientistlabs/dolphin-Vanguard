@@ -9,7 +9,6 @@
 #include <QDockWidget>
 
 #include "Common/CommonTypes.h"
-#include "Core/HW/AddressSpace.h"
 
 class MemoryViewWidget;
 class QCheckBox;
@@ -17,6 +16,7 @@ class QLabel;
 class QLineEdit;
 class QPushButton;
 class QRadioButton;
+class QShowEvent;
 class QSplitter;
 
 class MemoryWidget : public QDockWidget
@@ -31,6 +31,7 @@ public:
 signals:
   void BreakpointsChanged();
   void ShowCode(u32 address);
+  void RequestWatch(QString name, u32 address);
 
 private:
   void CreateWidgets();
@@ -61,10 +62,12 @@ private:
   void FindValue(bool next);
 
   void closeEvent(QCloseEvent*) override;
+  void showEvent(QShowEvent* event) override;
 
   MemoryViewWidget* m_memory_view;
   QSplitter* m_splitter;
   QLineEdit* m_search_address;
+  QLineEdit* m_search_offset;
   QLineEdit* m_data_edit;
   QPushButton* m_set_value;
   QPushButton* m_dump_mram;

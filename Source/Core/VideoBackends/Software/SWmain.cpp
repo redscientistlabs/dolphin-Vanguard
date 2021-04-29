@@ -45,12 +45,19 @@ public:
 
 std::string VideoSoftware::GetName() const
 {
-  return "Software Renderer";
+  return NAME;
 }
 
 std::string VideoSoftware::GetDisplayName() const
 {
   return _trans("Software Renderer");
+}
+
+std::optional<std::string> VideoSoftware::GetWarningMessage() const
+{
+  return _trans("The software renderer is significantly slower than other "
+                "backends and is only recommended for debugging purposes.\n\nDo you "
+                "really want to enable software rendering? If unsure, select 'No'.");
 }
 
 void VideoSoftware::InitBackendInfo()
@@ -70,6 +77,7 @@ void VideoSoftware::InitBackendInfo()
   g_Config.backend_info.bSupportsBPTCTextures = false;
   g_Config.backend_info.bSupportsCopyToVram = false;
   g_Config.backend_info.bSupportsLargePoints = false;
+  g_Config.backend_info.bSupportsDepthReadback = false;
   g_Config.backend_info.bSupportsPartialDepthCopies = false;
   g_Config.backend_info.bSupportsFramebufferFetch = false;
   g_Config.backend_info.bSupportsBackgroundCompiling = false;
@@ -104,7 +112,7 @@ bool VideoSoftware::Initialize(const WindowSystemInfo& wsi)
       !g_renderer->Initialize() || !g_framebuffer_manager->Initialize() ||
       !g_texture_cache->Initialize())
   {
-    PanicAlert("Failed to initialize renderer classes");
+    PanicAlertFmt("Failed to initialize renderer classes");
     Shutdown();
     return false;
   }

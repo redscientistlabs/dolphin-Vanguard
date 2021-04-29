@@ -6,12 +6,15 @@
 
 #pragma once
 
+#include <array>
+
 extern "C" {
 #include <X11/Xlib.h>
 #include <X11/extensions/XInput2.h>
 #include <X11/keysym.h>
 }
 
+#include "Common/Matrix.h"
 #include "InputCommon/ControllerInterface/ControllerInterface.h"
 
 namespace ciface::XInput2
@@ -23,12 +26,11 @@ class KeyboardMouse : public Core::Device
 private:
   struct State
   {
-    char keyboard[32];
+    std::array<char, 32> keyboard;
     unsigned int buttons;
-    struct
-    {
-      float x, y;
-    } cursor, axis;
+    Common::Vec2 cursor;
+    Common::Vec2 axis;
+    Common::Vec2 relative_mouse;
   };
 
   class Key : public Input
@@ -64,7 +66,7 @@ private:
   {
   public:
     std::string GetName() const override { return name; }
-    bool IsDetectable() override { return false; }
+    bool IsDetectable() const override { return false; }
     Cursor(u8 index, bool positive, const float* cursor);
     ControlState GetState() const override;
 
@@ -79,7 +81,7 @@ private:
   {
   public:
     std::string GetName() const override { return name; }
-    bool IsDetectable() override { return false; }
+    bool IsDetectable() const override { return false; }
     Axis(u8 index, bool positive, const float* axis);
     ControlState GetState() const override;
 
@@ -90,8 +92,23 @@ private:
     std::string name;
   };
 
+  class RelativeMouse : public Input
+  {
+  public:
+    std::string GetName() const override { return name; }
+    bool IsDetectable() const override { return false; }
+    RelativeMouse(u8 index, bool positive, const float* axis);
+    ControlState GetState() const override;
+
+  private:
+    const float* m_axis;
+    const u8 m_index;
+    const bool m_positive;
+    std::string name;
+  };
+
 private:
-  void SelectEventsForDevice(Window window, XIEventMask* mask, int deviceid);
+  void SelectEventsForDevice(XIEventMask* mask, int deviceid);
   void UpdateCursor();
 
 public:
@@ -106,9 +123,10 @@ public:
 private:
   Window m_window;
   Display* m_display;
-  State m_state;
-  int xi_opcode;
-  const int pointer_deviceid, keyboard_deviceid;
+  State m_state{};
+  const int xi_opcode;
+  const int pointer_deviceid;
+  const int keyboard_deviceid;
   std::string name;
 };
 }  // namespace ciface::XInput2

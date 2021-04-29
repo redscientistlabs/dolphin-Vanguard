@@ -5,10 +5,10 @@
 #include <algorithm>
 
 #include "Common/Assert.h"
+#include "Common/Image.h"
 #include "Common/MsgHandler.h"
 #include "VideoCommon/AbstractStagingTexture.h"
 #include "VideoCommon/AbstractTexture.h"
-#include "VideoCommon/ImageWrite.h"
 #include "VideoCommon/RenderBase.h"
 
 AbstractTexture::AbstractTexture(const TextureConfig& c) : m_config(c)
@@ -48,9 +48,10 @@ bool AbstractTexture::Save(const std::string& filename, unsigned int level)
   if (!readback_texture->Map())
     return false;
 
-  return TextureToPng(reinterpret_cast<const u8*>(readback_texture->GetMappedPointer()),
-                      static_cast<int>(readback_texture->GetMappedStride()), filename, level_width,
-                      level_height);
+  return Common::SavePNG(filename,
+                         reinterpret_cast<const u8*>(readback_texture->GetMappedPointer()),
+                         Common::ImageByteFormat::RGBA, level_width, level_height,
+                         static_cast<int>(readback_texture->GetMappedStride()));
 }
 
 bool AbstractTexture::IsCompressedFormat(AbstractTextureFormat format)
@@ -88,20 +89,19 @@ bool AbstractTexture::IsStencilFormat(AbstractTextureFormat format)
   return format == AbstractTextureFormat::D24_S8 || format == AbstractTextureFormat::D32F_S8;
 }
 
-AbstractTextureFormat AbstractTexture::GetColorFormatForDepthFormat(AbstractTextureFormat format)
+bool AbstractTexture::IsCompatibleDepthAndColorFormats(AbstractTextureFormat depth_format,
+                                                       AbstractTextureFormat color_format)
 {
-  switch (format)
+  switch (depth_format)
   {
   case AbstractTextureFormat::D16:
-    return AbstractTextureFormat::R16;
+    return color_format == AbstractTextureFormat::R16;
 
-  case AbstractTextureFormat::D24_S8:  // TODO: Incorrect
   case AbstractTextureFormat::D32F:
-  case AbstractTextureFormat::D32F_S8:
-    return AbstractTextureFormat::R32F;
+    return color_format == AbstractTextureFormat::R32F;
 
   default:
-    return format;
+    return false;
   }
 }
 
@@ -127,7 +127,7 @@ u32 AbstractTexture::CalculateStrideForFormat(AbstractTextureFormat format, u32 
   case AbstractTextureFormat::D32F_S8:
     return static_cast<size_t>(row_length) * 8;
   default:
-    PanicAlert("Unhandled texture format.");
+    PanicAlertFmt("Unhandled texture format.");
     return 0;
   }
 }
@@ -154,7 +154,7 @@ u32 AbstractTexture::GetTexelSizeForFormat(AbstractTextureFormat format)
   case AbstractTextureFormat::D32F_S8:
     return 8;
   default:
-    PanicAlert("Unhandled texture format.");
+    PanicAlertFmt("Unhandled texture format.");
     return 0;
   }
 }

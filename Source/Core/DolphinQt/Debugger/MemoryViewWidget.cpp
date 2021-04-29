@@ -14,9 +14,12 @@
 #include <cctype>
 #include <cmath>
 
+#include "Common/StringUtil.h"
 #include "Core/Core.h"
+#include "Core/HW/AddressSpace.h"
 #include "Core/PowerPC/BreakPoints.h"
 #include "Core/PowerPC/PowerPC.h"
+#include "DolphinQt/Host.h"
 #include "DolphinQt/Resources.h"
 #include "DolphinQt/Settings.h"
 
@@ -35,6 +38,7 @@ MemoryViewWidget::MemoryViewWidget(QWidget* parent) : QTableWidget(parent)
 
   connect(&Settings::Instance(), &Settings::DebugFontChanged, this, &QWidget::setFont);
   connect(&Settings::Instance(), &Settings::EmulationStateChanged, this, [this] { Update(); });
+  connect(Host::GetInstance(), &Host::UpdateDisasmDialog, this, &MemoryViewWidget::Update);
   connect(this, &MemoryViewWidget::customContextMenuRequested, this,
           &MemoryViewWidget::OnContextMenu);
   connect(&Settings::Instance(), &Settings::ThemeChanged, this, &MemoryViewWidget::Update);
@@ -152,7 +156,7 @@ void MemoryViewWidget::Update()
         }
         else
         {
-          hex_item->setFlags(0);
+          hex_item->setFlags({});
           hex_item->setText(QStringLiteral("-"));
         }
       }
@@ -168,7 +172,8 @@ void MemoryViewWidget::Update()
     case Type::ASCII:
       update_values([&accessors](u32 address) {
         const char value = accessors->ReadU8(address);
-        return std::isprint(value) ? QString{QChar::fromLatin1(value)} : QStringLiteral(".");
+        return IsPrintableCharacter(value) ? QString{QChar::fromLatin1(value)} :
+                                             QString{QChar::fromLatin1('.')};
       });
       break;
     case Type::U16:
@@ -377,7 +382,7 @@ void MemoryViewWidget::OnCopyHex()
   u64 value = accessors->ReadU64(addr);
 
   QApplication::clipboard()->setText(
-      QStringLiteral("%1").arg(value, length * 2, 16, QLatin1Char('0')).left(length * 2));
+      QStringLiteral("%1").arg(value, sizeof(u64) * 2, 16, QLatin1Char('0')).left(length * 2));
 }
 
 void MemoryViewWidget::OnContextMenu()
@@ -398,6 +403,11 @@ void MemoryViewWidget::OnContextMenu()
 
   menu->addSeparator();
 
+  menu->addAction(tr("Add to watch"), this, [this] {
+    const u32 address = GetContextAddress();
+    const QString name = QStringLiteral("mem_%1").arg(address, 8, 16, QLatin1Char('0'));
+    emit RequestWatch(name, address);
+  });
   menu->addAction(tr("Toggle Breakpoint"), this, &MemoryViewWidget::ToggleBreakpoint);
 
   menu->exec(QCursor::pos());

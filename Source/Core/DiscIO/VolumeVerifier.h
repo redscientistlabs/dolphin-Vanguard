@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <future>
 #include <map>
 #include <optional>
 #include <string>
@@ -13,12 +14,13 @@
 #include <mbedtls/sha1.h>
 
 #include "Common/CommonTypes.h"
+#include "Core/IOS/ES/Formats.h"
 #include "DiscIO/DiscScrubber.h"
 #include "DiscIO/Volume.h"
 
 // To be used as follows:
 //
-// VolumeVerifier verifier(volume);
+// VolumeVerifier verifier(volume, redump_verification, hashes_to_calculate);
 // verifier.Start();
 // while (verifier.GetBytesProcessed() != verifier.GetTotalBytes())
 //   verifier.Process();
@@ -29,15 +31,73 @@
 //
 // GetResult() can be called before the processing is finished, but the result will be incomplete.
 
-namespace IOS::ES
-{
-struct Content;
-class SignedBlobReader;
-}  // namespace IOS::ES
-
 namespace DiscIO
 {
-class FileInfo;
+template <typename T>
+struct Hashes
+{
+  T crc32;
+  T md5;
+  T sha1;
+};
+
+class RedumpVerifier final
+{
+public:
+  enum class Status
+  {
+    Unknown,
+    GoodDump,
+    BadDump,
+    Error,
+  };
+
+  struct Result
+  {
+    Status status = Status::Unknown;
+    std::string message;
+  };
+
+  void Start(const Volume& volume);
+  Result Finish(const Hashes<std::vector<u8>>& hashes);
+
+private:
+  enum class DownloadStatus
+  {
+    NotAttempted,
+    Success,
+    Fail,
+    FailButOldCacheAvailable,
+    SystemNotAvailable,
+  };
+
+  struct DownloadState
+  {
+    std::mutex mutex;
+    DownloadStatus status = DownloadStatus::NotAttempted;
+  };
+
+  struct PotentialMatch
+  {
+    u64 size;
+    Hashes<std::vector<u8>> hashes;
+  };
+
+  static DownloadStatus DownloadDatfile(const std::string& system, DownloadStatus old_status);
+  static std::vector<u8> ReadDatfile(const std::string& system);
+  std::vector<PotentialMatch> ScanDatfile(const std::vector<u8>& data, const std::string& system);
+
+  std::string m_game_id;
+  u16 m_revision;
+  u8 m_disc_number;
+  u64 m_size;
+
+  std::future<std::vector<PotentialMatch>> m_future;
+  Result m_result;
+
+  static DownloadState m_gc_download_state;
+  static DownloadState m_wii_download_state;
+};
 
 class VolumeVerifier final
 {
@@ -56,22 +116,15 @@ public:
     std::string text;
   };
 
-  template <typename T>
-  struct Hashes
-  {
-    T crc32;
-    T md5;
-    T sha1;
-  };
-
   struct Result
   {
     Hashes<std::vector<u8>> hashes;
     std::string summary_text;
     std::vector<Problem> problems;
+    RedumpVerifier::Result redump;
   };
 
-  VolumeVerifier(const Volume& volume, Hashes<bool> hashes_to_calculate);
+  VolumeVerifier(const Volume& volume, bool redump_verification, Hashes<bool> hashes_to_calculate);
   ~VolumeVerifier();
 
   void Start();
@@ -82,28 +135,28 @@ public:
   const Result& GetResult() const;
 
 private:
-  struct BlockToVerify
+  struct GroupToVerify
   {
     Partition partition;
     u64 offset;
-    u64 block_index;
+    size_t block_index_start;
+    size_t block_index_end;
   };
 
-  void CheckPartitions();
+  std::vector<Partition> CheckPartitions();
   bool CheckPartition(const Partition& partition);  // Returns false if partition should be ignored
   std::string GetPartitionName(std::optional<u32> type) const;
-  void CheckCorrectlySigned(const Partition& partition, std::string error_text);
   bool IsDebugSigned() const;
   bool ShouldHaveChannelPartition() const;
   bool ShouldHaveInstallPartition() const;
   bool ShouldHaveMasterpiecePartitions() const;
   bool ShouldBeDualLayer() const;
-  void CheckDiscSize();
-  u64 GetBiggestUsedOffset() const;
-  u64 GetBiggestUsedOffset(const FileInfo& file_info) const;
+  void CheckVolumeSize();
   void CheckMisc();
+  void CheckSuperPaperMario();
   void SetUpHashing();
-  bool CheckContentIntegrity(const IOS::ES::Content& content);
+  void WaitForAsyncOperations() const;
+  bool ReadChunkAndWaitForAsyncOperations(u64 bytes_to_read);
 
   void AddProblem(Severity severity, std::string text);
 
@@ -113,19 +166,36 @@ private:
   bool m_is_datel = false;
   bool m_is_not_retail = false;
 
+  bool m_redump_verification;
+  RedumpVerifier m_redump_verifier;
+
+  bool m_read_errors_occurred = false;
+
   Hashes<bool> m_hashes_to_calculate{};
   bool m_calculating_any_hash = false;
   unsigned long m_crc32_context = 0;
   mbedtls_md5_context m_md5_context;
   mbedtls_sha1_context m_sha1_context;
 
+  u64 m_excess_bytes = 0;
+  std::vector<u8> m_data;
+  std::future<void> m_crc32_future;
+  std::future<void> m_md5_future;
+  std::future<void> m_sha1_future;
+  std::future<void> m_content_future;
+  std::future<void> m_group_future;
+
   DiscScrubber m_scrubber;
+  IOS::ES::TicketReader m_ticket;
   std::vector<u64> m_content_offsets;
   u16 m_content_index = 0;
-  std::vector<BlockToVerify> m_blocks;
-  size_t m_block_index = 0;  // Index in m_blocks, not index in a specific partition
+  std::vector<GroupToVerify> m_groups;
+  size_t m_group_index = 0;  // Index in m_groups, not index in a specific partition
   std::map<Partition, size_t> m_block_errors;
   std::map<Partition, size_t> m_unused_block_errors;
+
+  u64 m_biggest_referenced_offset = 0;
+  u64 m_biggest_verified_offset = 0;
 
   bool m_started = false;
   bool m_done = false;

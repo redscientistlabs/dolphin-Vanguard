@@ -17,7 +17,7 @@
 
 namespace DiscIO
 {
-class Volume;
+class VolumeDisc;
 struct Partition;
 
 class FileInfoGCWii : public FileInfo
@@ -42,6 +42,7 @@ public:
 
   u64 GetOffset() const override;
   u32 GetSize() const override;
+  bool IsRoot() const override;
   bool IsDirectory() const override;
   u32 GetTotalChildren() const override;
   std::string GetName() const override;
@@ -87,7 +88,7 @@ private:
 class FileSystemGCWii : public FileSystem
 {
 public:
-  FileSystemGCWii(const Volume* volume, const Partition& partition);
+  FileSystemGCWii(const VolumeDisc* volume, const Partition& partition);
   ~FileSystemGCWii() override;
 
   bool IsValid() const override { return m_valid; }

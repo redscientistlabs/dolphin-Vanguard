@@ -19,19 +19,17 @@
 #include <deque>
 #include <list>
 #include <map>
+#include <optional>
 #include <set>
 #include <string>
 #include <type_traits>
 #include <utility>
 #include <vector>
-#include <sstream>
-#include <iostream>
-#include <string>
 
 #include "Common/Assert.h"
 #include "Common/CommonTypes.h"
-#include "Common/Compiler.h"
 #include "Common/Flag.h"
+#include "Common/Inline.h"
 #include "Common/Logging/Log.h"
 
 // XXX: Replace this with std::is_trivially_copyable<T> once we stop using volatile
@@ -147,6 +145,36 @@ public:
     Do(x.second);
   }
 
+  template <typename T>
+  void Do(std::optional<T>& x)
+  {
+    bool present = x.has_value();
+    Do(present);
+
+    switch (mode)
+    {
+    case MODE_READ:
+      if (present)
+      {
+        x = std::make_optional<T>();
+        Do(x.value());
+      }
+      else
+      {
+        x = std::nullopt;
+      }
+      break;
+
+    case MODE_WRITE:
+    case MODE_MEASURE:
+    case MODE_VERIFY:
+      if (present)
+        Do(x.value());
+
+      break;
+    }
+  }
+
   template <typename T, std::size_t N>
   void DoArray(std::array<T, N>& x)
   {
@@ -167,7 +195,7 @@ public:
   }
 
   template <typename T, std::size_t N>
-  void DoArray(T(&arr)[N])
+  void DoArray(T (&arr)[N])
   {
     DoArray(arr, static_cast<u32>(N));
   }
@@ -231,30 +259,20 @@ public:
       x = base + offset;
     }
   }
-  //narrysmod_hijack
+
   void DoMarker(const std::string& prevName, u32 arbitraryNumber = 0x42)
   {
-    std::string cookie;
-    //Pad by 3 bytes to force alignment of exram
-    if (prevName == "Memory FakeVMEM")
-      cookie = "[" + prevName + "@@@]";
-    //Pad by 1 byte because padding the exram moves the aram
-    else if (prevName == "ProcessorInterface")
-      cookie = "[" + prevName + "@]";
-    else
-      cookie = "[" + prevName + "]";
-
+    u32 cookie = arbitraryNumber;
     Do(cookie);
-    /*
-    if (mode == PointerWrap::MODE_READ && cookie != prevName.c_str())
+
+    if (mode == PointerWrap::MODE_READ && cookie != arbitraryNumber)
     {
-      PanicAlertT("Error: After \"%s\", found %d (0x%X) instead of save marker %d (0x%X). Aborting "
-        "savestate load...",
-        prevName.c_str(), cookie, cookie, arbitraryNumber, arbitraryNumber);
-        
+      PanicAlertFmtT(
+          "Error: After \"{0}\", found {1} ({2:#x}) instead of save marker {3} ({4:#x}). Aborting "
+          "savestate load...",
+          prevName, cookie, cookie, arbitraryNumber, arbitraryNumber);
       mode = PointerWrap::MODE_MEASURE;
     }
-    */
   }
 
   template <typename T, typename Functor>

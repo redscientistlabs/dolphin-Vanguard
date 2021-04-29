@@ -2,6 +2,13 @@
 // Licensed under GPLv2+
 // Refer to the license.txt file included.
 
+#include "InputCommon/InputProfile.h"
+
+#include <algorithm>
+#include <iterator>
+
+#include <fmt/format.h>
+
 #include "Common/FileSearch.h"
 #include "Common/FileUtil.h"
 #include "Common/StringUtil.h"
@@ -13,10 +20,6 @@
 
 #include "InputCommon/ControllerInterface/ControllerInterface.h"
 #include "InputCommon/InputConfig.h"
-#include "InputCommon/InputProfile.h"
-
-#include <algorithm>
-#include <iterator>
 
 namespace InputProfile
 {
@@ -32,7 +35,7 @@ std::vector<std::string> GetProfilesFromSetting(const std::string& setting, cons
   std::vector<std::string> result;
   for (const std::string& setting_choice : setting_choices)
   {
-    const std::string path = root + StripSpaces(setting_choice);
+    const std::string path = root + std::string(StripSpaces(setting_choice));
     if (File::IsDirectory(path))
     {
       const auto files_under_directory = Common::DoFileSearch({path}, {".ini"}, true);
@@ -70,7 +73,8 @@ std::string ProfileCycler::GetProfile(CycleDirection cycle_direction, int& profi
 }
 
 void ProfileCycler::UpdateToProfile(const std::string& profile_filename,
-                                    ControllerEmu::EmulatedController* controller)
+                                    ControllerEmu::EmulatedController* controller,
+                                    InputConfig* device_configuration)
 {
   std::string base;
   SplitPath(profile_filename, nullptr, &base, nullptr);
@@ -83,6 +87,7 @@ void ProfileCycler::UpdateToProfile(const std::string& profile_filename,
                          display_message_ms);
     controller->LoadConfig(ini_file.GetOrCreateSection("Profile"));
     controller->UpdateReferences(g_controller_interface);
+    device_configuration->GenerateControllerTextures(ini_file);
   }
   else
   {
@@ -126,7 +131,7 @@ void ProfileCycler::CycleProfile(CycleDirection cycle_direction, InputConfig* de
   auto* controller = device_configuration->GetController(controller_index);
   if (controller)
   {
-    UpdateToProfile(profile, controller);
+    UpdateToProfile(profile, controller, device_configuration);
   }
   else
   {
@@ -165,7 +170,7 @@ void ProfileCycler::CycleProfileForGame(CycleDirection cycle_direction,
   auto* controller = device_configuration->GetController(controller_index);
   if (controller)
   {
-    UpdateToProfile(profile, controller);
+    UpdateToProfile(profile, controller, device_configuration);
   }
   else
   {
@@ -180,7 +185,7 @@ std::string ProfileCycler::GetWiimoteInputProfilesForGame(int controller_index)
   const IniFile::Section* const control_section = game_ini.GetOrCreateSection("Controls");
 
   std::string result;
-  control_section->Get(StringFromFormat("WiimoteProfile%d", controller_index + 1), &result);
+  control_section->Get(fmt::format("WiimoteProfile{}", controller_index + 1), &result);
   return result;
 }
 

@@ -151,16 +151,16 @@ struct Ticket
 static_assert(sizeof(Ticket) == 0x2A4, "Ticket has the wrong size");
 #pragma pack(pop)
 
+constexpr u32 MAX_TMD_SIZE = 0x49e4;
+
 class SignedBlobReader
 {
 public:
   SignedBlobReader() = default;
-  explicit SignedBlobReader(const std::vector<u8>& bytes);
-  explicit SignedBlobReader(std::vector<u8>&& bytes);
+  explicit SignedBlobReader(std::vector<u8> bytes);
 
   const std::vector<u8>& GetBytes() const;
-  void SetBytes(const std::vector<u8>& bytes);
-  void SetBytes(std::vector<u8>&& bytes);
+  void SetBytes(std::vector<u8> bytes);
 
   /// Get the SHA1 hash for this signed blob (starting at the issuer).
   std::array<u8, 20> GetSha1() const;
@@ -187,8 +187,7 @@ class TMDReader final : public SignedBlobReader
 {
 public:
   TMDReader() = default;
-  explicit TMDReader(const std::vector<u8>& bytes);
-  explicit TMDReader(std::vector<u8>&& bytes);
+  explicit TMDReader(std::vector<u8> bytes);
 
   bool IsValid() const;
 
@@ -224,8 +223,7 @@ class TicketReader final : public SignedBlobReader
 {
 public:
   TicketReader() = default;
-  explicit TicketReader(const std::vector<u8>& bytes);
-  explicit TicketReader(std::vector<u8>&& bytes);
+  explicit TicketReader(std::vector<u8> bytes);
 
   bool IsValid() const;
 
@@ -257,15 +255,14 @@ public:
   // and has a title key that must be decrypted first.
   HLE::ReturnCode Unpersonalise(HLE::IOSC& iosc);
 
-  // Reset the common key field back to 0 if it's an incorrect value.
   // Intended for use before importing fakesigned tickets, which tend to have a high bogus index.
-  void FixCommonKeyIndex();
+  void OverwriteCommonKeyIndex(u8 index);
 };
 
 class SharedContentMap final
 {
 public:
-  explicit SharedContentMap(std::shared_ptr<HLE::FS::FileSystem> fs);
+  explicit SharedContentMap(std::shared_ptr<HLE::FSDevice> fs);
   ~SharedContentMap();
 
   std::optional<std::string> GetFilenameFromSHA1(const std::array<u8, 20>& sha1) const;
@@ -273,27 +270,35 @@ public:
   bool DeleteSharedContent(const std::array<u8, 20>& sha1);
   std::vector<std::array<u8, 20>> GetHashes() const;
 
+  u64 GetTicks() const { return m_ticks; }
+
 private:
   bool WriteEntries() const;
 
   struct Entry;
   u32 m_last_id = 0;
   std::vector<Entry> m_entries;
+  std::shared_ptr<HLE::FSDevice> m_fs_device;
   std::shared_ptr<HLE::FS::FileSystem> m_fs;
+  u64 m_ticks = 0;
 };
 
 class UIDSys final
 {
 public:
-  explicit UIDSys(std::shared_ptr<HLE::FS::FileSystem> fs);
+  explicit UIDSys(std::shared_ptr<HLE::FSDevice> fs);
 
   u32 GetUIDFromTitle(u64 title_id) const;
   u32 GetOrInsertUIDForTitle(u64 title_id);
   u32 GetNextUID() const;
 
+  u64 GetTicks() const { return m_ticks; }
+
 private:
+  std::shared_ptr<HLE::FSDevice> m_fs_device;
   std::shared_ptr<HLE::FS::FileSystem> m_fs;
   std::map<u32, u64> m_entries;
+  u64 m_ticks = 0;
 };
 
 class CertReader final : public SignedBlobReader

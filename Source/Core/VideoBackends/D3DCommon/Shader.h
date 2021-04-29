@@ -4,8 +4,9 @@
 
 #pragma once
 
+#include <optional>
 #include <string_view>
-#include "VideoBackends/D3DCommon/Common.h"
+#include "VideoBackends/D3DCommon/D3DCommon.h"
 #include "VideoCommon/AbstractShader.h"
 
 namespace D3DCommon
@@ -19,8 +20,8 @@ public:
 
   BinaryData GetBinary() const override;
 
-  static bool CompileShader(D3D_FEATURE_LEVEL feature_level, BinaryData* out_bytecode,
-                            ShaderStage stage, std::string_view source);
+  static std::optional<BinaryData> CompileShader(D3D_FEATURE_LEVEL feature_level, ShaderStage stage,
+                                                 std::string_view source);
 
   static BinaryData CreateByteCode(const void* data, size_t length);
 

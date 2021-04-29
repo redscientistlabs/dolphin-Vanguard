@@ -8,14 +8,15 @@
 
 namespace Config
 {
+// Layers in ascending order of priority.
 enum class LayerType
 {
   Base,
+  CommandLine,
   GlobalGame,
   LocalGame,
   Movie,
   Netplay,
-  CommandLine,
   CurrentRun,
   //Narrysmod - Add vanguard
   Vanguard,
@@ -32,17 +33,19 @@ enum class System
   GFX,
   Logger,
   Debugger,
+  DualShockUDPClient,
+  FreeLook,
 };
 
 constexpr std::array<LayerType, 8> SEARCH_ORDER{{
   //Narrysmod - Add vanguard
     LayerType::Vanguard,
     LayerType::CurrentRun,
-    LayerType::CommandLine,
-    LayerType::Movie,
     LayerType::Netplay,
+    LayerType::Movie,
     LayerType::LocalGame,
     LayerType::GlobalGame,
+    LayerType::CommandLine,
     LayerType::Base,
 }};
 }  // namespace Config

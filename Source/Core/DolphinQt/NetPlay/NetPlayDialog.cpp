@@ -5,6 +5,7 @@
 #include "DolphinQt/NetPlay/NetPlayDialog.h"
 
 #include <QAction>
+#include <QActionGroup>
 #include <QApplication>
 #include <QClipboard>
 #include <QComboBox>
@@ -14,7 +15,6 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QMenu>
-#include <QProgressDialog>
 #include <QPushButton>
 #include <QSignalBlocker>
 #include <QSpinBox>
@@ -22,6 +22,7 @@
 #include <QTableWidget>
 #include <QTextBrowser>
 
+#include <algorithm>
 #include <sstream>
 
 #include "Common/CommonPaths.h"
@@ -38,8 +39,8 @@
 #include "Core/ConfigManager.h"
 #include "Core/Core.h"
 #include "Core/NetPlayServer.h"
+#include "Core/SyncIdentifier.h"
 
-#include "DolphinQt/GameList/GameListModel.h"
 #include "DolphinQt/NetPlay/ChunkedProgressDialog.h"
 #include "DolphinQt/NetPlay/GameListDialog.h"
 #include "DolphinQt/NetPlay/MD5Dialog.h"
@@ -59,8 +60,8 @@
 #include "VideoCommon/RenderBase.h"
 #include "VideoCommon/VideoConfig.h"
 
-NetPlayDialog::NetPlayDialog(QWidget* parent)
-    : QDialog(parent), m_game_list_model(Settings::Instance().GetGameListModel())
+NetPlayDialog::NetPlayDialog(const GameListModel& game_list_model, QWidget* parent)
+    : QDialog(parent), m_game_list_model(game_list_model)
 {
   setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
 
@@ -106,6 +107,8 @@ void NetPlayDialog::CreateMainLayout()
   m_data_menu = m_menu_bar->addMenu(tr("Data"));
   m_data_menu->setToolTipsVisible(true);
   m_save_sd_action = m_data_menu->addAction(tr("Write Save/SD Data"));
+  m_save_sd_action->setToolTip(
+      tr("If \"Allow Writes to SD Card\" is disabled this does not override it."));
   m_save_sd_action->setCheckable(true);
   m_load_wii_action = m_data_menu->addAction(tr("Load Wii Save"));
   m_load_wii_action->setCheckable(true);
@@ -124,13 +127,6 @@ void NetPlayDialog::CreateMainLayout()
 
   m_network_menu = m_menu_bar->addMenu(tr("Network"));
   m_network_menu->setToolTipsVisible(true);
-  m_reduce_polling_rate_action = m_network_menu->addAction(tr("Reduce Polling Rate"));
-  m_reduce_polling_rate_action->setToolTip(
-      tr("This will reduce bandwidth usage by polling GameCube controllers only twice per frame. "
-         "Does not affect Wii Remotes."));
-  m_reduce_polling_rate_action->setCheckable(true);
-
-  m_network_menu->addSeparator();
   m_fixed_delay_action = m_network_menu->addAction(tr("Fair Input Delay"));
   m_fixed_delay_action->setToolTip(
       tr("Each player sends their own inputs to the game, with equal buffer size for all players, "
@@ -159,17 +155,19 @@ void NetPlayDialog::CreateMainLayout()
 
   m_md5_menu = m_menu_bar->addMenu(tr("Checksum"));
   m_md5_menu->addAction(tr("Current game"), this, [this] {
-    Settings::Instance().GetNetPlayServer()->ComputeMD5(m_current_game);
+    Settings::Instance().GetNetPlayServer()->ComputeMD5(m_current_game_identifier);
   });
   m_md5_menu->addAction(tr("Other game..."), this, [this] {
-    GameListDialog gld(this);
+    GameListDialog gld(m_game_list_model, this);
 
     if (gld.exec() != QDialog::Accepted)
       return;
-    Settings::Instance().GetNetPlayServer()->ComputeMD5(gld.GetSelectedUniqueID().toStdString());
+    Settings::Instance().GetNetPlayServer()->ComputeMD5(gld.GetSelectedGame().GetSyncIdentifier());
   });
-  m_md5_menu->addAction(tr("SD Card"), this,
-                        [] { Settings::Instance().GetNetPlayServer()->ComputeMD5(WII_SDCARD); });
+  m_md5_menu->addAction(tr("SD Card"), this, [] {
+    Settings::Instance().GetNetPlayServer()->ComputeMD5(
+        NetPlay::NetPlayClient::GetSDCardIdentifier());
+  });
 
   m_other_menu = m_menu_bar->addMenu(tr("Other"));
   m_record_input_action = m_other_menu->addAction(tr("Record Inputs"));
@@ -238,6 +236,7 @@ void NetPlayDialog::CreatePlayersLayout()
   m_kick_button = new QPushButton(tr("Kick Player"));
   m_assign_ports_button = new QPushButton(tr("Assign Controller Ports"));
 
+  m_players_list->setTabKeyNavigation(false);
   m_players_list->setColumnCount(5);
   m_players_list->verticalHeader()->hide();
   m_players_list->setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -262,7 +261,7 @@ void NetPlayDialog::CreatePlayersLayout()
 void NetPlayDialog::ConnectWidgets()
 {
   // Players
-  connect(m_room_box, static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this,
+  connect(m_room_box, qOverload<int>(&QComboBox::currentIndexChanged), this,
           &NetPlayDialog::UpdateGUI);
   connect(m_hostcode_action_button, &QPushButton::clicked, [this] {
     if (m_is_copy_button_retry && m_room_box->currentIndex() == 0)
@@ -293,18 +292,17 @@ void NetPlayDialog::ConnectWidgets()
           [this] { m_chat_send_button->setEnabled(!m_chat_type_edit->text().isEmpty()); });
 
   // Other
-  connect(m_buffer_size_box, static_cast<void (QSpinBox::*)(int)>(&QSpinBox::valueChanged),
-          [this](int value) {
-            if (value == m_buffer_size)
-              return;
+  connect(m_buffer_size_box, qOverload<int>(&QSpinBox::valueChanged), [this](int value) {
+    if (value == m_buffer_size)
+      return;
 
-            auto client = Settings::Instance().GetNetPlayClient();
-            auto server = Settings::Instance().GetNetPlayServer();
-            if (server && !m_host_input_authority)
-              server->AdjustPadBufferSize(value);
-            else
-              client->AdjustPadBufferSize(value);
-          });
+    auto client = Settings::Instance().GetNetPlayClient();
+    auto server = Settings::Instance().GetNetPlayServer();
+    if (server && !m_host_input_authority)
+      server->AdjustPadBufferSize(value);
+    else
+      client->AdjustPadBufferSize(value);
+  });
 
   const auto hia_function = [this](bool enable) {
     if (m_host_input_authority != enable)
@@ -324,12 +322,17 @@ void NetPlayDialog::ConnectWidgets()
   connect(m_quit_button, &QPushButton::clicked, this, &NetPlayDialog::reject);
 
   connect(m_game_button, &QPushButton::clicked, [this] {
-    GameListDialog gld(this);
+    GameListDialog gld(m_game_list_model, this);
     if (gld.exec() == QDialog::Accepted)
     {
-      auto unique_id = gld.GetSelectedUniqueID();
-      Settings::Instance().GetNetPlayServer()->ChangeGame(unique_id.toStdString());
-      Settings::GetQSettings().setValue(QStringLiteral("netplay/hostgame"), unique_id);
+      Settings& settings = Settings::Instance();
+
+      const UICommon::GameFile& game = gld.GetSelectedGame();
+      const std::string netplay_name = m_game_list_model.GetNetPlayName(game);
+
+      settings.GetNetPlayServer()->ChangeGame(game.GetSyncIdentifier(), netplay_name);
+      Settings::GetQSettings().setValue(QStringLiteral("netplay/hostgame"),
+                                        QString::fromStdString(netplay_name));
     }
   });
 
@@ -352,14 +355,13 @@ void NetPlayDialog::ConnectWidgets()
 
   // SaveSettings() - Save Hosting-Dialog Settings
 
-  connect(m_buffer_size_box, static_cast<void (QSpinBox::*)(int)>(&QSpinBox::valueChanged), this,
+  connect(m_buffer_size_box, qOverload<int>(&QSpinBox::valueChanged), this,
           &NetPlayDialog::SaveSettings);
   connect(m_save_sd_action, &QAction::toggled, this, &NetPlayDialog::SaveSettings);
   connect(m_load_wii_action, &QAction::toggled, this, &NetPlayDialog::SaveSettings);
   connect(m_sync_save_data_action, &QAction::toggled, this, &NetPlayDialog::SaveSettings);
   connect(m_sync_codes_action, &QAction::toggled, this, &NetPlayDialog::SaveSettings);
   connect(m_record_input_action, &QAction::toggled, this, &NetPlayDialog::SaveSettings);
-  connect(m_reduce_polling_rate_action, &QAction::toggled, this, &NetPlayDialog::SaveSettings);
   connect(m_strict_settings_sync_action, &QAction::toggled, this, &NetPlayDialog::SaveSettings);
   connect(m_host_input_authority_action, &QAction::toggled, this, &NetPlayDialog::SaveSettings);
   connect(m_sync_all_wii_saves_action, &QAction::toggled, this, &NetPlayDialog::SaveSettings);
@@ -423,10 +425,10 @@ void NetPlayDialog::OnStart()
     return;
   }
 
-  const auto game = FindGameFile(m_current_game);
+  const auto game = FindGameFile(m_current_game_identifier);
   if (!game)
   {
-    PanicAlertT("Selected game doesn't exist in game list!");
+    PanicAlertFmtT("Selected game doesn't exist in game list!");
     return;
   }
 
@@ -443,22 +445,33 @@ void NetPlayDialog::OnStart()
   settings.m_CPUcore = Config::Get(Config::MAIN_CPU_CORE);
   settings.m_EnableCheats = Config::Get(Config::MAIN_ENABLE_CHEATS);
   settings.m_SelectedLanguage = Config::Get(Config::MAIN_GC_LANGUAGE);
-  settings.m_OverrideGCLanguage = Config::Get(Config::MAIN_OVERRIDE_GC_LANGUAGE);
-  settings.m_ProgressiveScan = Config::Get(Config::SYSCONF_PROGRESSIVE_SCAN);
-  settings.m_PAL60 = Config::Get(Config::SYSCONF_PAL60);
+  settings.m_OverrideRegionSettings = Config::Get(Config::MAIN_OVERRIDE_REGION_SETTINGS);
   settings.m_DSPHLE = Config::Get(Config::MAIN_DSP_HLE);
   settings.m_DSPEnableJIT = Config::Get(Config::MAIN_DSP_JIT);
   settings.m_WriteToMemcard = m_save_sd_action->isChecked();
+  settings.m_Mem1Size = Config::Get(Config::MAIN_MEM1_SIZE);
+  settings.m_Mem2Size = Config::Get(Config::MAIN_MEM2_SIZE);
+  settings.m_FallbackRegion = Config::Get(Config::MAIN_FALLBACK_REGION);
   settings.m_CopyWiiSave = m_load_wii_action->isChecked();
   settings.m_OCEnable = Config::Get(Config::MAIN_OVERCLOCK_ENABLE);
   settings.m_OCFactor = Config::Get(Config::MAIN_OVERCLOCK);
-  settings.m_ReducePollingRate = m_reduce_polling_rate_action->isChecked();
   settings.m_EXIDevice[0] =
       static_cast<ExpansionInterface::TEXIDevices>(Config::Get(Config::MAIN_SLOT_A));
   settings.m_EXIDevice[1] =
       static_cast<ExpansionInterface::TEXIDevices>(Config::Get(Config::MAIN_SLOT_B));
   // There's no way the BBA is going to sync, disable it
   settings.m_EXIDevice[2] = ExpansionInterface::EXIDEVICE_NONE;
+
+  for (size_t i = 0; i < Config::SYSCONF_SETTINGS.size(); ++i)
+  {
+    std::visit(
+        [&](auto* info) {
+          static_assert(sizeof(info->GetDefaultValue()) <= sizeof(u32));
+          settings.m_SYSCONFSettings[i] = static_cast<u32>(Config::Get(*info));
+        },
+        Config::SYSCONF_SETTINGS[i].config_info);
+  }
+
   settings.m_EFBAccessEnable = Config::Get(Config::GFX_HACK_EFB_ACCESS_ENABLE);
   settings.m_BBoxEnable = Config::Get(Config::GFX_HACK_BBOX_ENABLE);
   settings.m_ForceProgressive = Config::Get(Config::GFX_HACK_FORCE_PROGRESSIVE);
@@ -472,6 +485,7 @@ void NetPlayDialog::OnStart()
   settings.m_PerfQueriesEnable = Config::Get(Config::GFX_PERF_QUERIES_ENABLE);
   settings.m_FPRF = Config::Get(Config::MAIN_FPRF);
   settings.m_AccurateNaNs = Config::Get(Config::MAIN_ACCURATE_NANS);
+  settings.m_DisableICache = Config::Get(Config::MAIN_DISABLE_ICACHE);
   settings.m_SyncOnSkipIdle = Config::Get(Config::MAIN_SYNC_ON_SKIP_IDLE);
   settings.m_SyncGPU = Config::Get(Config::MAIN_SYNC_GPU);
   settings.m_SyncGpuMaxDistance = Config::Get(Config::MAIN_SYNC_GPU_MAX_DISTANCE);
@@ -591,11 +605,12 @@ void NetPlayDialog::UpdateDiscordPresence()
 {
 #ifdef USE_DISCORD_PRESENCE
   // both m_current_game and m_player_count need to be set for the status to be displayed correctly
-  if (m_player_count == 0 || m_current_game.empty())
+  if (m_player_count == 0 || m_current_game_name.empty())
     return;
 
   const auto use_default = [this]() {
-    Discord::UpdateDiscordPresence(m_player_count, Discord::SecretType::Empty, "", m_current_game);
+    Discord::UpdateDiscordPresence(m_player_count, Discord::SecretType::Empty, "",
+                                   m_current_game_name);
   };
 
   if (Core::IsRunning())
@@ -610,7 +625,8 @@ void NetPlayDialog::UpdateDiscordPresence()
         return use_default();
 
       Discord::UpdateDiscordPresence(m_player_count, Discord::SecretType::RoomID,
-                                     std::string(host_id.begin(), host_id.end()), m_current_game);
+                                     std::string(host_id.begin(), host_id.end()),
+                                     m_current_game_name);
     }
     else
     {
@@ -620,7 +636,7 @@ void NetPlayDialog::UpdateDiscordPresence()
 
       Discord::UpdateDiscordPresence(
           m_player_count, Discord::SecretType::IPAddress,
-          Discord::CreateSecretFromIPAddress(*m_external_ip_address, port), m_current_game);
+          Discord::CreateSecretFromIPAddress(*m_external_ip_address, port), m_current_game_name);
     }
   }
   else
@@ -668,9 +684,10 @@ void NetPlayDialog::UpdateGUI()
     return '|' + str + '|';
   };
 
-  static const std::map<NetPlay::PlayerGameStatus, QString> player_status{
-      {NetPlay::PlayerGameStatus::Ok, tr("OK")},
-      {NetPlay::PlayerGameStatus::NotFound, tr("Not Found")},
+  static const std::map<NetPlay::SyncIdentifierComparison, QString> player_status{
+      {NetPlay::SyncIdentifierComparison::SameGame, tr("OK")},
+      {NetPlay::SyncIdentifierComparison::DifferentVersion, tr("Wrong Version")},
+      {NetPlay::SyncIdentifierComparison::DifferentGame, tr("Not Found")},
   };
 
   for (int i = 0; i < m_player_count; i++)
@@ -708,11 +725,11 @@ void NetPlayDialog::UpdateGUI()
   {
     switch (g_TraversalClient->GetState())
     {
-    case TraversalClient::Connecting:
+    case TraversalClient::State::Connecting:
       m_hostcode_label->setText(tr("..."));
       m_hostcode_action_button->setEnabled(false);
       break;
-    case TraversalClient::Connected:
+    case TraversalClient::State::Connected:
     {
       const auto host_id = g_TraversalClient->GetHostID();
       m_hostcode_label->setText(
@@ -722,7 +739,7 @@ void NetPlayDialog::UpdateGUI()
       m_is_copy_button_retry = false;
       break;
     }
-    case TraversalClient::Failure:
+    case TraversalClient::State::Failure:
       m_hostcode_label->setText(tr("Error"));
       m_hostcode_action_button->setText(tr("Retry"));
       m_hostcode_action_button->setEnabled(true);
@@ -813,15 +830,17 @@ void NetPlayDialog::AppendChat(const std::string& msg)
   QApplication::alert(this);
 }
 
-void NetPlayDialog::OnMsgChangeGame(const std::string& title)
+void NetPlayDialog::OnMsgChangeGame(const NetPlay::SyncIdentifier& sync_identifier,
+                                    const std::string& netplay_name)
 {
-  QString qtitle = QString::fromStdString(title);
-  QueueOnObject(this, [this, qtitle, title] {
-    m_game_button->setText(qtitle);
-    m_current_game = title;
+  QString qname = QString::fromStdString(netplay_name);
+  QueueOnObject(this, [this, qname, netplay_name, &sync_identifier] {
+    m_game_button->setText(qname);
+    m_current_game_identifier = sync_identifier;
+    m_current_game_name = netplay_name;
     UpdateDiscordPresence();
   });
-  DisplayMessage(tr("Game changed to \"%1\"").arg(qtitle), "magenta");
+  DisplayMessage(tr("Game changed to \"%1\"").arg(qname), "magenta");
 }
 
 void NetPlayDialog::GameStatusChanged(bool running)
@@ -840,7 +859,6 @@ void NetPlayDialog::SetOptionsEnabled(bool enabled)
     m_sync_save_data_action->setEnabled(enabled);
     m_sync_codes_action->setEnabled(enabled);
     m_assign_ports_button->setEnabled(enabled);
-    m_reduce_polling_rate_action->setEnabled(enabled);
     m_strict_settings_sync_action->setEnabled(enabled);
     m_host_input_authority_action->setEnabled(enabled);
     m_sync_all_wii_saves_action->setEnabled(enabled && m_sync_save_data_action->isChecked());
@@ -868,7 +886,12 @@ void NetPlayDialog::OnMsgStartGame()
     auto client = Settings::Instance().GetNetPlayClient();
 
     if (client)
-      client->StartGame(FindGame(m_current_game));
+    {
+      if (auto game = FindGameFile(m_current_game_identifier))
+        client->StartGame(game->GetFilePath());
+      else
+        PanicAlertFmtT("Selected game doesn't exist in game list!");
+    }
     UpdateDiscordPresence();
   });
 }
@@ -885,6 +908,16 @@ void NetPlayDialog::OnMsgPowerButton()
   if (!Core::IsRunning())
     return;
   QueueOnObject(this, [] { UICommon::TriggerSTMPowerEvent(); });
+}
+
+void NetPlayDialog::OnPlayerConnect(const std::string& player)
+{
+  DisplayMessage(tr("%1 has joined").arg(QString::fromStdString(player)), "darkcyan");
+}
+
+void NetPlayDialog::OnPlayerDisconnect(const std::string& player)
+{
+  DisplayMessage(tr("%1 has left").arg(QString::fromStdString(player)), "darkcyan");
 }
 
 void NetPlayDialog::OnPadBufferChanged(u32 buffer)
@@ -984,6 +1017,7 @@ void NetPlayDialog::OnTraversalStateChanged(TraversalClient::State state)
   case TraversalClient::State::Connected:
   case TraversalClient::State::Failure:
     UpdateDiscordPresence();
+    break;
   default:
     break;
   }
@@ -1016,29 +1050,24 @@ bool NetPlayDialog::IsRecording()
   return false;
 }
 
-std::string NetPlayDialog::FindGame(const std::string& game)
+std::shared_ptr<const UICommon::GameFile>
+NetPlayDialog::FindGameFile(const NetPlay::SyncIdentifier& sync_identifier,
+                            NetPlay::SyncIdentifierComparison* found)
 {
-  std::optional<std::string> path = RunOnObject(this, [this, &game] {
-    for (int i = 0; i < m_game_list_model->rowCount(QModelIndex()); i++)
-    {
-      if (m_game_list_model->GetUniqueIdentifier(i).toStdString() == game)
-        return m_game_list_model->GetPath(i).toStdString();
-    }
-    return std::string("");
-  });
-  if (path)
-    return *path;
-  return std::string("");
-}
+  NetPlay::SyncIdentifierComparison temp;
+  if (!found)
+    found = &temp;
 
-std::shared_ptr<const UICommon::GameFile> NetPlayDialog::FindGameFile(const std::string& game)
-{
+  *found = NetPlay::SyncIdentifierComparison::DifferentGame;
+
   std::optional<std::shared_ptr<const UICommon::GameFile>> game_file =
-      RunOnObject(this, [this, &game] {
-        for (int i = 0; i < m_game_list_model->rowCount(QModelIndex()); i++)
+      RunOnObject(this, [this, &sync_identifier, found] {
+        for (int i = 0; i < m_game_list_model.rowCount(QModelIndex()); i++)
         {
-          if (m_game_list_model->GetUniqueIdentifier(i).toStdString() == game)
-            return m_game_list_model->GetGameFile(i);
+          auto file = m_game_list_model.GetGameFile(i);
+          *found = std::min(*found, file->CompareSyncIdentifier(sync_identifier));
+          if (*found == NetPlay::SyncIdentifierComparison::SameGame)
+            return file;
         }
         return static_cast<std::shared_ptr<const UICommon::GameFile>>(nullptr);
       });
@@ -1055,7 +1084,6 @@ void NetPlayDialog::LoadSettings()
   const bool sync_saves = Config::Get(Config::NETPLAY_SYNC_SAVES);
   const bool sync_codes = Config::Get(Config::NETPLAY_SYNC_CODES);
   const bool record_inputs = Config::Get(Config::NETPLAY_RECORD_INPUTS);
-  const bool reduce_polling_rate = Config::Get(Config::NETPLAY_REDUCE_POLLING_RATE);
   const bool strict_settings_sync = Config::Get(Config::NETPLAY_STRICT_SETTINGS_SYNC);
   const bool sync_all_wii_saves = Config::Get(Config::NETPLAY_SYNC_ALL_WII_SAVES);
   const bool golf_mode_overlay = Config::Get(Config::NETPLAY_GOLF_MODE_OVERLAY);
@@ -1066,7 +1094,6 @@ void NetPlayDialog::LoadSettings()
   m_sync_save_data_action->setChecked(sync_saves);
   m_sync_codes_action->setChecked(sync_codes);
   m_record_input_action->setChecked(record_inputs);
-  m_reduce_polling_rate_action->setChecked(reduce_polling_rate);
   m_strict_settings_sync_action->setChecked(strict_settings_sync);
   m_sync_all_wii_saves_action->setChecked(sync_all_wii_saves);
   m_golf_mode_overlay_action->setChecked(golf_mode_overlay);
@@ -1087,7 +1114,7 @@ void NetPlayDialog::LoadSettings()
   }
   else
   {
-    WARN_LOG(NETPLAY, "Unknown network mode '%s', using 'fixeddelay'", network_mode.c_str());
+    WARN_LOG_FMT(NETPLAY, "Unknown network mode '{}', using 'fixeddelay'", network_mode);
     m_fixed_delay_action->setChecked(true);
   }
 }
@@ -1106,7 +1133,6 @@ void NetPlayDialog::SaveSettings()
   Config::SetBase(Config::NETPLAY_SYNC_SAVES, m_sync_save_data_action->isChecked());
   Config::SetBase(Config::NETPLAY_SYNC_CODES, m_sync_codes_action->isChecked());
   Config::SetBase(Config::NETPLAY_RECORD_INPUTS, m_record_input_action->isChecked());
-  Config::SetBase(Config::NETPLAY_REDUCE_POLLING_RATE, m_reduce_polling_rate_action->isChecked());
   Config::SetBase(Config::NETPLAY_STRICT_SETTINGS_SYNC, m_strict_settings_sync_action->isChecked());
   Config::SetBase(Config::NETPLAY_SYNC_ALL_WII_SAVES, m_sync_all_wii_saves_action->isChecked());
   Config::SetBase(Config::NETPLAY_GOLF_MODE_OVERLAY, m_golf_mode_overlay_action->isChecked());
@@ -1128,15 +1154,15 @@ void NetPlayDialog::SaveSettings()
   Config::SetBase(Config::NETPLAY_NETWORK_MODE, network_mode);
 }
 
-void NetPlayDialog::ShowMD5Dialog(const std::string& file_identifier)
+void NetPlayDialog::ShowMD5Dialog(const std::string& title)
 {
-  QueueOnObject(this, [this, file_identifier] {
+  QueueOnObject(this, [this, title] {
     m_md5_menu->setEnabled(false);
 
     if (m_md5_dialog->isVisible())
       m_md5_dialog->close();
 
-    m_md5_dialog->show(QString::fromStdString(file_identifier));
+    m_md5_dialog->show(QString::fromStdString(title));
   });
 }
 

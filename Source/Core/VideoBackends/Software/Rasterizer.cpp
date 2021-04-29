@@ -2,16 +2,18 @@
 // Licensed under GPLv2+
 // Refer to the license.txt file included.
 
+#include "VideoBackends/Software/Rasterizer.h"
+
 #include <algorithm>
 #include <cstring>
 
 #include "Common/CommonTypes.h"
 #include "VideoBackends/Software/EfbInterface.h"
 #include "VideoBackends/Software/NativeVertexFormat.h"
-#include "VideoBackends/Software/Rasterizer.h"
 #include "VideoBackends/Software/Tev.h"
 #include "VideoCommon/PerfQueryBase.h"
 #include "VideoCommon/Statistics.h"
+#include "VideoCommon/VideoCommon.h"
 #include "VideoCommon/VideoConfig.h"
 #include "VideoCommon/XFMemory.h"
 
@@ -72,7 +74,7 @@ void SetTevReg(int reg, int comp, s16 color)
 
 static void Draw(s32 x, s32 y, s32 xi, s32 yi)
 {
-  INCSTAT(stats.thisFrame.rasterizedPixels);
+  INCSTAT(g_stats.this_frame.rasterized_pixels);
 
   float dx = vertexOffsetX + (float)(x - vertex0X);
   float dy = vertexOffsetY + (float)(y - vertex0Y);
@@ -171,7 +173,7 @@ static inline void CalculateLOD(s32* lodp, bool* linear, u32 texmap, u32 texcoor
   const TexMode1& tm1 = texUnit.texMode1[subTexmap];
 
   float sDelta, tDelta;
-  if (tm0.diag_lod)
+  if (tm0.diag_lod == LODType::Diagonal)
   {
     float* uv0 = rasterBlock.Pixel[0][0].Uv[texcoord];
     float* uv1 = rasterBlock.Pixel[1][1].Uv[texcoord];
@@ -197,7 +199,8 @@ static inline void CalculateLOD(s32* lodp, bool* linear, u32 texmap, u32 texcoor
   bias >>= 1;
   lod += bias;
 
-  *linear = ((lod > 0 && (tm0.min_filter & 4)) || (lod <= 0 && tm0.mag_filter));
+  *linear = ((lod > 0 && tm0.min_filter == FilterMode::Linear) ||
+             (lod <= 0 && tm0.mag_filter == FilterMode::Linear));
 
   // NOTE: The order of comparisons for this clamp check matters.
   if (lod > static_cast<s32>(tm1.max_lod))
@@ -226,12 +229,9 @@ static void BuildBlock(s32 blockX, s32 blockY)
       for (unsigned int i = 0; i < bpmem.genMode.numtexgens; i++)
       {
         float projection = invW;
-        if (xfmem.texMtxInfo[i].projection)
-        {
-          float q = TexSlopes[i][2].GetValue(dx, dy) * invW;
-          if (q != 0.0f)
-            projection = invW / q;
-        }
+        float q = TexSlopes[i][2].GetValue(dx, dy) * invW;
+        if (q != 0.0f)
+          projection = invW / q;
 
         pixel.Uv[i][0] = TexSlopes[i][0].GetValue(dx, dy) * projection;
         pixel.Uv[i][1] = TexSlopes[i][1].GetValue(dx, dy) * projection;
@@ -267,7 +267,7 @@ static void BuildBlock(s32 blockX, s32 blockY)
 void DrawTriangleFrontFace(const OutputVertexData* v0, const OutputVertexData* v1,
                            const OutputVertexData* v2)
 {
-  INCSTAT(stats.thisFrame.numTrianglesDrawn);
+  INCSTAT(g_stats.this_frame.num_triangles_drawn);
 
   // adapted from http://devmaster.net/posts/6145/advanced-rasterization
 
@@ -306,23 +306,23 @@ void DrawTriangleFrontFace(const OutputVertexData* v0, const OutputVertexData* v
   s32 maxy = (std::max(std::max(Y1, Y2), Y3) + 0xF) >> 4;
 
   // scissor
-  int xoff = bpmem.scissorOffset.x * 2 - 342;
-  int yoff = bpmem.scissorOffset.y * 2 - 342;
+  s32 xoff = bpmem.scissorOffset.x * 2;
+  s32 yoff = bpmem.scissorOffset.y * 2;
 
-  s32 scissorLeft = bpmem.scissorTL.x - xoff - 342;
+  s32 scissorLeft = bpmem.scissorTL.x - xoff;
   if (scissorLeft < 0)
     scissorLeft = 0;
 
-  s32 scissorTop = bpmem.scissorTL.y - yoff - 342;
+  s32 scissorTop = bpmem.scissorTL.y - yoff;
   if (scissorTop < 0)
     scissorTop = 0;
 
-  s32 scissorRight = bpmem.scissorBR.x - xoff - 341;
-  if (scissorRight > EFB_WIDTH)
+  s32 scissorRight = bpmem.scissorBR.x - xoff + 1;
+  if (scissorRight > s32(EFB_WIDTH))
     scissorRight = EFB_WIDTH;
 
-  s32 scissorBottom = bpmem.scissorBR.y - yoff - 341;
-  if (scissorBottom > EFB_HEIGHT)
+  s32 scissorBottom = bpmem.scissorBR.y - yoff + 1;
+  if (scissorBottom > s32(EFB_HEIGHT))
     scissorBottom = EFB_HEIGHT;
 
   minx = std::max(minx, scissorLeft);

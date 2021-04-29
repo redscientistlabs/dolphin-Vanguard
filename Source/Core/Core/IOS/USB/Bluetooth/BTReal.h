@@ -19,6 +19,7 @@
 #include "Core/IOS/USB/Bluetooth/BTBase.h"
 #include "Core/IOS/USB/Bluetooth/hci.h"
 #include "Core/IOS/USB/USBV0.h"
+#include "Core/LibusbUtils.h"
 
 class PointerWrap;
 struct libusb_device;
@@ -39,17 +40,15 @@ enum class SyncButtonState
 
 using linkkey_t = std::array<u8, 16>;
 
-namespace Device
-{
-class BluetoothReal final : public BluetoothBase
+class BluetoothRealDevice final : public BluetoothBaseDevice
 {
 public:
-  BluetoothReal(Kernel& ios, const std::string& device_name);
-  ~BluetoothReal() override;
+  BluetoothRealDevice(Kernel& ios, const std::string& device_name);
+  ~BluetoothRealDevice() override;
 
-  IPCCommandResult Open(const OpenRequest& request) override;
-  IPCCommandResult Close(u32 fd) override;
-  IPCCommandResult IOCtlV(const IOCtlVRequest& request) override;
+  std::optional<IPCReply> Open(const OpenRequest& request) override;
+  std::optional<IPCReply> Close(u32 fd) override;
+  std::optional<IPCReply> IOCtlV(const IOCtlVRequest& request) override;
 
   void DoState(PointerWrap& p) override;
   void UpdateSyncButtonState(bool is_held) override;
@@ -70,6 +69,9 @@ private:
   std::atomic<SyncButtonState> m_sync_button_state{SyncButtonState::Unpressed};
   Common::Timer m_sync_button_held_timer;
 
+  std::string m_last_open_error;
+
+  LibusbUtils::Context m_context;
   libusb_device* m_device = nullptr;
   libusb_device_handle* m_handle = nullptr;
 
@@ -117,14 +119,13 @@ private:
 
   bool OpenDevice(libusb_device* device);
 };
-}  // namespace Device
 }  // namespace IOS::HLE
 
 #else
 #include "Core/IOS/USB/Bluetooth/BTStub.h"
 
-namespace IOS::HLE::Device
+namespace IOS::HLE
 {
-using BluetoothReal = BluetoothStub;
-}  // namespace IOS::HLE::Device
+using BluetoothRealDevice = BluetoothStubDevice;
+}  // namespace IOS::HLE
 #endif

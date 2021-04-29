@@ -122,17 +122,17 @@ static u32 EFB_Read(const u32 addr)
 
   if (addr & 0x00800000)
   {
-    ERROR_LOG(MEMMAP, "Unimplemented Z+Color EFB read @ 0x%08x", addr);
+    ERROR_LOG_FMT(MEMMAP, "Unimplemented Z+Color EFB read @ {:#010x}", addr);
   }
   else if (addr & 0x00400000)
   {
     var = g_video_backend->Video_AccessEFB(EFBAccessType::PeekZ, x, y, 0);
-    DEBUG_LOG(MEMMAP, "EFB Z Read @ %u, %u\t= 0x%08x", x, y, var);
+    DEBUG_LOG_FMT(MEMMAP, "EFB Z Read @ {}, {}\t= {:#010x}", x, y, var);
   }
   else
   {
     var = g_video_backend->Video_AccessEFB(EFBAccessType::PeekColor, x, y, 0);
-    DEBUG_LOG(MEMMAP, "EFB Color Read @ %u, %u\t= 0x%08x", x, y, var);
+    DEBUG_LOG_FMT(MEMMAP, "EFB Color Read @ {}, {}\t= {:#010x}", x, y, var);
   }
 
   return var;
@@ -147,17 +147,17 @@ static void EFB_Write(u32 data, u32 addr)
   {
     // It's possible to do a z-tested write to EFB by writing a 64bit value to this address range.
     // Not much is known, but let's at least get some loging.
-    ERROR_LOG(MEMMAP, "Unimplemented Z+Color EFB write. %08x @ 0x%08x", data, addr);
+    ERROR_LOG_FMT(MEMMAP, "Unimplemented Z+Color EFB write. {:08x} @ {:#010x}", data, addr);
   }
   else if (addr & 0x00400000)
   {
     g_video_backend->Video_AccessEFB(EFBAccessType::PokeZ, x, y, data);
-    DEBUG_LOG(MEMMAP, "EFB Z Write %08x @ %u, %u", data, x, y);
+    DEBUG_LOG_FMT(MEMMAP, "EFB Z Write {:08x} @ {}, {}", data, x, y);
   }
   else
   {
     g_video_backend->Video_AccessEFB(EFBAccessType::PokeColor, x, y, data);
-    DEBUG_LOG(MEMMAP, "EFB Color Write %08x @ %u, %u", data, x, y);
+    DEBUG_LOG_FMT(MEMMAP, "EFB Color Write {:08x} @ {}, {}", data, x, y);
   }
 }
 
@@ -207,18 +207,18 @@ static T ReadFromHardware(u32 em_address)
 
   // TODO: Make sure these are safe for unaligned addresses.
 
-  if ((em_address & 0xF8000000) == 0x00000000)
+  if (Memory::m_pRAM && (em_address & 0xF8000000) == 0x00000000)
   {
     // Handle RAM; the masking intentionally discards bits (essentially creating
     // mirrors of memory).
-    // TODO: Only the first REALRAM_SIZE is supposed to be backed by actual memory.
+    // TODO: Only the first GetRamSizeReal() is supposed to be backed by actual memory.
     T value;
-    std::memcpy(&value, &Memory::m_pRAM[em_address & Memory::RAM_MASK], sizeof(T));
+    std::memcpy(&value, &Memory::m_pRAM[em_address & Memory::GetRamMask()], sizeof(T));
     return bswap(value);
   }
 
   if (Memory::m_pEXRAM && (em_address >> 28) == 0x1 &&
-      (em_address & 0x0FFFFFFF) < Memory::EXRAM_SIZE)
+      (em_address & 0x0FFFFFFF) < Memory::GetExRamSizeReal())
   {
     T value;
     std::memcpy(&value, &Memory::m_pEXRAM[em_address & 0x0FFFFFFF], sizeof(T));
@@ -226,7 +226,8 @@ static T ReadFromHardware(u32 em_address)
   }
 
   // Locked L1 technically doesn't have a fixed address, but games all use 0xE0000000.
-  if ((em_address >> 28) == 0xE && (em_address < (0xE0000000 + Memory::L1_CACHE_SIZE)))
+  if (Memory::m_pL1Cache && (em_address >> 28) == 0xE &&
+      (em_address < (0xE0000000 + Memory::GetL1CacheSize())))
   {
     T value;
     std::memcpy(&value, &Memory::m_pL1Cache[em_address & 0x0FFFFFFF], sizeof(T));
@@ -238,7 +239,7 @@ static T ReadFromHardware(u32 em_address)
   if (Memory::m_pFakeVMEM && ((em_address & 0xFE000000) == 0x7E000000))
   {
     T value;
-    std::memcpy(&value, &Memory::m_pFakeVMEM[em_address & Memory::RAM_MASK], sizeof(T));
+    std::memcpy(&value, &Memory::m_pFakeVMEM[em_address & Memory::GetRamMask()], sizeof(T));
     return bswap(value);
   }
 
@@ -250,7 +251,7 @@ static T ReadFromHardware(u32 em_address)
       return (T)Memory::mmio_mapping->Read<typename std::make_unsigned<T>::type>(em_address);
   }
 
-  PanicAlert("Unable to resolve read address %x PC %x", em_address, PC);
+  PanicAlertFmt("Unable to resolve read address {:x} PC {:x}", em_address, PC);
   return 0;
 }
 
@@ -296,18 +297,18 @@ static void WriteToHardware(u32 em_address, const T data)
 
   // TODO: Make sure these are safe for unaligned addresses.
 
-  if ((em_address & 0xF8000000) == 0x00000000)
+  if (Memory::m_pRAM && (em_address & 0xF8000000) == 0x00000000)
   {
     // Handle RAM; the masking intentionally discards bits (essentially creating
     // mirrors of memory).
-    // TODO: Only the first REALRAM_SIZE is supposed to be backed by actual memory.
+    // TODO: Only the first GetRamSizeReal() is supposed to be backed by actual memory.
     const T swapped_data = bswap(data);
-    std::memcpy(&Memory::m_pRAM[em_address & Memory::RAM_MASK], &swapped_data, sizeof(T));
+    std::memcpy(&Memory::m_pRAM[em_address & Memory::GetRamMask()], &swapped_data, sizeof(T));
     return;
   }
 
   if (Memory::m_pEXRAM && (em_address >> 28) == 0x1 &&
-      (em_address & 0x0FFFFFFF) < Memory::EXRAM_SIZE)
+      (em_address & 0x0FFFFFFF) < Memory::GetExRamSizeReal())
   {
     const T swapped_data = bswap(data);
     std::memcpy(&Memory::m_pEXRAM[em_address & 0x0FFFFFFF], &swapped_data, sizeof(T));
@@ -315,7 +316,8 @@ static void WriteToHardware(u32 em_address, const T data)
   }
 
   // Locked L1 technically doesn't have a fixed address, but games all use 0xE0000000.
-  if ((em_address >> 28 == 0xE) && (em_address < (0xE0000000 + Memory::L1_CACHE_SIZE)))
+  if (Memory::m_pL1Cache && (em_address >> 28 == 0xE) &&
+      (em_address < (0xE0000000 + Memory::GetL1CacheSize())))
   {
     const T swapped_data = bswap(data);
     std::memcpy(&Memory::m_pL1Cache[em_address & 0x0FFFFFFF], &swapped_data, sizeof(T));
@@ -328,7 +330,7 @@ static void WriteToHardware(u32 em_address, const T data)
   if (Memory::m_pFakeVMEM && ((em_address & 0xFE000000) == 0x7E000000))
   {
     const T swapped_data = bswap(data);
-    std::memcpy(&Memory::m_pFakeVMEM[em_address & Memory::RAM_MASK], &swapped_data, sizeof(T));
+    std::memcpy(&Memory::m_pFakeVMEM[em_address & Memory::GetRamMask()], &swapped_data, sizeof(T));
     return;
   }
 
@@ -368,8 +370,7 @@ static void WriteToHardware(u32 em_address, const T data)
     }
   }
 
-  PanicAlert("Unable to resolve write address %x PC %x", em_address, PC);
-  return;
+  PanicAlertFmt("Unable to resolve write address {:x} PC {:x}", em_address, PC);
 }
 // =====================
 
@@ -412,7 +413,7 @@ TryReadInstResult TryReadInstruction(u32 address)
   // TODO: Refactor this. This icache implementation is totally wrong if used with the fake vmem.
   if (Memory::m_pFakeVMEM && ((address & 0xFE000000) == 0x7E000000))
   {
-    hex = Common::swap32(&Memory::m_pFakeVMEM[address & Memory::FAKEVMEM_MASK]);
+    hex = Common::swap32(&Memory::m_pFakeVMEM[address & Memory::GetFakeVMemMask()]);
   }
   else
   {
@@ -423,8 +424,7 @@ TryReadInstResult TryReadInstruction(u32 address)
 
 u32 HostRead_Instruction(const u32 address)
 {
-  UGeckoInstruction inst = HostRead_U32(address);
-  return inst.hex;
+  return ReadFromHardware<XCheckTLBFlag::OpcodeNoException, u32>(address);
 }
 
 static void Memcheck(u32 address, u32 var, bool write, size_t size)
@@ -667,14 +667,24 @@ static bool IsRAMAddress(u32 address, bool translate)
   }
 
   u32 segment = address >> 28;
-  if (segment == 0x0 && (address & 0x0FFFFFFF) < Memory::REALRAM_SIZE)
+  if (Memory::m_pRAM && segment == 0x0 && (address & 0x0FFFFFFF) < Memory::GetRamSizeReal())
+  {
     return true;
-  else if (Memory::m_pEXRAM && segment == 0x1 && (address & 0x0FFFFFFF) < Memory::EXRAM_SIZE)
+  }
+  else if (Memory::m_pEXRAM && segment == 0x1 &&
+           (address & 0x0FFFFFFF) < Memory::GetExRamSizeReal())
+  {
     return true;
+  }
   else if (Memory::m_pFakeVMEM && ((address & 0xFE000000) == 0x7E000000))
+  {
     return true;
-  else if (segment == 0xE && (address < (0xE0000000 + Memory::L1_CACHE_SIZE)))
+  }
+  else if (Memory::m_pL1Cache && segment == 0xE &&
+           (address < (0xE0000000 + Memory::GetL1CacheSize())))
+  {
     return true;
+  }
   return false;
 }
 
@@ -942,8 +952,8 @@ static void GenerateDSIException(u32 effective_address, bool write)
   // DSI exceptions are only supported in MMU mode.
   if (!SConfig::GetInstance().bMMU)
   {
-    PanicAlert("Invalid %s 0x%08x, PC = 0x%08x ", write ? "write to" : "read from",
-               effective_address, PC);
+    PanicAlertFmt("Invalid {} {:#010x}, PC = {:#010x}", write ? "write to" : "read from",
+                  effective_address, PC);
     return;
   }
 
@@ -963,21 +973,23 @@ static void GenerateISIException(u32 effective_address)
   NPC = effective_address;
 
   PowerPC::ppcState.Exceptions |= EXCEPTION_ISI;
-  WARN_LOG(POWERPC, "ISI exception at 0x%08x", PC);
+  WARN_LOG_FMT(POWERPC, "ISI exception at {:#010x}", PC);
 }
 
 void SDRUpdated()
 {
   u32 htabmask = SDR1_HTABMASK(PowerPC::ppcState.spr[SPR_SDR]);
   if (!Common::IsValidLowMask(htabmask))
-  {
-    return;
-  }
+    WARN_LOG_FMT(POWERPC, "Invalid HTABMASK: 0b{:032b}", htabmask);
+
+  // While 6xx_pem.pdf §7.6.1.1 mentions that the number of trailing zeros in HTABORG
+  // must be equal to the number of trailing ones in the mask (i.e. HTABORG must be
+  // properly aligned), this is actually not a hard requirement. Real hardware will just OR
+  // the base address anyway. Ignoring SDR changes would lead to incorrect emulation.
   u32 htaborg = SDR1_HTABORG(PowerPC::ppcState.spr[SPR_SDR]);
   if (htaborg & htabmask)
-  {
-    return;
-  }
+    WARN_LOG_FMT(POWERPC, "Invalid HTABORG: htaborg=0x{:08x} htabmask=0x{:08x}", htaborg, htabmask);
+
   PowerPC::ppcState.pagetable_base = htaborg << 16;
   PowerPC::ppcState.pagetable_hashmask = ((htabmask << 10) | 0x3ff);
 }
@@ -1101,7 +1113,7 @@ static TranslateAddressResult TranslatePageAddress(const u32 address, const XChe
 
   // hash function no 1 "xor" .360
   u32 hash = (VSID ^ page_index);
-  u32 pte1 = Common::swap32((VSID << 7) | api | PTE1_V);
+  u32 pte1 = (VSID << 7) | api | PTE1_V;
 
   for (int hash_func = 0; hash_func < 2; hash_func++)
   {
@@ -1109,7 +1121,7 @@ static TranslateAddressResult TranslatePageAddress(const u32 address, const XChe
     if (hash_func == 1)
     {
       hash = ~hash;
-      pte1 |= PTE1_H << 24;
+      pte1 |= PTE1_H;
     }
 
     u32 pteg_addr =
@@ -1117,13 +1129,12 @@ static TranslateAddressResult TranslatePageAddress(const u32 address, const XChe
 
     for (int i = 0; i < 8; i++, pteg_addr += 8)
     {
-      u32 pteg;
-      std::memcpy(&pteg, &Memory::physical_base[pteg_addr], sizeof(u32));
+      const u32 pteg = Memory::Read_U32(pteg_addr);
 
       if (pte1 == pteg)
       {
         UPTE2 PTE2;
-        PTE2.Hex = Common::swap32(&Memory::physical_base[pteg_addr + 4]);
+        PTE2.Hex = Memory::Read_U32(pteg_addr + 4);
 
         // set the access bits
         switch (flag)
@@ -1145,8 +1156,7 @@ static TranslateAddressResult TranslatePageAddress(const u32 address, const XChe
 
         if (!IsNoExceptionFlag(flag))
         {
-          const u32 swapped_pte2 = Common::swap32(PTE2.Hex);
-          std::memcpy(&Memory::physical_base[pteg_addr + 4], &swapped_pte2, sizeof(u32));
+          Memory::Write_U32(PTE2.Hex, pteg_addr + 4);
         }
 
         // We already updated the TLB entry if this was caused by a C bit.
@@ -1181,7 +1191,7 @@ static void UpdateBATs(BatTable& bat_table, u32 base_spr)
       // With a valid BAT, the simplest way to match is
       // (input & ~BL_mask) == BEPI. For now, assume it's
       // implemented this way for invalid BATs as well.
-      WARN_LOG(POWERPC, "Bad BAT setup: BEPI overlaps BL");
+      WARN_LOG_FMT(POWERPC, "Bad BAT setup: BEPI overlaps BL");
       continue;
     }
     if ((batl.BRPN & batu.BL) != 0)
@@ -1189,7 +1199,7 @@ static void UpdateBATs(BatTable& bat_table, u32 base_spr)
       // With a valid BAT, the simplest way to translate is
       // (input & BL_mask) | BRPN_address. For now, assume it's
       // implemented this way for invalid BATs as well.
-      WARN_LOG(POWERPC, "Bad BAT setup: BPRN overlaps BL");
+      WARN_LOG_FMT(POWERPC, "Bad BAT setup: BPRN overlaps BL");
     }
     if (!Common::IsValidLowMask((u32)batu.BL))
     {
@@ -1197,7 +1207,7 @@ static void UpdateBATs(BatTable& bat_table, u32 base_spr)
       // (input & ~BL_mask) for matching and (input & BL_mask) for
       // translation. For now, assume it's implemented this way for
       // invalid BATs as well.
-      WARN_LOG(POWERPC, "Bad BAT setup: invalid mask in BL");
+      WARN_LOG_FMT(POWERPC, "Bad BAT setup: invalid mask in BL");
     }
     for (u32 j = 0; j <= batu.BL; ++j)
     {
@@ -1214,13 +1224,13 @@ static void UpdateBATs(BatTable& bat_table, u32 base_spr)
         u32 valid_bit = BAT_MAPPED_BIT;
         if (Memory::m_pFakeVMEM && (physical_address & 0xFE000000) == 0x7E000000)
           valid_bit |= BAT_PHYSICAL_BIT;
-        else if (physical_address < Memory::REALRAM_SIZE)
+        else if (physical_address < Memory::GetRamSizeReal())
           valid_bit |= BAT_PHYSICAL_BIT;
         else if (Memory::m_pEXRAM && physical_address >> 28 == 0x1 &&
-                 (physical_address & 0x0FFFFFFF) < Memory::EXRAM_SIZE)
+                 (physical_address & 0x0FFFFFFF) < Memory::GetExRamSizeReal())
           valid_bit |= BAT_PHYSICAL_BIT;
         else if (physical_address >> 28 == 0xE &&
-                 physical_address < 0xE0000000 + Memory::L1_CACHE_SIZE)
+                 physical_address < 0xE0000000 + Memory::GetL1CacheSize())
           valid_bit |= BAT_PHYSICAL_BIT;
 
         // Fastmem doesn't support memchecks, so disable it for all overlapping virtual pages.
@@ -1241,7 +1251,7 @@ static void UpdateFakeMMUBat(BatTable& bat_table, u32 start_addr)
     // Map from 0x4XXXXXXX or 0x7XXXXXXX to the range
     // [0x7E000000,0x80000000).
     u32 e_address = i + (start_addr >> BAT_INDEX_SHIFT);
-    u32 p_address = 0x7E000000 | (i << BAT_INDEX_SHIFT & Memory::FAKEVMEM_MASK);
+    u32 p_address = 0x7E000000 | (i << BAT_INDEX_SHIFT & Memory::GetFakeVMemMask());
     u32 flags = BAT_MAPPED_BIT | BAT_PHYSICAL_BIT;
 
     if (PowerPC::memchecks.OverlapsMemcheck(e_address << BAT_INDEX_SHIFT, BAT_PAGE_SIZE))

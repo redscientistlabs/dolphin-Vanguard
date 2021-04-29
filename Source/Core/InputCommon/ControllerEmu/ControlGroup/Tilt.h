@@ -8,7 +8,7 @@
 
 #include "InputCommon/ControllerEmu/Setting/NumericSetting.h"
 #include "InputCommon/ControllerEmu/StickGate.h"
-#include "InputCommon/ControllerInterface/Device.h"
+#include "InputCommon/ControllerInterface/CoreDevice.h"
 
 namespace ControllerEmu
 {
@@ -28,7 +28,11 @@ public:
 
   StateData GetState();
 
+  // Return peak rotational velocity (for a complete turn) in radians/sec
+  ControlState GetMaxRotationalVelocity() const;
+
 private:
   SettingValue<double> m_max_angle_setting;
+  SettingValue<double> m_max_rotational_velocity;
 };
 }  // namespace ControllerEmu

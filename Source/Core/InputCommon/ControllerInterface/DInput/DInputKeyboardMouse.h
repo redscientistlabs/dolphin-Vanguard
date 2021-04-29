@@ -6,12 +6,16 @@
 
 #include <windows.h>
 
+#include "Common/Matrix.h"
+#include "InputCommon/ControllerInterface/ControllerInterface.h"
+#include "InputCommon/ControllerInterface/CoreDevice.h"
 #include "InputCommon/ControllerInterface/DInput/DInput8.h"
-#include "InputCommon/ControllerInterface/Device.h"
 
 namespace ciface::DInput
 {
 void InitKeyboardMouse(IDirectInput8* const idi8, HWND hwnd);
+
+using RelativeMouseState = RelativeInputState<Common::TVec3<LONG>>;
 
 class KeyboardMouse : public Core::Device
 {
@@ -19,11 +23,15 @@ private:
   struct State
   {
     BYTE keyboard[256];
+
+    // Old smoothed relative mouse movement.
     DIMOUSESTATE2 mouse;
-    struct
-    {
-      ControlState x, y;
-    } cursor;
+
+    // Normalized mouse cursor position.
+    Common::TVec2<ControlState> cursor;
+
+    // Raw relative mouse movement.
+    RelativeMouseState relative_mouse;
   };
 
   class Key : public Input
@@ -55,6 +63,7 @@ private:
   public:
     Axis(u8 index, const LONG& axis, LONG range) : m_axis(axis), m_range(range), m_index(index) {}
     std::string GetName() const override;
+    bool IsDetectable() const override { return false; }
     ControlState GetState() const override;
 
   private:
@@ -71,7 +80,7 @@ private:
     {
     }
     std::string GetName() const override;
-    bool IsDetectable() override { return false; }
+    bool IsDetectable() const override { return false; }
     ControlState GetState() const override;
 
   private:

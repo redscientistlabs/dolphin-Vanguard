@@ -7,7 +7,7 @@
 #include <string>
 #include "InputCommon/ControllerEmu/ControlGroup/ControlGroup.h"
 #include "InputCommon/ControllerEmu/Setting/NumericSetting.h"
-#include "InputCommon/ControllerInterface/Device.h"
+#include "InputCommon/ControllerInterface/CoreDevice.h"
 
 namespace ControllerEmu
 {
@@ -21,6 +21,8 @@ public:
 
   ControlState GetDeadzone() const;
   ControlState GetThreshold() const;
+
+  size_t GetTriggerCount() const;
 
 private:
   SettingValue<double> m_threshold_setting;

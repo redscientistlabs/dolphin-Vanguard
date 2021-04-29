@@ -11,6 +11,7 @@
 #include <QMenu>
 #include <QMenuBar>
 #include <QPushButton>
+#include <QRegularExpression>
 #include <QScrollBar>
 #include <QStringListModel>
 #include <QTextCursor>
@@ -21,8 +22,8 @@
 #include "DolphinQt/Config/GameConfigHighlighter.h"
 #include "DolphinQt/QtUtils/ModalMessageBox.h"
 
-GameConfigEdit::GameConfigEdit(QWidget* parent, const QString& path, bool read_only)
-    : m_path(path), m_read_only(read_only)
+GameConfigEdit::GameConfigEdit(QWidget* parent, QString path, bool read_only)
+    : QWidget{parent}, m_path(std::move(path)), m_read_only(read_only)
 {
   CreateWidgets();
 
@@ -135,8 +136,8 @@ void GameConfigEdit::ConnectWidgets()
 {
   connect(m_edit, &QTextEdit::textChanged, this, &GameConfigEdit::SaveFile);
   connect(m_edit, &QTextEdit::selectionChanged, this, &GameConfigEdit::OnSelectionChanged);
-  connect(m_completer, static_cast<void (QCompleter::*)(const QString&)>(&QCompleter::activated),
-          this, &GameConfigEdit::OnAutoComplete);
+  connect(m_completer, qOverload<const QString&>(&QCompleter::activated), this,
+          &GameConfigEdit::OnAutoComplete);
 }
 
 void GameConfigEdit::OnSelectionChanged()
@@ -161,7 +162,7 @@ void GameConfigEdit::AddBoolOption(QMenu* menu, const QString& name, const QStri
 void GameConfigEdit::SetOption(const QString& section, const QString& key, const QString& value)
 {
   auto section_cursor =
-      m_edit->document()->find(QRegExp(QStringLiteral("^\\[%1\\]").arg(section)), 0);
+      m_edit->document()->find(QRegularExpression(QStringLiteral("^\\[%1\\]").arg(section)), 0);
 
   // Check if the section this belongs in can be found
   if (section_cursor.isNull())
@@ -170,8 +171,8 @@ void GameConfigEdit::SetOption(const QString& section, const QString& key, const
   }
   else
   {
-    auto value_cursor =
-        m_edit->document()->find(QRegExp(QStringLiteral("^%1 = .*").arg(key)), section_cursor);
+    auto value_cursor = m_edit->document()->find(
+        QRegularExpression(QStringLiteral("^%1 = .*").arg(key)), section_cursor);
 
     const QString new_line = QStringLiteral("%1 = %2").arg(key).arg(value);
 
@@ -179,7 +180,7 @@ void GameConfigEdit::SetOption(const QString& section, const QString& key, const
     if (value_cursor.isNull())
     {
       section_cursor.clearSelection();
-      section_cursor.insertText(QStringLiteral("\n") + new_line);
+      section_cursor.insertText(QLatin1Char{'\n'} + new_line);
     }
     else
     {

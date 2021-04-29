@@ -6,7 +6,7 @@
 
 #include <QAbstractEventDispatcher>
 #include <QApplication>
-#include <QProgressDialog>
+#include <QLocale>
 
 #include <imgui.h>
 
@@ -19,6 +19,7 @@
 #include "Core/Host.h"
 #include "Core/NetPlayProto.h"
 #include "Core/PowerPC/PowerPC.h"
+#include "Core/State.h"
 
 #include "DolphinQt/QtUtils/QueueOnObject.h"
 #include "DolphinQt/Settings.h"
@@ -30,7 +31,15 @@
 #include "VideoCommon/RenderBase.h"
 #include "VideoCommon/VideoConfig.h"
 
-Host::Host() = default;
+Host::Host()
+{
+  State::SetOnAfterLoadCallback([] { Host_UpdateDisasmDialog(); });
+}
+
+Host::~Host()
+{
+  State::SetOnAfterLoadCallback(nullptr);
+}
 
 Host* Host::GetInstance()
 {
@@ -87,6 +96,17 @@ void Host::ResizeSurface(int new_width, int new_height)
     g_renderer->ResizeSurface();
 }
 
+std::vector<std::string> Host_GetPreferredLocales()
+{
+  const QStringList ui_languages = QLocale::system().uiLanguages();
+  std::vector<std::string> converted_languages(ui_languages.size());
+
+  for (int i = 0; i < ui_languages.size(); ++i)
+    converted_languages[i] = ui_languages[i].toStdString();
+
+  return converted_languages;
+}
+
 void Host_Message(HostMessageID id)
 {
   if (id == HostMessageID::WMUserStop)
@@ -126,11 +146,6 @@ void Host_UpdateDisasmDialog()
   QueueOnObject(QApplication::instance(), [] { emit Host::GetInstance()->UpdateDisasmDialog(); });
 }
 
-void Host_UpdateProgressDialog(const char* caption, int position, int total)
-{
-  emit Host::GetInstance()->UpdateProgressDialog(QString::fromUtf8(caption), position, total);
-}
-
 void Host::RequestNotifyMapLoaded()
 {
   QueueOnObject(QApplication::instance(), [this] { emit NotifyMapLoaded(); });
@@ -151,12 +166,6 @@ void Host_UpdateMainFrame()
 void Host_RequestRenderWindowSize(int w, int h)
 {
   emit Host::GetInstance()->RequestRenderSize(w, h);
-}
-
-bool Host_UINeedsControllerState()
-{
-  return Settings::Instance().IsControllerStateNeeded() ||
-         (ImGui::GetCurrentContext() && ImGui::GetIO().WantCaptureKeyboard);
 }
 
 bool Host_UIBlocksControllerState()

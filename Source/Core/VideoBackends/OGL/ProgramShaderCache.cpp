@@ -4,8 +4,8 @@
 
 #include "VideoBackends/OGL/ProgramShaderCache.h"
 
+#include <array>
 #include <atomic>
-#include <limits>
 #include <memory>
 #include <string>
 
@@ -17,31 +17,29 @@
 #include "Common/Logging/Log.h"
 #include "Common/MsgHandler.h"
 #include "Common/StringUtil.h"
-#include "Common/Timer.h"
+#include "Common/Version.h"
 
 #include "Core/ConfigManager.h"
-#include "Core/Host.h"
 
+#include "VideoBackends/OGL/OGLRender.h"
 #include "VideoBackends/OGL/OGLShader.h"
-#include "VideoBackends/OGL/Render.h"
-#include "VideoBackends/OGL/StreamBuffer.h"
-#include "VideoBackends/OGL/VertexManager.h"
+#include "VideoBackends/OGL/OGLStreamBuffer.h"
+#include "VideoBackends/OGL/OGLVertexManager.h"
 
 #include "VideoCommon/AsyncShaderCompiler.h"
-#include "VideoCommon/DriverDetails.h"
 #include "VideoCommon/GeometryShaderManager.h"
-#include "VideoCommon/ImageWrite.h"
 #include "VideoCommon/PixelShaderManager.h"
 #include "VideoCommon/Statistics.h"
 #include "VideoCommon/VertexLoaderManager.h"
 #include "VideoCommon/VertexShaderManager.h"
-#include "VideoCommon/VideoCommon.h"
+#include "VideoCommon/VideoBackendBase.h"
+#include "VideoCommon/VideoConfig.h"
 #include "DolphinQt/NarrysMod/ThreadLocalHelper.h"
 
 namespace OGL
 {
 u32 ProgramShaderCache::s_ubo_buffer_size;
-s32 ProgramShaderCache::s_ubo_align;
+s32 ProgramShaderCache::s_ubo_align = 1;
 GLuint ProgramShaderCache::s_attributeless_VBO = 0;
 GLuint ProgramShaderCache::s_attributeless_VAO = 0;
 GLuint ProgramShaderCache::s_last_VAO = 0;
@@ -164,7 +162,7 @@ void SHADER::Bind() const
 {
   if (CurrentProgram != glprogid)
   {
-    INCSTAT(stats.thisFrame.numShaderChanges);
+    INCSTAT(g_stats.this_frame.num_shader_changes);
     glUseProgram(glprogid);
     CurrentProgram = glprogid;
   }
@@ -254,7 +252,7 @@ void ProgramShaderCache::UploadConstants()
     VertexShaderManager::dirty = false;
     GeometryShaderManager::dirty = false;
 
-    ADDSTAT(stats.thisFrame.bytesUniformStreamed, s_ubo_buffer_size);
+    ADDSTAT(g_stats.this_frame.bytes_uniform_streamed, s_ubo_buffer_size);
   }
 }
 
@@ -270,22 +268,22 @@ void ProgramShaderCache::UploadConstants(const void* data, u32 data_size)
   for (u32 index = 1; index <= 3; index++)
     glBindBufferRange(GL_UNIFORM_BUFFER, index, s_buffer->m_buffer, buffer.second, data_size);
 
-  ADDSTAT(stats.thisFrame.bytesUniformStreamed, data_size);
+  ADDSTAT(g_stats.this_frame.bytes_uniform_streamed, data_size);
 }
 
-bool ProgramShaderCache::CompileComputeShader(SHADER& shader, const std::string& code)
+bool ProgramShaderCache::CompileComputeShader(SHADER& shader, std::string_view code)
 {
   // We need to enable GL_ARB_compute_shader for drivers that support the extension,
   // but not GLSL 4.3. Mesa is one example.
-  std::string header;
+  std::string full_code;
   if (g_ActiveConfig.backend_info.bSupportsComputeShaders &&
       g_ogl_config.eSupportedGLSLVersion < Glsl430)
   {
-    header = "#extension GL_ARB_compute_shader : enable\n";
+    full_code = "#extension GL_ARB_compute_shader : enable\n";
   }
 
-  std::string full_code = header + code;
-  GLuint shader_id = CompileSingleShader(GL_COMPUTE_SHADER, full_code);
+  full_code += code;
+  const GLuint shader_id = CompileSingleShader(GL_COMPUTE_SHADER, full_code);
   if (!shader_id)
     return false;
 
@@ -297,7 +295,7 @@ bool ProgramShaderCache::CompileComputeShader(SHADER& shader, const std::string&
   // original shaders aren't needed any more
   glDeleteShader(shader_id);
 
-  if (!CheckProgramLinkResult(shader.glprogid, &full_code, nullptr, nullptr))
+  if (!CheckProgramLinkResult(shader.glprogid, full_code, {}, {}))
   {
     shader.Destroy();
     return false;
@@ -307,13 +305,21 @@ bool ProgramShaderCache::CompileComputeShader(SHADER& shader, const std::string&
   return true;
 }
 
-GLuint ProgramShaderCache::CompileSingleShader(GLenum type, const std::string& code)
+GLuint ProgramShaderCache::CompileSingleShader(GLenum type, std::string_view code)
 {
-  GLuint result = glCreateShader(type);
+  const GLuint result = glCreateShader(type);
 
-  const char* src[] = {s_glsl_header.c_str(), code.c_str()};
+  constexpr GLsizei num_strings = 2;
+  const std::array<const char*, num_strings> src{
+      s_glsl_header.data(),
+      code.data(),
+  };
+  const std::array<GLint, num_strings> src_sizes{
+      static_cast<GLint>(s_glsl_header.size()),
+      static_cast<GLint>(code.size()),
+  };
 
-  glShaderSource(result, 2, src, nullptr);
+  glShaderSource(result, num_strings, src.data(), src_sizes.data());
   glCompileShader(result);
 
   if (!CheckShaderCompileResult(result, type, code))
@@ -326,7 +332,7 @@ GLuint ProgramShaderCache::CompileSingleShader(GLenum type, const std::string& c
   return result;
 }
 
-bool ProgramShaderCache::CheckShaderCompileResult(GLuint id, GLenum type, const std::string& code)
+bool ProgramShaderCache::CheckShaderCompileResult(GLuint id, GLenum type, std::string_view code)
 {
   GLint compileStatus;
   glGetShaderiv(id, GL_COMPILE_STATUS, &compileStatus);
@@ -357,31 +363,33 @@ bool ProgramShaderCache::CheckShaderCompileResult(GLuint id, GLenum type, const 
 
     if (compileStatus != GL_TRUE)
     {
-      ERROR_LOG(VIDEO, "%s failed compilation:\n%s", prefix, info_log.c_str());
+      ERROR_LOG_FMT(VIDEO, "{} failed compilation:\n{}", prefix, info_log);
 
-      std::string filename = StringFromFormat(
-          "%sbad_%s_%04i.txt", File::GetUserPath(D_DUMP_IDX).c_str(), prefix, num_failures++);
+      std::string filename = VideoBackendBase::BadShaderFilename(prefix, num_failures++);
       std::ofstream file;
       File::OpenFStream(file, filename, std::ios_base::out);
       file << s_glsl_header << code << info_log;
+      file << "\n";
+      file << "Dolphin Version: " + Common::scm_rev_str + "\n";
+      file << "Video Backend: " + g_video_backend->GetDisplayName();
       file.close();
 
-      PanicAlert("Failed to compile %s shader: %s\n"
-                 "Debug info (%s, %s, %s):\n%s",
-                 prefix, filename.c_str(), g_ogl_config.gl_vendor, g_ogl_config.gl_renderer,
-                 g_ogl_config.gl_version, info_log.c_str());
+      PanicAlertFmt("Failed to compile {} shader: {}\n"
+                    "Debug info ({}, {}, {}):\n{}",
+                    prefix, filename, g_ogl_config.gl_vendor, g_ogl_config.gl_renderer,
+                    g_ogl_config.gl_version, info_log);
 
       return false;
     }
 
-    WARN_LOG(VIDEO, "%s compiled with warnings:\n%s", prefix, info_log.c_str());
+    WARN_LOG_FMT(VIDEO, "{} compiled with warnings:\n{}", prefix, info_log);
   }
 
   return true;
 }
 
-bool ProgramShaderCache::CheckProgramLinkResult(GLuint id, const std::string* vcode,
-                                                const std::string* pcode, const std::string* gcode)
+bool ProgramShaderCache::CheckProgramLinkResult(GLuint id, std::string_view vcode,
+                                                std::string_view pcode, std::string_view gcode)
 {
   GLint linkStatus;
   glGetProgramiv(id, GL_LINK_STATUS, &linkStatus);
@@ -394,30 +402,32 @@ bool ProgramShaderCache::CheckProgramLinkResult(GLuint id, const std::string* vc
     glGetProgramInfoLog(id, length, &length, &info_log[0]);
     if (linkStatus != GL_TRUE)
     {
-      ERROR_LOG(VIDEO, "Program failed linking:\n%s", info_log.c_str());
-      std::string filename =
-          StringFromFormat("%sbad_p_%d.txt", File::GetUserPath(D_DUMP_IDX).c_str(), num_failures++);
+      ERROR_LOG_FMT(VIDEO, "Program failed linking:\n{}", info_log);
+      std::string filename = VideoBackendBase::BadShaderFilename("p", num_failures++);
       std::ofstream file;
       File::OpenFStream(file, filename, std::ios_base::out);
-      if (vcode)
-        file << s_glsl_header << *vcode << '\n';
-      if (gcode)
-        file << s_glsl_header << *gcode << '\n';
-      if (pcode)
-        file << s_glsl_header << *pcode << '\n';
+      if (!vcode.empty())
+        file << s_glsl_header << vcode << '\n';
+      if (!gcode.empty())
+        file << s_glsl_header << gcode << '\n';
+      if (!pcode.empty())
+        file << s_glsl_header << pcode << '\n';
 
       file << info_log;
+      file << "\n";
+      file << "Dolphin Version: " + Common::scm_rev_str + "\n";
+      file << "Video Backend: " + g_video_backend->GetDisplayName();
       file.close();
 
-      PanicAlert("Failed to link shaders: %s\n"
-                 "Debug info (%s, %s, %s):\n%s",
-                 filename.c_str(), g_ogl_config.gl_vendor, g_ogl_config.gl_renderer,
-                 g_ogl_config.gl_version, info_log.c_str());
+      PanicAlertFmt("Failed to link shaders: {}\n"
+                    "Debug info ({}, {}, {}):\n{}",
+                    filename, g_ogl_config.gl_vendor, g_ogl_config.gl_renderer,
+                    g_ogl_config.gl_version, info_log);
 
       return false;
     }
 
-    WARN_LOG(VIDEO, "Program linked with warnings:\n%s", info_log.c_str());
+    WARN_LOG_FMT(VIDEO, "Program linked with warnings:\n{}", info_log);
   }
 
   return true;
@@ -522,7 +532,7 @@ PipelineProgram* ProgramShaderCache::GetPipelineProgram(const GLVertexFormat* ve
                             geometry_shader ? geometry_shader->GetID() : 0,
                             pixel_shader ? pixel_shader->GetID() : 0};
   {
-    std::lock_guard<std::mutex> guard(s_pipeline_program_lock);
+    std::lock_guard guard{s_pipeline_program_lock};
     auto iter = s_pipeline_programs.find(key);
     if (iter != s_pipeline_programs.end())
     {
@@ -550,7 +560,7 @@ PipelineProgram* ProgramShaderCache::GetPipelineProgram(const GLVertexFormat* ve
     glGetProgramiv(prog->shader.glprogid, GL_LINK_STATUS, &link_status);
     if (link_status != GL_TRUE)
     {
-      WARN_LOG(VIDEO, "Failed to create GL program from program binary.");
+      WARN_LOG_FMT(VIDEO, "Failed to create GL program from program binary.");
       prog->shader.Destroy();
       return nullptr;
     }
@@ -589,10 +599,10 @@ PipelineProgram* ProgramShaderCache::GetPipelineProgram(const GLVertexFormat* ve
     if (!s_is_shared_context.GetValue() && vao != s_last_VAO)
       glBindVertexArray(s_last_VAO);
 
-    if (!ProgramShaderCache::CheckProgramLinkResult(
-            prog->shader.glprogid, vertex_shader ? &vertex_shader->GetSource() : nullptr,
-            geometry_shader ? &geometry_shader->GetSource() : nullptr,
-            pixel_shader ? &pixel_shader->GetSource() : nullptr))
+    if (!CheckProgramLinkResult(prog->shader.glprogid,
+                                vertex_shader ? vertex_shader->GetSource() : std::string_view{},
+                                geometry_shader ? geometry_shader->GetSource() : std::string_view{},
+                                pixel_shader ? pixel_shader->GetSource() : std::string_view{}))
     {
       prog->shader.Destroy();
       return nullptr;
@@ -600,7 +610,7 @@ PipelineProgram* ProgramShaderCache::GetPipelineProgram(const GLVertexFormat* ve
   }
 
   // Lock to insert. A duplicate program may have been created in the meantime.
-  std::lock_guard<std::mutex> guard(s_pipeline_program_lock);
+  std::lock_guard guard{s_pipeline_program_lock};
   auto iter = s_pipeline_programs.find(key);
   if (iter != s_pipeline_programs.end())
   {
@@ -630,8 +640,8 @@ void ProgramShaderCache::ReleasePipelineProgram(PipelineProgram* prog)
 
   prog->shader.Destroy();
 
-  std::lock_guard<std::mutex> guard(s_pipeline_program_lock);
-  auto iter = s_pipeline_programs.find(prog->key);
+  std::lock_guard guard{s_pipeline_program_lock};
+  const auto iter = s_pipeline_programs.find(prog->key);
   ASSERT(iter != s_pipeline_programs.end() && prog == iter->second.get());
   s_pipeline_programs.erase(iter);
 }
@@ -843,7 +853,7 @@ bool SharedContextAsyncShaderCompiler::WorkerThreadInitMainThread(void** param)
       static_cast<Renderer*>(g_renderer.get())->GetMainGLContext()->CreateSharedContext();
   if (!context)
   {
-    PanicAlert("Failed to create shared context for shader compiling.");
+    PanicAlertFmt("Failed to create shared context for shader compiling.");
     return false;
   }
 

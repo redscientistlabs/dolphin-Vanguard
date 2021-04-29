@@ -27,13 +27,12 @@
 #include "Common/Event.h"
 #include "Common/Flag.h"
 #include "Common/MathUtil.h"
-#include "VideoCommon/AVIDump.h"
 #include "VideoCommon/AsyncShaderCompiler.h"
 #include "VideoCommon/BPMemory.h"
 #include "VideoCommon/FPSCounter.h"
+#include "VideoCommon/FrameDump.h"
 #include "VideoCommon/RenderState.h"
 #include "VideoCommon/TextureConfig.h"
-#include "VideoCommon/VideoCommon.h"
 
 class AbstractFramebuffer;
 class AbstractPipeline;
@@ -42,6 +41,7 @@ class AbstractTexture;
 class AbstractStagingTexture;
 class NativeVertexFormat;
 class NetPlayChatUI;
+class PointerWrap;
 struct TextureConfig;
 struct ComputePipelineConfig;
 struct AbstractPipelineConfig;
@@ -50,11 +50,12 @@ enum class ShaderStage;
 enum class EFBAccessType;
 enum class EFBReinterpretType;
 enum class StagingTextureType;
+enum class AspectMode;
 
 namespace VideoCommon
 {
 class PostProcessing;
-}
+}  // namespace VideoCommon
 
 struct EfbPokeData
 {
@@ -159,13 +160,14 @@ public:
   // Converts an upper-left to lower-left if required by the backend, optionally
   // clamping to the framebuffer size.
   MathUtil::Rectangle<int> ConvertFramebufferRectangle(const MathUtil::Rectangle<int>& rect,
-                                                       u32 fb_width, u32 fb_height);
-  MathUtil::Rectangle<int> ConvertFramebufferRectangle(const MathUtil::Rectangle<int>& rect,
-                                                       const AbstractFramebuffer* framebuffer);
+                                                       u32 fb_width, u32 fb_height) const;
+  MathUtil::Rectangle<int>
+  ConvertFramebufferRectangle(const MathUtil::Rectangle<int>& rect,
+                              const AbstractFramebuffer* framebuffer) const;
 
   // EFB coordinate conversion functions
   // Use this to convert a whole native EFB rect to backbuffer coordinates
-  MathUtil::Rectangle<int> ConvertEFBRectangle(const MathUtil::Rectangle<int>& rc);
+  MathUtil::Rectangle<int> ConvertEFBRectangle(const MathUtil::Rectangle<int>& rc) const;
 
   const MathUtil::Rectangle<int>& GetTargetRectangle() const { return m_target_rectangle; }
   float CalculateDrawAspectRatio() const;
@@ -179,6 +181,8 @@ public:
 
   std::tuple<float, float> ScaleToDisplayAspectRatio(int width, int height) const;
   void UpdateDrawRectangle();
+
+  std::tuple<float, float> ApplyStandardAspectCrop(float width, float height) const;
 
   // Use this to convert a single target rectangle to two stereo rectangles
   std::tuple<MathUtil::Rectangle<int>, MathUtil::Rectangle<int>>
@@ -195,11 +199,8 @@ public:
   float EFBToScaledYf(float y) const;
 
   // Random utilities
-  void SaveScreenshot(const std::string& filename, bool wait_for_completion);
+  void SaveScreenshot(std::string filename);
   void DrawDebugText();
-
-  // ImGui initialization depends on being able to create textures and pipelines, so do it last.
-  bool InitializeImGui();
 
   virtual void ClearScreen(const MathUtil::Rectangle<int>& rc, bool colorEnable, bool alphaEnable,
                            bool zEnable, u32 color, u32 z);
@@ -220,6 +221,8 @@ public:
   // Finish up the current frame, print some stats
   void Swap(u32 xfb_addr, u32 fb_width, u32 fb_stride, u32 fb_height, u64 ticks);
 
+  void UpdateWidescreenHeuristic();
+
   // Draws the specified XFB buffer to the screen, performing any post-processing.
   // Assumes that the backbuffer has already been bound and cleared.
   virtual void RenderXFBToScreen(const MathUtil::Rectangle<int>& target_rc,
@@ -229,8 +232,8 @@ public:
   // Called when the configuration changes, and backend structures need to be updated.
   virtual void OnConfigChanged(u32 bits) {}
 
-  PEControl::PixelFormat GetPrevPixelFormat() const { return m_prev_efb_format; }
-  void StorePixelFormat(PEControl::PixelFormat new_format) { m_prev_efb_format = new_format; }
+  PixelFormat GetPrevPixelFormat() const { return m_prev_efb_format; }
+  void StorePixelFormat(PixelFormat new_format) { m_prev_efb_format = new_format; }
   bool EFBHasAlphaChannel() const;
   VideoCommon::PostProcessing* GetPostProcessor() const { return m_post_processor.get(); }
   // Final surface changing
@@ -238,8 +241,13 @@ public:
   void ChangeSurface(void* new_surface_handle);
   void ResizeSurface();
   bool UseVertexDepthRange() const;
+  void DoState(PointerWrap& p);
 
   virtual std::unique_ptr<VideoCommon::AsyncShaderCompiler> CreateAsyncShaderCompiler();
+
+  // Returns true if a layer-expanding geometry shader should be used when rendering the user
+  // interface and final XFB.
+  bool UseGeometryShaderForUI() const;
 
   // Returns a lock for the ImGui mutex, enabling data structures to be modified from outside.
   // Use with care, only non-drawing functions should be called from outside the video thread,
@@ -250,6 +258,9 @@ public:
   // change in the future.
   void BeginUIFrame();
   void EndUIFrame();
+
+  // Will forcibly reload all textures on the next swap
+  void ForceReloadTextures();
 
 protected:
   // Bitmask containing information about which configuration has changed for the backend.
@@ -273,6 +284,12 @@ protected:
   void CheckFifoRecording();
   void RecordVideoMemory();
 
+  // ImGui initialization depends on being able to create textures and pipelines, so do it last.
+  bool InitializeImGui();
+
+  // Recompiles ImGui pipeline - call when stereo mode changes.
+  bool RecompileImGuiPipeline();
+
   // Sets up ImGui state for the next frame.
   // This function itself acquires the ImGui lock, so it should not be held.
   void BeginImGuiFrame();
@@ -291,7 +308,9 @@ protected:
   Common::Event m_screenshot_completed;
   std::mutex m_screenshot_lock;
   std::string m_screenshot_name;
-  bool m_aspect_wide = false;
+
+  bool m_is_game_widescreen = false;
+  bool m_was_orthographically_anamorphic = false;
 
   // The framebuffer size
   int m_target_width = 1;
@@ -322,56 +341,67 @@ protected:
   u64 m_imgui_last_frame_time;
 
 private:
-  void RunFrameDumps();
-  std::tuple<int, int> CalculateOutputDimensions(int width, int height);
+  std::tuple<int, int> CalculateOutputDimensions(int width, int height) const;
 
-  PEControl::PixelFormat m_prev_efb_format = PEControl::INVALID_FMT;
+  PixelFormat m_prev_efb_format = PixelFormat::INVALID_FMT;
   unsigned int m_efb_scale = 1;
 
   // These will be set on the first call to SetWindowSize.
   int m_last_window_request_width = 0;
   int m_last_window_request_height = 0;
 
-  // frame dumping
+  // frame dumping:
+  FrameDump m_frame_dump;
   std::thread m_frame_dump_thread;
-  Common::Event m_frame_dump_start;
-  Common::Event m_frame_dump_done;
   Common::Flag m_frame_dump_thread_running;
-  u32 m_frame_dump_image_counter = 0;
-  bool m_frame_dump_frame_running = false;
-  struct FrameDumpConfig
-  {
-    const u8* data;
-    int width;
-    int height;
-    int stride;
-    AVIDump::Frame state;
-  } m_frame_dump_config;
+
+  // Used to kick frame dump thread.
+  Common::Event m_frame_dump_start;
+
+  // Set by frame dump thread on frame completion.
+  Common::Event m_frame_dump_done;
+
+  // Holds emulation state during the last swap when dumping.
+  FrameDump::FrameState m_last_frame_state;
+
+  // Communication of frame between video and dump threads.
+  FrameDump::FrameData m_frame_dump_data;
 
   // Texture used for screenshot/frame dumping
   std::unique_ptr<AbstractTexture> m_frame_dump_render_texture;
   std::unique_ptr<AbstractFramebuffer> m_frame_dump_render_framebuffer;
-  std::array<std::unique_ptr<AbstractStagingTexture>, 2> m_frame_dump_readback_textures;
-  AVIDump::Frame m_last_frame_state;
-  bool m_last_frame_exported = false;
+
+  // Double buffer:
+  std::unique_ptr<AbstractStagingTexture> m_frame_dump_readback_texture;
+  std::unique_ptr<AbstractStagingTexture> m_frame_dump_output_texture;
+  // Set when readback texture holds a frame that needs to be dumped.
+  bool m_frame_dump_needs_flush = false;
+  // Set when thread is processing output texture.
+  bool m_frame_dump_frame_running = false;
+
+  // Used to generate screenshot names.
+  u32 m_frame_dump_image_counter = 0;
 
   // Tracking of XFB textures so we don't render duplicate frames.
   u64 m_last_xfb_id = std::numeric_limits<u64>::max();
-
-  // Note: Only used for auto-ir
-  u32 m_last_xfb_width = MAX_XFB_WIDTH;
-  u32 m_last_xfb_height = MAX_XFB_HEIGHT;
+  u64 m_last_xfb_ticks = 0;
+  u32 m_last_xfb_addr = 0;
+  u32 m_last_xfb_width = 0;
+  u32 m_last_xfb_stride = 0;
+  u32 m_last_xfb_height = 0;
 
   // NOTE: The methods below are called on the framedumping thread.
-  bool StartFrameDumpToAVI(const FrameDumpConfig& config);
-  void DumpFrameToAVI(const FrameDumpConfig& config);
-  void StopFrameDumpToAVI();
+  void FrameDumpThreadFunc();
+  bool StartFrameDumpToFFMPEG(const FrameDump::FrameData&);
+  void DumpFrameToFFMPEG(const FrameDump::FrameData&);
+  void StopFrameDumpToFFMPEG();
   std::string GetFrameDumpNextImageFileName() const;
-  bool StartFrameDumpToImage(const FrameDumpConfig& config);
-  void DumpFrameToImage(const FrameDumpConfig& config);
+  bool StartFrameDumpToImage(const FrameDump::FrameData&);
+  void DumpFrameToImage(const FrameDump::FrameData&);
+
   void ShutdownFrameDumping();
 
-  bool IsFrameDumping();
+  bool IsFrameDumping() const;
 
   // Checks that the frame dump render texture exists and is the correct size.
   bool CheckFrameDumpRenderTexture(u32 target_width, u32 target_height);
@@ -381,10 +411,10 @@ private:
 
   // Fills the frame dump staging texture with the current XFB texture.
   void DumpCurrentFrame(const AbstractTexture* src_texture,
-                        const MathUtil::Rectangle<int>& src_rect, u64 ticks);
+                        const MathUtil::Rectangle<int>& src_rect, u64 ticks, int frame_number);
 
   // Asynchronously encodes the specified pointer of frame data to the frame dump.
-  void DumpFrameData(const u8* data, int w, int h, int stride, const AVIDump::Frame& state);
+  void DumpFrameData(const u8* data, int w, int h, int stride);
 
   // Ensures all rendered frames are queued for encoding.
   void FlushFrameDump();
@@ -393,6 +423,8 @@ private:
   void FinishFrameData();
 
   std::unique_ptr<NetPlayChatUI> m_netplay_chat_ui;
+
+  Common::Flag m_force_reload_textures;
 };
 
 extern std::unique_ptr<Renderer> g_renderer;

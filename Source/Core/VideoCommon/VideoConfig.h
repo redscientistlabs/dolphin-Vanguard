@@ -14,7 +14,8 @@
 #include <vector>
 
 #include "Common/CommonTypes.h"
-#include "VideoCommon/VideoCommon.h"
+
+enum class APIType;
 
 // Log in two categories, and save three other options in the same byte
 #define CONF_LOG 1
@@ -39,8 +40,7 @@ enum class StereoMode : int
   TAB,
   Anaglyph,
   QuadBuffer,
-  Passive,
-  Nvidia3DVision,
+  Passive
 };
 
 enum class ShaderCompilationMode : int
@@ -95,6 +95,8 @@ struct VideoConfig final
 
   // Utility
   bool bDumpTextures;
+  bool bDumpMipmapTextures;
+  bool bDumpBaseTextures;
   bool bHiresTextures;
   bool bCacheHiresTextures;
   bool bDumpEFBTarget;
@@ -106,7 +108,6 @@ struct VideoConfig final
   std::string sDumpFormat;
   std::string sDumpPath;
   bool bInternalResolutionFrameDumps;
-  bool bFreeLook;
   bool bBorderlessFullscreen;
   bool bEnableGPUTextureDecoding;
   int iBitrateKbps;
@@ -124,6 +125,7 @@ struct VideoConfig final
   bool bDisableCopyToVRAM;
   bool bDeferEFBCopies;
   bool bImmediateXFB;
+  bool bSkipPresentingDuplicateXFBs;
   bool bCopyEFBScaled;
   int iSafeTextureCache_ColorSamples;
   float fAspectRatioHackW, fAspectRatioHackH;
@@ -220,6 +222,7 @@ struct VideoConfig final
     bool bSupportsBackgroundCompiling;
     bool bSupportsLargePoints;
     bool bSupportsPartialDepthCopies;
+    bool bSupportsDepthReadback;
     bool bSupportsShaderBinaries;
     bool bSupportsPipelineCacheData;
   } backend_info;

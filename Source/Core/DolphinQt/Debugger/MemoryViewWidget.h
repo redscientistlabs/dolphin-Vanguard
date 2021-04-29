@@ -7,7 +7,11 @@
 #include <QTableWidget>
 
 #include "Common/CommonTypes.h"
-#include "Core/HW/AddressSpace.h"
+
+namespace AddressSpace
+{
+enum class Type;
+}
 
 class MemoryViewWidget : public QTableWidget
 {
@@ -53,13 +57,14 @@ public:
 signals:
   void BreakpointsChanged();
   void ShowCode(u32 address);
+  void RequestWatch(QString name, u32 address);
 
 private:
   void OnContextMenu();
   void OnCopyAddress();
   void OnCopyHex();
 
-  AddressSpace::Type m_address_space = AddressSpace::Type::Effective;
+  AddressSpace::Type m_address_space{};
   Type m_type = Type::U8;
   BPType m_bp_type = BPType::ReadWrite;
   bool m_do_log = true;

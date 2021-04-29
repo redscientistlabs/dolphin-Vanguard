@@ -6,33 +6,15 @@
 #include <ShlObj.h>
 #include <shellapi.h>
 
+#include <optional>
 #include <string>
 #include <vector>
 
+#include "Common/CommonFuncs.h"
 #include "Common/StringUtil.h"
 
 #include "UpdaterCommon/UI.h"
 #include "UpdaterCommon/UpdaterCommon.h"
-
-namespace
-{
-std::vector<std::string> CommandLineToUtf8Argv(PCWSTR command_line)
-{
-  int nargs;
-  LPWSTR* tokenized = CommandLineToArgvW(command_line, &nargs);
-  if (!tokenized)
-    return {};
-
-  std::vector<std::string> argv(nargs);
-  for (int i = 0; i < nargs; ++i)
-  {
-    argv[i] = UTF16ToUTF8(tokenized[i]);
-  }
-
-  LocalFree(tokenized);
-  return argv;
-}
-};  // namespace
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow)
 {
@@ -64,15 +46,15 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
       return 1;
     }
 
-    wchar_t path[MAX_PATH];
-    if (GetModuleFileName(hInstance, path, sizeof(path)) == 0)
+    auto path = GetModuleName(hInstance);
+    if (!path)
     {
       MessageBox(nullptr, L"Failed to get updater filename.", L"Error", MB_ICONERROR);
       return 1;
     }
 
     // Relaunch the updater as administrator
-    ShellExecuteW(nullptr, L"runas", path, pCmdLine, NULL, SW_SHOW);
+    ShellExecuteW(nullptr, L"runas", path->c_str(), pCmdLine, NULL, SW_SHOW);
     return 0;
   }
 

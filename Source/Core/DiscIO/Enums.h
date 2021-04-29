@@ -76,7 +76,11 @@ bool IsDisc(Platform volume_type);
 bool IsWii(Platform volume_type);
 bool IsNTSC(Region region);
 
+int ToGameCubeLanguage(Language language);
+Language FromGameCubeLanguage(int language);
+
 Country TypicalCountryForRegion(Region region);
+Region SysConfCountryToRegion(u8 country_code);
 // Avoid using this function if you can. Country codes aren't always reliable region indicators.
 Region CountryCodeToRegion(u8 country_code, Platform platform,
                            Region expected_region = Region::Unknown,

@@ -4,10 +4,10 @@
 
 #include "Core/FifoPlayer/FifoAnalyzer.h"
 
-#include <algorithm>
 #include <numeric>
 
 #include "Common/Assert.h"
+#include "Common/MsgHandler.h"
 #include "Common/Swap.h"
 
 #include "Core/FifoPlayer/FifoRecordAnalyzer.h"
@@ -20,29 +20,134 @@
 
 namespace FifoAnalyzer
 {
-bool s_DrawingObject;
-FifoAnalyzer::CPMemory s_CpMem;
-
+namespace
+{
 u8 ReadFifo8(const u8*& data)
 {
-  u8 value = data[0];
+  const u8 value = data[0];
   data += 1;
   return value;
 }
 
 u16 ReadFifo16(const u8*& data)
 {
-  u16 value = Common::swap16(data);
+  const u16 value = Common::swap16(data);
   data += 2;
   return value;
 }
 
 u32 ReadFifo32(const u8*& data)
 {
-  u32 value = Common::swap32(data);
+  const u32 value = Common::swap32(data);
   data += 4;
   return value;
 }
+
+std::array<int, 21> CalculateVertexElementSizes(int vatIndex, const CPMemory& cpMem)
+{
+  const TVtxDesc& vtxDesc = cpMem.vtxDesc;
+  const VAT& vtxAttr = cpMem.vtxAttr[vatIndex];
+
+  // Colors
+  const std::array<ColorFormat, 2> colComp{
+      vtxAttr.g0.Color0Comp,
+      vtxAttr.g0.Color1Comp,
+  };
+
+  const std::array<TexComponentCount, 8> tcElements{
+      vtxAttr.g0.Tex0CoordElements, vtxAttr.g1.Tex1CoordElements, vtxAttr.g1.Tex2CoordElements,
+      vtxAttr.g1.Tex3CoordElements, vtxAttr.g1.Tex4CoordElements, vtxAttr.g2.Tex5CoordElements,
+      vtxAttr.g2.Tex6CoordElements, vtxAttr.g2.Tex7CoordElements,
+  };
+  const std::array<ComponentFormat, 8> tcFormat{
+      vtxAttr.g0.Tex0CoordFormat, vtxAttr.g1.Tex1CoordFormat, vtxAttr.g1.Tex2CoordFormat,
+      vtxAttr.g1.Tex3CoordFormat, vtxAttr.g1.Tex4CoordFormat, vtxAttr.g2.Tex5CoordFormat,
+      vtxAttr.g2.Tex6CoordFormat, vtxAttr.g2.Tex7CoordFormat,
+  };
+
+  std::array<int, 21> sizes{};
+
+  // Add position and texture matrix indices
+  sizes[0] = vtxDesc.low.PosMatIdx;
+  for (size_t i = 0; i < vtxDesc.low.TexMatIdx.Size(); ++i)
+  {
+    sizes[i + 1] = vtxDesc.low.TexMatIdx[i];
+  }
+
+  // Position
+  sizes[9] = VertexLoader_Position::GetSize(vtxDesc.low.Position, vtxAttr.g0.PosFormat,
+                                            vtxAttr.g0.PosElements);
+
+  // Normals
+  if (vtxDesc.low.Normal != VertexComponentFormat::NotPresent)
+  {
+    sizes[10] = VertexLoader_Normal::GetSize(vtxDesc.low.Normal, vtxAttr.g0.NormalFormat,
+                                             vtxAttr.g0.NormalElements, vtxAttr.g0.NormalIndex3);
+  }
+  else
+  {
+    sizes[10] = 0;
+  }
+
+  // Colors
+  for (size_t i = 0; i < vtxDesc.low.Color.Size(); i++)
+  {
+    int size = 0;
+
+    switch (vtxDesc.low.Color[i])
+    {
+    case VertexComponentFormat::NotPresent:
+      break;
+    case VertexComponentFormat::Direct:
+      switch (colComp[i])
+      {
+      case ColorFormat::RGB565:
+        size = 2;
+        break;
+      case ColorFormat::RGB888:
+        size = 3;
+        break;
+      case ColorFormat::RGB888x:
+        size = 4;
+        break;
+      case ColorFormat::RGBA4444:
+        size = 2;
+        break;
+      case ColorFormat::RGBA6666:
+        size = 3;
+        break;
+      case ColorFormat::RGBA8888:
+        size = 4;
+        break;
+      default:
+        ASSERT(0);
+        break;
+      }
+      break;
+    case VertexComponentFormat::Index8:
+      size = 1;
+      break;
+    case VertexComponentFormat::Index16:
+      size = 2;
+      break;
+    }
+
+    sizes[11 + i] = size;
+  }
+
+  // Texture coordinates
+  for (size_t i = 0; i < tcFormat.size(); i++)
+  {
+    sizes[13 + i] =
+        VertexLoader_TextCoord::GetSize(vtxDesc.high.TexCoord[i], tcFormat[i], tcElements[i]);
+  }
+
+  return sizes;
+}
+}  // Anonymous namespace
+
+bool s_DrawingObject;
+FifoAnalyzer::CPMemory s_CpMem;
 
 u32 AnalyzeCommand(const u8* data, DecodeMode mode)
 {
@@ -53,7 +158,7 @@ u32 AnalyzeCommand(const u8* data, DecodeMode mode)
   switch (cmd)
   {
   case OpcodeDecoder::GX_NOP:
-  case 0x44:
+  case OpcodeDecoder::GX_CMD_UNKNOWN_METRICS:
   case OpcodeDecoder::GX_CMD_INVL_VC:
     break;
 
@@ -88,7 +193,7 @@ u32 AnalyzeCommand(const u8* data, DecodeMode mode)
     int array = 0xc + (cmd - OpcodeDecoder::GX_LOAD_INDX_A) / 8;
     u32 value = ReadFifo32(data);
 
-    if (mode == DECODE_RECORD)
+    if (mode == DecodeMode::Record)
       FifoRecordAnalyzer::ProcessLoadIndexedXf(value, array);
     break;
   }
@@ -113,27 +218,28 @@ u32 AnalyzeCommand(const u8* data, DecodeMode mode)
     {
       s_DrawingObject = true;
 
-      int sizes[21];
-      CalculateVertexElementSizes(sizes, cmd & OpcodeDecoder::GX_VAT_MASK, s_CpMem);
+      const std::array<int, 21> sizes =
+          CalculateVertexElementSizes(cmd & OpcodeDecoder::GX_VAT_MASK, s_CpMem);
 
       // Determine offset of each element that might be a vertex array
       // The first 9 elements are never vertex arrays so we just accumulate their sizes.
-      int offsets[12];
-      int offset = std::accumulate(&sizes[0], &sizes[9], 0u);
-      for (int i = 0; i < 12; ++i)
+      int offset = std::accumulate(sizes.begin(), sizes.begin() + 9, 0u);
+      std::array<int, NUM_VERTEX_COMPONENT_ARRAYS> offsets;
+      for (size_t i = 0; i < offsets.size(); ++i)
       {
         offsets[i] = offset;
         offset += sizes[i + 9];
       }
 
-      int vertexSize = offset;
-      int numVertices = ReadFifo16(data);
+      const int vertexSize = offset;
+      const int numVertices = ReadFifo16(data);
 
-      if (mode == DECODE_RECORD && numVertices > 0)
+      if (mode == DecodeMode::Record && numVertices > 0)
       {
-        for (int i = 0; i < 12; ++i)
+        for (size_t i = 0; i < offsets.size(); ++i)
         {
-          FifoRecordAnalyzer::WriteVertexArray(i, data + offsets[i], vertexSize, numVertices);
+          FifoRecordAnalyzer::WriteVertexArray(static_cast<int>(i), data + offsets[i], vertexSize,
+                                               numVertices);
         }
       }
 
@@ -141,7 +247,7 @@ u32 AnalyzeCommand(const u8* data, DecodeMode mode)
     }
     else
     {
-      PanicAlert("FifoPlayer: Unknown Opcode (0x%x).\n", cmd);
+      PanicAlertFmt("FifoPlayer: Unknown Opcode ({:#x}).\n", cmd);
       return 0;
     }
     break;
@@ -155,13 +261,11 @@ void LoadCPReg(u32 subCmd, u32 value, CPMemory& cpMem)
   switch (subCmd & 0xF0)
   {
   case 0x50:
-    cpMem.vtxDesc.Hex &= ~0x1FFFF;  // keep the Upper bits
-    cpMem.vtxDesc.Hex |= value;
+    cpMem.vtxDesc.low.Hex = value;
     break;
 
   case 0x60:
-    cpMem.vtxDesc.Hex &= 0x1FFFF;  // keep the lower 17Bits
-    cpMem.vtxDesc.Hex |= (u64)value << 17;
+    cpMem.vtxDesc.high.Hex = value;
     break;
 
   case 0x70:
@@ -186,103 +290,6 @@ void LoadCPReg(u32 subCmd, u32 value, CPMemory& cpMem)
   case 0xB0:
     cpMem.arrayStrides[subCmd & 0xF] = value & 0xFF;
     break;
-  }
-}
-
-void CalculateVertexElementSizes(int sizes[], int vatIndex, const CPMemory& cpMem)
-{
-  const TVtxDesc& vtxDesc = cpMem.vtxDesc;
-  const VAT& vtxAttr = cpMem.vtxAttr[vatIndex];
-
-  // Colors
-  const u64 colDesc[2] = {vtxDesc.Color0, vtxDesc.Color1};
-  const u32 colComp[2] = {vtxAttr.g0.Color0Comp, vtxAttr.g0.Color1Comp};
-
-  const u32 tcElements[8] = {vtxAttr.g0.Tex0CoordElements, vtxAttr.g1.Tex1CoordElements,
-                             vtxAttr.g1.Tex2CoordElements, vtxAttr.g1.Tex3CoordElements,
-                             vtxAttr.g1.Tex4CoordElements, vtxAttr.g2.Tex5CoordElements,
-                             vtxAttr.g2.Tex6CoordElements, vtxAttr.g2.Tex7CoordElements};
-
-  const u32 tcFormat[8] = {vtxAttr.g0.Tex0CoordFormat, vtxAttr.g1.Tex1CoordFormat,
-                           vtxAttr.g1.Tex2CoordFormat, vtxAttr.g1.Tex3CoordFormat,
-                           vtxAttr.g1.Tex4CoordFormat, vtxAttr.g2.Tex5CoordFormat,
-                           vtxAttr.g2.Tex6CoordFormat, vtxAttr.g2.Tex7CoordFormat};
-
-  // Add position and texture matrix indices
-  u64 vtxDescHex = cpMem.vtxDesc.Hex;
-  for (int i = 0; i < 9; ++i)
-  {
-    sizes[i] = vtxDescHex & 1;
-    vtxDescHex >>= 1;
-  }
-
-  // Position
-  sizes[9] = VertexLoader_Position::GetSize(vtxDesc.Position, vtxAttr.g0.PosFormat,
-                                            vtxAttr.g0.PosElements);
-
-  // Normals
-  if (vtxDesc.Normal != NOT_PRESENT)
-  {
-    sizes[10] = VertexLoader_Normal::GetSize(vtxDesc.Normal, vtxAttr.g0.NormalFormat,
-                                             vtxAttr.g0.NormalElements, vtxAttr.g0.NormalIndex3);
-  }
-  else
-  {
-    sizes[10] = 0;
-  }
-
-  // Colors
-  for (int i = 0; i < 2; i++)
-  {
-    int size = 0;
-
-    switch (colDesc[i])
-    {
-    case NOT_PRESENT:
-      break;
-    case DIRECT:
-      switch (colComp[i])
-      {
-      case FORMAT_16B_565:
-        size = 2;
-        break;
-      case FORMAT_24B_888:
-        size = 3;
-        break;
-      case FORMAT_32B_888x:
-        size = 4;
-        break;
-      case FORMAT_16B_4444:
-        size = 2;
-        break;
-      case FORMAT_24B_6666:
-        size = 3;
-        break;
-      case FORMAT_32B_8888:
-        size = 4;
-        break;
-      default:
-        ASSERT(0);
-        break;
-      }
-      break;
-    case INDEX8:
-      size = 1;
-      break;
-    case INDEX16:
-      size = 2;
-      break;
-    }
-
-    sizes[11 + i] = size;
-  }
-
-  // Texture coordinates
-  vtxDescHex = vtxDesc.Hex >> 17;
-  for (int i = 0; i < 8; i++)
-  {
-    sizes[13 + i] = VertexLoader_TextCoord::GetSize(vtxDescHex & 3, tcFormat[i], tcElements[i]);
-    vtxDescHex >>= 2;
   }
 }
 }  // namespace FifoAnalyzer

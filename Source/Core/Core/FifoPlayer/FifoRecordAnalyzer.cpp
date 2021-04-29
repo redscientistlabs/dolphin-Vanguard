@@ -5,8 +5,8 @@
 #include "Core/FifoPlayer/FifoRecordAnalyzer.h"
 
 #include <algorithm>
-#include <cstring>
 
+#include "Common/MsgHandler.h"
 #include "Core/FifoPlayer/FifoAnalyzer.h"
 #include "Core/FifoPlayer/FifoRecorder.h"
 #include "Core/HW/Memmap.h"
@@ -22,8 +22,13 @@ void FifoRecordAnalyzer::Initialize(const u32* cpMem)
   for (int i = 0; i < 8; ++i)
     FifoAnalyzer::LoadCPReg(0x70 + i, *(cpMem + 0x70 + i), s_CpMem);
 
-  memcpy(s_CpMem.arrayBases, cpMem + 0xA0, 16 * 4);
-  memcpy(s_CpMem.arrayStrides, cpMem + 0xB0, 16 * 4);
+  const u32* const bases_start = cpMem + 0xA0;
+  const u32* const bases_end = bases_start + s_CpMem.arrayBases.size();
+  std::copy(bases_start, bases_end, s_CpMem.arrayBases.begin());
+
+  const u32* const strides_start = cpMem + 0xB0;
+  const u32* const strides_end = strides_start + s_CpMem.arrayStrides.size();
+  std::copy(strides_start, strides_end, s_CpMem.arrayStrides.begin());
 }
 
 void FifoRecordAnalyzer::ProcessLoadIndexedXf(u32 val, int array)
@@ -40,14 +45,28 @@ void FifoRecordAnalyzer::WriteVertexArray(int arrayIndex, const u8* vertexData, 
                                           int numVertices)
 {
   // Skip if not indexed array
-  int arrayType = (s_CpMem.vtxDesc.Hex >> (9 + (arrayIndex * 2))) & 3;
-  if (arrayType < 2)
+  VertexComponentFormat arrayType;
+  if (arrayIndex == ARRAY_POSITION)
+    arrayType = s_CpMem.vtxDesc.low.Position;
+  else if (arrayIndex == ARRAY_NORMAL)
+    arrayType = s_CpMem.vtxDesc.low.Normal;
+  else if (arrayIndex >= ARRAY_COLOR0 && arrayIndex < ARRAY_COLOR0 + NUM_COLOR_ARRAYS)
+    arrayType = s_CpMem.vtxDesc.low.Color[arrayIndex - ARRAY_COLOR0];
+  else if (arrayIndex >= ARRAY_TEXCOORD0 && arrayIndex < ARRAY_TEXCOORD0 + NUM_TEXCOORD_ARRAYS)
+    arrayType = s_CpMem.vtxDesc.high.TexCoord[arrayIndex - ARRAY_TEXCOORD0];
+  else
+  {
+    PanicAlertFmt("Invalid arrayIndex {}", arrayIndex);
+    return;
+  }
+
+  if (!IsIndexed(arrayType))
     return;
 
   int maxIndex = 0;
 
   // Determine min and max indices
-  if (arrayType == INDEX8)
+  if (arrayType == VertexComponentFormat::Index8)
   {
     for (int i = 0; i < numVertices; ++i)
     {

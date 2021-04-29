@@ -13,6 +13,10 @@
 class QKeyEvent;
 class QMouseEvent;
 class QResizeEvent;
+class QShowEvent;
+
+struct CodeViewBranch;
+class BranchDisplayDelegate;
 
 class CodeViewWidget : public QTableWidget
 {
@@ -21,10 +25,12 @@ public:
   enum class SetAddressUpdate
   {
     WithUpdate,
-    WithoutUpdate
+    WithoutUpdate,
+    WithDetailedUpdate
   };
 
   explicit CodeViewWidget();
+  ~CodeViewWidget() override;
 
   u32 GetAddress() const;
   u32 GetContextAddress() const;
@@ -37,11 +43,14 @@ public:
   void ToggleBreakpoint();
   void AddBreakpoint();
 
+  u32 AddressForRow(int row) const;
+
 signals:
   void RequestPPCComparison(u32 addr);
   void ShowMemory(u32 address);
   void SymbolsChanged();
   void BreakpointsChanged();
+  void UpdateCodeWidget();
 
 private:
   enum class ReplaceWith
@@ -56,6 +65,7 @@ private:
   void keyPressEvent(QKeyEvent* event) override;
   void mousePressEvent(QMouseEvent* event) override;
   void wheelEvent(QWheelEvent* event) override;
+  void showEvent(QShowEvent* event) override;
 
   void OnContextMenu();
 
@@ -77,8 +87,14 @@ private:
   void OnReplaceInstruction();
   void OnRestoreInstruction();
 
+  void CalculateBranchIndentation();
+
   bool m_updating = false;
 
   u32 m_address = 0;
   u32 m_context_address = 0;
+
+  std::vector<CodeViewBranch> m_branches;
+
+  friend class BranchDisplayDelegate;
 };

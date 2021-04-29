@@ -5,16 +5,17 @@
 #include "Common/Debug/Watches.h"
 
 #include <algorithm>
+#include <locale>
 #include <sstream>
 
 namespace Common::Debug
 {
-Watch::Watch(u32 address_, const std::string& name_, Watch::State is_enabled_)
-    : address(address_), name(name_), is_enabled(is_enabled_)
+Watch::Watch(u32 address_, std::string name_, State is_enabled_)
+    : address(address_), name(std::move(name_)), is_enabled(is_enabled_)
 {
 }
 
-std::size_t Watches::SetWatch(u32 address, const std::string& name)
+std::size_t Watches::SetWatch(u32 address, std::string name)
 {
   const std::size_t size = m_watches.size();
   for (std::size_t index = 0; index < size; index++)
@@ -25,7 +26,7 @@ std::size_t Watches::SetWatch(u32 address, const std::string& name)
       return index;
     }
   }
-  m_watches.emplace_back(address, name, Watch::State::Enabled);
+  m_watches.emplace_back(address, std::move(name), Watch::State::Enabled);
   return size;
 }
 
@@ -46,10 +47,10 @@ void Watches::UnsetWatch(u32 address)
                   m_watches.end());
 }
 
-void Watches::UpdateWatch(std::size_t index, u32 address, const std::string& name)
+void Watches::UpdateWatch(std::size_t index, u32 address, std::string name)
 {
   m_watches[index].address = address;
-  m_watches[index].name = name;
+  m_watches[index].name = std::move(name);
 }
 
 void Watches::UpdateWatchAddress(std::size_t index, u32 address)
@@ -57,9 +58,9 @@ void Watches::UpdateWatchAddress(std::size_t index, u32 address)
   m_watches[index].address = address;
 }
 
-void Watches::UpdateWatchName(std::size_t index, const std::string& name)
+void Watches::UpdateWatchName(std::size_t index, std::string name)
 {
-  m_watches[index].name = name;
+  m_watches[index].name = std::move(name);
 }
 
 void Watches::EnableWatch(std::size_t index)
@@ -88,11 +89,11 @@ void Watches::LoadFromStrings(const std::vector<std::string>& watches)
 {
   for (const std::string& watch : watches)
   {
-    std::stringstream ss;
+    std::istringstream ss(watch);
+    ss.imbue(std::locale::classic());
     u32 address;
     std::string name;
-    ss << std::hex << watch;
-    ss >> address;
+    ss >> std::hex >> address;
     ss >> std::ws;
     std::getline(ss, name);
     SetWatch(address, name);
@@ -104,7 +105,8 @@ std::vector<std::string> Watches::SaveToStrings() const
   std::vector<std::string> watches;
   for (const auto& watch : m_watches)
   {
-    std::stringstream ss;
+    std::ostringstream ss;
+    ss.imbue(std::locale::classic());
     ss << std::hex << watch.address << " " << watch.name;
     watches.push_back(ss.str());
   }

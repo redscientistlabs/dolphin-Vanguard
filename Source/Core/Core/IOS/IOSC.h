@@ -165,6 +165,9 @@ public:
     HANDLE_ROOT_KEY = 0xfffffff,
   };
 
+  static constexpr std::array<DefaultHandle, 2> COMMON_KEY_HANDLES = {HANDLE_COMMON_KEY,
+                                                                      HANDLE_NEW_COMMON_KEY};
+
   enum ObjectType : u8
   {
     TYPE_SECRET_KEY = 0,
@@ -211,8 +214,8 @@ public:
   ReturnCode VerifyPublicKeySign(const std::array<u8, 20>& sha1, Handle signer_handle,
                                  const std::vector<u8>& signature, u32 pid) const;
   // Import a certificate (signed by the certificate in signer_handle) into dest_handle.
-  ReturnCode ImportCertificate(const IOS::ES::CertReader& cert, Handle signer_handle,
-                               Handle dest_handle, u32 pid);
+  ReturnCode ImportCertificate(const ES::CertReader& cert, Handle signer_handle, Handle dest_handle,
+                               u32 pid);
 
   // Ownership
   ReturnCode GetOwnership(Handle handle, u32* owner) const;

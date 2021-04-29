@@ -15,6 +15,7 @@
 #include "Core/PowerPC/PPCAnalyst.h"
 #include "UICommon/Disassembler.h"
 
+#include "DolphinQt/Host.h"
 #include "DolphinQt/Settings.h"
 
 JITWidget::JITWidget(QWidget* parent) : QDockWidget(parent)
@@ -40,13 +41,14 @@ JITWidget::JITWidget(QWidget* parent) : QDockWidget(parent)
   m_asm_splitter->restoreState(
       settings.value(QStringLiteral("jitwidget/asmsplitter")).toByteArray());
 
-  connect(&Settings::Instance(), &Settings::JITVisibilityChanged,
+  connect(&Settings::Instance(), &Settings::JITVisibilityChanged, this,
           [this](bool visible) { setHidden(!visible); });
 
-  connect(&Settings::Instance(), &Settings::DebugModeToggled,
+  connect(&Settings::Instance(), &Settings::DebugModeToggled, this,
           [this](bool enabled) { setHidden(!enabled || !Settings::Instance().IsJITVisible()); });
 
   connect(&Settings::Instance(), &Settings::EmulationStateChanged, this, &JITWidget::Update);
+  connect(Host::GetInstance(), &Host::UpdateDisasmDialog, this, &JITWidget::Update);
 
   ConnectWidgets();
 
@@ -57,8 +59,6 @@ JITWidget::JITWidget(QWidget* parent) : QDockWidget(parent)
 #else
   m_disassembler = GetNewDisassembler("UNK");
 #endif
-
-  Update();
 }
 
 JITWidget::~JITWidget()
@@ -75,6 +75,7 @@ void JITWidget::CreateWidgets()
 {
   m_table_widget = new QTableWidget;
 
+  m_table_widget->setTabKeyNavigation(false);
   m_table_widget->setColumnCount(7);
   m_table_widget->setHorizontalHeaderLabels(
       {tr("Address"), tr("PPC Size"), tr("Host Size"),
@@ -115,7 +116,7 @@ void JITWidget::CreateWidgets()
 
 void JITWidget::ConnectWidgets()
 {
-  connect(m_refresh_button, &QPushButton::pressed, this, &JITWidget::Update);
+  connect(m_refresh_button, &QPushButton::clicked, this, &JITWidget::Update);
 }
 
 void JITWidget::Compare(u32 address)
@@ -126,6 +127,9 @@ void JITWidget::Compare(u32 address)
 
 void JITWidget::Update()
 {
+  if (!isVisible())
+    return;
+
   if (!m_address)
   {
     m_ppc_asm_widget->setHtml(QStringLiteral("<i>%1</i>").arg(tr("(ppc)")));
@@ -207,4 +211,9 @@ void JITWidget::Update()
 void JITWidget::closeEvent(QCloseEvent*)
 {
   Settings::Instance().SetJITVisible(false);
+}
+
+void JITWidget::showEvent(QShowEvent* event)
+{
+  Update();
 }

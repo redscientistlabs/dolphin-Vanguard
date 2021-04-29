@@ -20,10 +20,10 @@ CSIDevice_GCSteeringWheel::CSIDevice_GCSteeringWheel(SIDevices device, int devic
 {
 }
 
-int CSIDevice_GCSteeringWheel::RunBuffer(u8* buffer, int length)
+int CSIDevice_GCSteeringWheel::RunBuffer(u8* buffer, int request_length)
 {
   // For debug logging only
-  ISIDevice::RunBuffer(buffer, length);
+  ISIDevice::RunBuffer(buffer, request_length);
 
   // Read the command
   EBufferCommands command = static_cast<EBufferCommands>(buffer[0]);
@@ -36,14 +36,11 @@ int CSIDevice_GCSteeringWheel::RunBuffer(u8* buffer, int length)
   {
     u32 id = Common::swap32(SI_GC_STEERING);
     std::memcpy(buffer, &id, sizeof(id));
-    break;
+    return sizeof(id);
   }
-
   default:
-    return CSIDevice_GCController::RunBuffer(buffer, length);
+    return CSIDevice_GCController::RunBuffer(buffer, request_length);
   }
-
-  return length;
 }
 
 bool CSIDevice_GCSteeringWheel::GetData(u32& hi, u32& low)
@@ -132,15 +129,15 @@ void CSIDevice_GCSteeringWheel::SendCommand(u32 command, u8 poll)
         Pad::Rumble(pad_num, 0);
         break;
       default:
-        WARN_LOG(SERIALINTERFACE, "Unknown CMD_FORCE type %i", int(type));
+        WARN_LOG_FMT(SERIALINTERFACE, "Unknown CMD_FORCE type {}", int(type));
         break;
       }
     }
 
-    if (!poll)
+    if (poll == 0)
     {
       m_mode = wheel_command.parameter2;
-      INFO_LOG(SERIALINTERFACE, "PAD %i set to mode %i", m_device_number, m_mode);
+      INFO_LOG_FMT(SERIALINTERFACE, "PAD {} set to mode {}", m_device_number, m_mode);
     }
   }
   else

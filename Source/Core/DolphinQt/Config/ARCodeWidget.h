@@ -10,7 +10,11 @@
 #include <vector>
 
 #include "Common/CommonTypes.h"
-#include "Core/ActionReplay.h"
+
+namespace ActionReplay
+{
+struct ARCode;
+}
 
 namespace UICommon
 {
@@ -28,6 +32,7 @@ class ARCodeWidget : public QWidget
   Q_OBJECT
 public:
   explicit ARCodeWidget(const UICommon::GameFile& game, bool restart_required = true);
+  ~ARCodeWidget() override;
 
   void AddCode(ActionReplay::ARCode code);
 
@@ -45,9 +50,9 @@ private:
   void SaveCodes();
   void SortAlphabetically();
 
-  void OnCodeAddPressed();
-  void OnCodeEditPressed();
-  void OnCodeRemovePressed();
+  void OnCodeAddClicked();
+  void OnCodeEditClicked();
+  void OnCodeRemoveClicked();
 
   void OnListReordered();
 

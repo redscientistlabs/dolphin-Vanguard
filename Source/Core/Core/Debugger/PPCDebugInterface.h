@@ -5,9 +5,13 @@
 #pragma once
 
 #include <cstddef>
+#include <memory>
 #include <string>
 
+#include "Common/Debug/MemoryPatches.h"
+#include "Common/Debug/Watches.h"
 #include "Common/DebugInterface.h"
+#include "Core/NetworkCaptureLogger.h"
 
 class PPCPatches : public Common::Debug::MemoryPatches
 {
@@ -20,15 +24,17 @@ private:
 class PPCDebugInterface final : public Common::DebugInterface
 {
 public:
-  PPCDebugInterface() {}
+  PPCDebugInterface();
+  ~PPCDebugInterface() override;
+
   // Watches
-  std::size_t SetWatch(u32 address, const std::string& name = "") override;
+  std::size_t SetWatch(u32 address, std::string name = "") override;
   const Common::Debug::Watch& GetWatch(std::size_t index) const override;
   const std::vector<Common::Debug::Watch>& GetWatches() const override;
   void UnsetWatch(u32 address) override;
-  void UpdateWatch(std::size_t index, u32 address, const std::string& name) override;
+  void UpdateWatch(std::size_t index, u32 address, std::string name) override;
   void UpdateWatchAddress(std::size_t index, u32 address) override;
-  void UpdateWatchName(std::size_t index, const std::string& name) override;
+  void UpdateWatchName(std::size_t index, std::string name) override;
   void EnableWatch(std::size_t index) override;
   void DisableWatch(std::size_t index) override;
   bool HasEnabledWatch(u32 address) const override;
@@ -48,38 +54,42 @@ public:
   void RemovePatch(std::size_t index) override;
   void ClearPatches() override;
 
-  std::string Disassemble(unsigned int address) override;
-  std::string GetRawMemoryString(int memory, unsigned int address) override;
-  int GetInstructionSize(int /*instruction*/) override { return 4; }
-  bool IsAlive() override;
-  bool IsBreakpoint(unsigned int address) override;
-  void SetBreakpoint(unsigned int address) override;
-  void ClearBreakpoint(unsigned int address) override;
+  // Threads
+  Common::Debug::Threads GetThreads() const override;
+
+  std::string Disassemble(u32 address) const override;
+  std::string GetRawMemoryString(int memory, u32 address) const override;
+  bool IsAlive() const override;
+  bool IsBreakpoint(u32 address) const override;
+  void SetBreakpoint(u32 address) override;
+  void ClearBreakpoint(u32 address) override;
   void ClearAllBreakpoints() override;
-  void ToggleBreakpoint(unsigned int address) override;
+  void ToggleBreakpoint(u32 address) override;
   void ClearAllMemChecks() override;
-  bool IsMemCheck(unsigned int address, size_t size = 1) override;
-  void ToggleMemCheck(unsigned int address, bool read = true, bool write = true,
-                      bool log = true) override;
-  unsigned int ReadMemory(unsigned int address) override;
+  bool IsMemCheck(u32 address, size_t size = 1) const override;
+  void ToggleMemCheck(u32 address, bool read = true, bool write = true, bool log = true) override;
+  u32 ReadMemory(u32 address) const override;
 
   enum
   {
     EXTRAMEM_ARAM = 1,
   };
 
-  unsigned int ReadExtraMemory(int memory, unsigned int address) override;
-  unsigned int ReadInstruction(unsigned int address) override;
-  unsigned int GetPC() override;
-  void SetPC(unsigned int address) override;
+  u32 ReadExtraMemory(int memory, u32 address) const override;
+  u32 ReadInstruction(u32 address) const override;
+  u32 GetPC() const override;
+  void SetPC(u32 address) override;
   void Step() override {}
   void RunToBreakpoint() override;
-  int GetColor(unsigned int address) override;
-  std::string GetDescription(unsigned int address) override;
+  u32 GetColor(u32 address) const override;
+  std::string GetDescription(u32 address) const override;
+
+  std::shared_ptr<Core::NetworkCaptureLogger> NetworkLogger();
 
   void Clear() override;
 
 private:
   Common::Debug::Watches m_watches;
   PPCPatches m_patches;
+  std::shared_ptr<Core::NetworkCaptureLogger> m_network_logger;
 };
