@@ -1,6 +1,5 @@
 // Copyright 2008 Dolphin Emulator Project
-// Licensed under GPLv2+
-// Refer to the license.txt file included.
+// SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "Core/Debugger/Debugger_SymbolMap.h"
 
@@ -98,54 +97,31 @@ bool GetCallstack(std::vector<CallstackEntry>& output)
   return true;
 }
 
-void PrintCallstack()
+void PrintCallstack(Common::Log::LogType type, Common::Log::LogLevel level)
 {
-  printf("== STACK TRACE - SP = %08x ==", PowerPC::ppcState.gpr[1]);
+  GENERIC_LOG_FMT(type, level, "== STACK TRACE - SP = {:08x} ==", PowerPC::ppcState.gpr[1]);
 
   if (LR == 0)
   {
-    printf(" LR = 0 - this is bad");
+    GENERIC_LOG_FMT(type, level, " LR = 0 - this is bad");
   }
 
   if (g_symbolDB.GetDescription(PC) != g_symbolDB.GetDescription(LR))
   {
-    printf(" * %s  [ LR = %08x ]", g_symbolDB.GetDescription(LR).c_str(), LR);
-  }
-
-  WalkTheStack([](u32 func_addr) {
-    std::string func_desc = g_symbolDB.GetDescription(func_addr);
-    if (func_desc.empty() || func_desc == "Invalid")
-      func_desc = "(unknown)";
-    printf(" * %s [ addr = %08x ]", func_desc.c_str(), func_addr);
-  });
-}
-
-void PrintCallstack(Common::Log::LOG_TYPE type, Common::Log::LOG_LEVELS level)
-{
-  GENERIC_LOG(type, level, "== STACK TRACE - SP = %08x ==", PowerPC::ppcState.gpr[1]);
-
-  if (LR == 0)
-  {
-    GENERIC_LOG(type, level, " LR = 0 - this is bad");
-  }
-
-  if (g_symbolDB.GetDescription(PC) != g_symbolDB.GetDescription(LR))
-  {
-    GENERIC_LOG(type, level, " * %s  [ LR = %08x ]", g_symbolDB.GetDescription(LR).c_str(), LR);
+    GENERIC_LOG_FMT(type, level, " * {}  [ LR = {:08x} ]", g_symbolDB.GetDescription(LR), LR);
   }
 
   WalkTheStack([type, level](u32 func_addr) {
     std::string func_desc = g_symbolDB.GetDescription(func_addr);
     if (func_desc.empty() || func_desc == "Invalid")
       func_desc = "(unknown)";
-    GENERIC_LOG(type, level, " * %s [ addr = %08x ]", func_desc.c_str(), func_addr);
+    GENERIC_LOG_FMT(type, level, " * {} [ addr = {:08x} ]", func_desc, func_addr);
   });
 }
 
-void PrintDataBuffer(Common::Log::LOG_TYPE type, const u8* data, size_t size,
-                     const std::string& title)
+void PrintDataBuffer(Common::Log::LogType type, const u8* data, size_t size, std::string_view title)
 {
-  GENERIC_LOG(type, Common::Log::LDEBUG, "%s", title.c_str());
+  GENERIC_LOG_FMT(type, Common::Log::LogLevel::LDEBUG, "{}", title);
   for (u32 j = 0; j < size;)
   {
     std::string hex_line;
@@ -156,7 +132,7 @@ void PrintDataBuffer(Common::Log::LOG_TYPE type, const u8* data, size_t size,
       if (j >= size)
         break;
     }
-    GENERIC_LOG(type, Common::Log::LDEBUG, "   Data: %s", hex_line.c_str());
+    GENERIC_LOG_FMT(type, Common::Log::LogLevel::LDEBUG, "   Data: {}", hex_line);
   }
 }
 

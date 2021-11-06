@@ -1,10 +1,11 @@
 // Copyright 2013 Max Eliaser
-// Licensed under GPLv2+
-// Refer to the license.txt file included.
+// SPDX-License-Identifier: GPL-2.0-or-later
 
 // See XInput2.cpp for extensive documentation.
 
 #pragma once
+
+#include <array>
 
 extern "C" {
 #include <X11/Xlib.h>
@@ -24,10 +25,11 @@ class KeyboardMouse : public Core::Device
 private:
   struct State
   {
-    char keyboard[32];
+    std::array<char, 32> keyboard;
     unsigned int buttons;
     Common::Vec2 cursor;
     Common::Vec2 axis;
+    Common::Vec2 relative_mouse;
   };
 
   class Key : public Input
@@ -89,8 +91,23 @@ private:
     std::string name;
   };
 
+  class RelativeMouse : public Input
+  {
+  public:
+    std::string GetName() const override { return name; }
+    bool IsDetectable() const override { return false; }
+    RelativeMouse(u8 index, bool positive, const float* axis);
+    ControlState GetState() const override;
+
+  private:
+    const float* m_axis;
+    const u8 m_index;
+    const bool m_positive;
+    std::string name;
+  };
+
 private:
-  void SelectEventsForDevice(Window window, XIEventMask* mask, int deviceid);
+  void SelectEventsForDevice(XIEventMask* mask, int deviceid);
   void UpdateCursor();
 
 public:
@@ -106,8 +123,9 @@ private:
   Window m_window;
   Display* m_display;
   State m_state{};
-  int xi_opcode;
-  const int pointer_deviceid, keyboard_deviceid;
+  const int xi_opcode;
+  const int pointer_deviceid;
+  const int keyboard_deviceid;
   std::string name;
 };
 }  // namespace ciface::XInput2

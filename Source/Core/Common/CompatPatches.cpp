@@ -1,6 +1,5 @@
 // Copyright 2008 Dolphin Emulator Project
-// Licensed under GPLv2+
-// Refer to the license.txt file included.
+// SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <Windows.h>
 #include <functional>
@@ -183,7 +182,7 @@ static bool GetModuleVersion(const wchar_t* name, Version* version)
   if (!data_len)
     return false;
   std::vector<u8> block(data_len);
-  if (!GetFileVersionInfoW(path->c_str(), handle, data_len, block.data()))
+  if (!GetFileVersionInfoW(path->c_str(), 0, data_len, block.data()))
     return false;
   void* buf;
   UINT buf_len;

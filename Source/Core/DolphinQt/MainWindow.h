@@ -1,12 +1,12 @@
 // Copyright 2015 Dolphin Emulator Project
-// Licensed under GPLv2+
-// Refer to the license.txt file included.
+// SPDX-License-Identifier: GPL-2.0-or-later
 
 #pragma once
 
 #include <QMainWindow>
 #include <QStringList>
 
+#include <array>
 #include <memory>
 #include <optional>
 #include <string>
@@ -23,6 +23,7 @@ class ControllersWindow;
 class DiscordHandler;
 class DragEnterEvent;
 class FIFOPlayerWindow;
+class FreeLookWindow;
 class GameList;
 class GCTASInputWindow;
 class GraphicsWindow;
@@ -113,6 +114,7 @@ private:
   void SetFullScreenResolution(bool fullscreen);
 
   void FullScreen();
+  void UnlockCursor();
   void ScreenShot();
 
   void CreateComponents();
@@ -146,13 +148,14 @@ private:
                  const std::optional<std::string>& savestate_path = {});
   void StartGame(std::unique_ptr<BootParameters>&& parameters);
   void ShowRenderWidget();
-  void HideRenderWidget(bool reinit = true);
+  void HideRenderWidget(bool reinit = true, bool is_exit = false);
 
   void ShowSettingsWindow();
   void ShowGeneralWindow();
   void ShowAudioWindow();
   void ShowControllersWindow();
   void ShowGraphicsWindow();
+  void ShowFreeLookWindow();
   void ShowAboutDialog();
   void ShowHotkeyDialog();
   void ShowNetPlaySetupDialog();
@@ -161,10 +164,11 @@ private:
   void ShowMemcardManager();
   void ShowResourcePackManager();
   void ShowCheatsManager();
+  void ShowRiivolutionBootWidget(const UICommon::GameFile& game);
 
   void NetPlayInit();
   bool NetPlayJoin();
-  bool NetPlayHost(const QString& game_id);
+  bool NetPlayHost(const UICommon::GameFile& game);
   void NetPlayQuit();
 
   void OnBootGameCubeIPL(DiscIO::Region region);
@@ -188,14 +192,14 @@ private:
 
   QStringList PromptFileNames();
 
-  void EnableScreenSaver(bool enable);
+  void UpdateScreenSaverInhibition();
 
   void OnStopComplete();
   void dragEnterEvent(QDragEnterEvent* event) override;
   void dropEvent(QDropEvent* event) override;
   QSize sizeHint() const override;
 
-#if defined(HAVE_XRANDR) && HAVE_XRANDR
+#ifdef HAVE_XRANDR
   std::unique_ptr<X11Utils::XRRConfiguration> m_xrr_config;
 #endif
 
@@ -209,6 +213,7 @@ private:
   bool m_stop_confirm_showing = false;
   bool m_stop_requested = false;
   bool m_fullscreen_requested = false;
+  bool m_is_screensaver_inhibited = false;
   int m_state_slot = 1;
   std::unique_ptr<BootParameters> m_pending_boot;
 
@@ -217,6 +222,7 @@ private:
   GraphicsWindow* m_graphics_window = nullptr;
   FIFOPlayerWindow* m_fifo_window = nullptr;
   MappingWindow* m_hotkey_window = nullptr;
+  FreeLookWindow* m_freelook_window = nullptr;
 
   HotkeyScheduler* m_hotkey_scheduler;
   NetPlayDialog* m_netplay_dialog;

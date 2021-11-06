@@ -1,6 +1,5 @@
 // Copyright 2013 Dolphin Emulator Project
-// Licensed under GPLv2+
-// Refer to the license.txt file included.
+// SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <sstream>
 #include <unordered_map>
@@ -2439,7 +2438,7 @@ static void* GetFuncAddress(GLContext* context, const std::string& name, void** 
     *func = dlsym(RTLD_NEXT, name.c_str());
 #endif
     if (*func == nullptr)
-      ERROR_LOG(VIDEO, "Couldn't load function %s", name.c_str());
+      ERROR_LOG_FMT(VIDEO, "Couldn't load function {}", name);
   }
   return *func;
 }

@@ -9,7 +9,7 @@ Download link: http://redscientist.com/rtc
 
 # Dolphin - A GameCube and Wii Emulator
 
-[Homepage](https://dolphin-emu.org/) | [Project Site](https://github.com/dolphin-emu/dolphin) | [Forums](https://forums.dolphin-emu.org/) | [Wiki](https://wiki.dolphin-emu.org/) | [Issue Tracker](https://bugs.dolphin-emu.org/projects/emulator/issues) | [Coding Style](https://github.com/dolphin-emu/dolphin/blob/master/Contributing.md) | [Transifex Page](https://www.transifex.com/projects/p/dolphin-emu/)
+[Homepage](https://dolphin-emu.org/) | [Project Site](https://github.com/dolphin-emu/dolphin) | [Buildbot](https://dolphin.ci) | [Forums](https://forums.dolphin-emu.org/) | [Wiki](https://wiki.dolphin-emu.org/) | [Issue Tracker](https://bugs.dolphin-emu.org/projects/emulator/issues) | [Coding Style](https://github.com/dolphin-emu/dolphin/blob/master/Contributing.md) | [Transifex Page](https://www.transifex.com/projects/p/dolphin-emu/)
 
 Dolphin is an emulator for running GameCube and Wii games on Windows,
 Linux, macOS, and recent Android devices. It's licensed under the terms
@@ -24,7 +24,7 @@ Please read the [FAQ](https://dolphin-emu.org/docs/faq/) before using Dolphin.
 * OS
     * Windows (7 SP1 or higher).
     * Linux.
-    * macOS (10.12 Sierra or higher).
+    * macOS (10.13 High Sierra or higher).
     * Unix-like systems other than Linux are not officially supported but might work.
 * Processor
     * A CPU with SSE2 support.
@@ -72,7 +72,14 @@ bundled with Dolphin and used if they're not installed on your system. CMake
 will inform you if a bundled library is used or if you need to install any
 missing packages yourself.
 
+Make sure to pull submodules before building:
+```sh
+git submodule update --init
+```
+
 ### macOS Build Steps:
+
+A binary supporting a single architecture can be built using the following steps: 
 
 1. `mkdir build`
 2. `cd build`
@@ -80,6 +87,18 @@ missing packages yourself.
 4. `make`
 
 An application bundle will be created in `./Binaries`.
+
+A script is also provided to build universal binaries supporting both x64 and ARM in the same
+application bundle using the following steps:
+
+1. `mkdir build`
+2. `cd build`
+3. `python ../BuildMacOSUniversalBinary.py`
+4. Universal binaries will be available in the `universal` folder
+
+Doing this is more complex as it requires installation of library dependencies for both x64 and ARM (or universal library
+equivalents) and may require specifying additional arguments to point to relevant library locations. 
+Execute BuildMacOSUniversalBinary.py --help for more details.  
 
 ### Linux Global Build Steps:
 
@@ -118,6 +137,11 @@ Or useful for having multiple distinct Dolphin setups for testing/development/TA
 These instructions assume familiarity with Android development. If you do not have an
 Android dev environment set up, see [AndroidSetup.md](AndroidSetup.md).
 
+Make sure to pull submodules before building:
+```sh
+git submodule update --init
+```
+
 If using Android Studio, import the Gradle project located in `./Source/Android`.
 
 Android apps are compiled using a build system called Gradle. Dolphin's native component,
@@ -139,19 +163,19 @@ see where it's stored) if you don't plan to reinstall Dolphin.
 
 ## Command Line Usage
 
-`Usage: Dolphin [-h] [-d] [-l] [-e <str>] [-b] [-V <str>] [-A <str>]`
+`Usage: Dolphin [-h] [-d] [-l] [-e <str>] [-b] [-v <str>] [-a <str>]`
 
 * -h, --help Show this help message
 * -d, --debugger Show the debugger pane and additional View menu options
 * -l, --logger Open the logger
 * -e, --exec=<str> Load the specified file (DOL,ELF,WAD,GCM,ISO)
 * -b, --batch Exit Dolphin with emulator
-* -V, --video_backend=<str> Specify a video backend
-* -A, --audio_emulation=<str> Low level (LLE) or high level (HLE) audio
+* -v, --video_backend=<str> Specify a video backend
+* -a, --audio_emulation=<str> Low level (LLE) or high level (HLE) audio
 
 Available DSP emulation engines are HLE (High Level Emulation) and
 LLE (Low Level Emulation). HLE is faster but less accurate whereas
-LLE is slower but close to perfect. Note that LLE has two submodes (Interpreter and Recompiler) 
+LLE is slower but close to perfect. Note that LLE has two submodes (Interpreter and Recompiler)
 but they cannot be selected from the command line.
 
 Available video backends are "D3D" and "D3D12" (they are only available on Windows), "OGL", and "Vulkan".
@@ -168,8 +192,8 @@ is intended for debugging purposes only.
 * `GC/dsp_coef.bin`: DSP dumps
 * `GC/dsp_rom.bin`: DSP dumps
 * `Wii/clientca.pem`: Wii network certificate
-* `Wii/clientcacakey.pem`: Wii network certificate
-* `Wii/rootca.pem`: Wii network certificate
+* `Wii/clientcakey.pem`: Wii network certificate key
+* `Wii/rootca.pem`: Wii network certificate issuer / CA
 
 The DSP dumps included with Dolphin have been written from scratch and do not
 contain any copyrighted material. They should work for most purposes, however

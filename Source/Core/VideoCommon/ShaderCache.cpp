@@ -1,6 +1,5 @@
 // Copyright 2018 Dolphin Emulator Project
-// Licensed under GPLv2+
-// Refer to the license.txt file included.
+// SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "VideoCommon/ShaderCache.h"
 
@@ -36,7 +35,7 @@ ShaderCache::~ShaderCache()
 bool ShaderCache::Initialize()
 {
   m_api_type = g_ActiveConfig.backend_info.api_type;
-  m_host_config = ShaderHostConfig::GetCurrent();
+  m_host_config.bits = ShaderHostConfig::GetCurrent().bits;
 
   if (!CompileSharedPipelines())
     return false;
@@ -76,7 +75,7 @@ void ShaderCache::Reload()
   ClearCaches();
 
   if (!CompileSharedPipelines())
-    PanicAlert("Failed to compile shared pipelines after reload.");
+    PanicAlertFmt("Failed to compile shared pipelines after reload.");
 
   if (g_ActiveConfig.bShaderCache)
     LoadCaches();
@@ -161,10 +160,12 @@ void ShaderCache::WaitForAsyncCompiler()
     m_async_shader_compiler->WaitUntilCompletion([](size_t completed, size_t total) {
       g_renderer->BeginUIFrame();
 
+      const float center_x = ImGui::GetIO().DisplaySize.x * 0.5f;
+      const float center_y = ImGui::GetIO().DisplaySize.y * 0.5f;
       const float scale = ImGui::GetIO().DisplayFramebufferScale.x;
 
       ImGui::SetNextWindowSize(ImVec2(400.0f * scale, 50.0f * scale), ImGuiCond_Always);
-      ImGui::SetNextWindowPosCenter(ImGuiCond_Always);
+      ImGui::SetNextWindowPos(ImVec2(center_x, center_y), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
       if (ImGui::Begin(Common::GetStringT("Compiling Shaders").c_str(), nullptr,
                        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoInputs |
                            ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
@@ -188,7 +189,7 @@ template <typename SerializedUidType, typename UidType>
 static void SerializePipelineUid(const UidType& uid, SerializedUidType& serialized_uid)
 {
   // Convert to disk format. Ensure all padding bytes are zero.
-  std::memset(&serialized_uid, 0, sizeof(serialized_uid));
+  std::memset(reinterpret_cast<u8*>(&serialized_uid), 0, sizeof(serialized_uid));
   serialized_uid.vertex_decl = uid.vertex_format->GetVertexDeclaration();
   serialized_uid.vs_uid = uid.vs_uid;
   serialized_uid.gs_uid = uid.gs_uid;
@@ -249,7 +250,7 @@ void ShaderCache::LoadShaderCache(T& cache, APIType api_type, const char* type, 
   std::string filename = GetDiskShaderCacheFileName(api_type, type, include_gameid, true);
   CacheReader reader(cache);
   u32 count = cache.disk_cache.OpenAndRead(filename, reader);
-  INFO_LOG(VIDEO, "Loaded %u cached shaders from %s", count, filename.c_str());
+  INFO_LOG_FMT(VIDEO, "Loaded {} cached shaders from {}", count, filename);
 }
 
 template <typename T>
@@ -303,8 +304,8 @@ void ShaderCache::LoadPipelineCache(T& cache, LinearDiskCache<DiskKeyType, u8>& 
 
   std::string filename = GetDiskShaderCacheFileName(api_type, type, include_gameid, true);
   CacheReader reader(this, cache);
-  u32 count = disk_cache.OpenAndRead(filename, reader);
-  INFO_LOG(VIDEO, "Loaded %u cached pipelines from %s", count, filename.c_str());
+  const u32 count = disk_cache.OpenAndRead(filename, reader);
+  INFO_LOG_FMT(VIDEO, "Loaded {} cached pipelines from {}", count, filename);
 
   // If any of the pipelines in the cache failed to create, it's likely because of a change of
   // driver version, or system configuration. In this case, when the UID cache picks up the pipeline
@@ -312,8 +313,8 @@ void ShaderCache::LoadPipelineCache(T& cache, LinearDiskCache<DiskKeyType, u8>& 
   // the old cache data around, so discard and recreate the disk cache.
   if (reader.AnyFailed())
   {
-    WARN_LOG(VIDEO, "Failed to load one or more pipelines from cache '%s'. Discarding.",
-             filename.c_str());
+    WARN_LOG_FMT(VIDEO, "Failed to load one or more pipelines from cache '{}'. Discarding.",
+                 filename);
     disk_cache.Close();
     File::Delete(filename);
     disk_cache.OpenAndRead(filename, reader);
@@ -586,7 +587,8 @@ AbstractPipelineConfig ShaderCache::GetGXPipelineConfig(
 
   if (config.blending_state.logicopenable && !g_ActiveConfig.backend_info.bSupportsLogicOp)
   {
-    WARN_LOG(VIDEO, "Approximating logic op with blending, this will produce incorrect rendering.");
+    WARN_LOG_FMT(VIDEO,
+                 "Approximating logic op with blending, this will produce incorrect rendering.");
     config.blending_state.ApproximateLogicOpWithBlending();
   }
 
@@ -791,8 +793,7 @@ void ShaderCache::LoadPipelineUIDCache()
     }
   }
 
-  INFO_LOG(VIDEO, "Read %u pipeline UIDs from %s",
-           static_cast<unsigned>(m_gx_pipeline_cache.size()), filename.c_str());
+  INFO_LOG_FMT(VIDEO, "Read {} pipeline UIDs from {}", m_gx_pipeline_cache.size(), filename);
 }
 
 void ShaderCache::ClosePipelineUIDCache()
@@ -824,7 +825,7 @@ void ShaderCache::AppendGXPipelineUID(const GXPipelineUid& config)
   SerializePipelineUid(config, disk_uid);
   if (!m_gx_pipeline_uid_cache_file.WriteBytes(&disk_uid, sizeof(disk_uid)))
   {
-    WARN_LOG(VIDEO, "Writing pipeline UID to cache failed, closing file.");
+    WARN_LOG_FMT(VIDEO, "Writing pipeline UID to cache failed, closing file.");
     m_gx_pipeline_uid_cache_file.Close();
   }
 }
@@ -1115,7 +1116,7 @@ void ShaderCache::QueueUberShaderPipelines()
     {
       // uint_output is only ever enabled when logic ops are enabled.
       config.blending_state.logicopenable = true;
-      config.blending_state.logicmode = BlendMode::AND;
+      config.blending_state.logicmode = LogicOp::And;
     }
 
     auto iter = m_gx_uber_pipeline_cache.find(config);

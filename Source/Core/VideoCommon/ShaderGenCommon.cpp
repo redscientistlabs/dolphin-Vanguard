@@ -1,6 +1,5 @@
 // Copyright 2017 Dolphin Emulator Project
-// Licensed under GPLv2+
-// Refer to the license.txt file included.
+// SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "VideoCommon/ShaderGenCommon.h"
 
@@ -39,6 +38,7 @@ ShaderHostConfig ShaderHostConfig::GetCurrent()
   bits.backend_shader_framebuffer_fetch = g_ActiveConfig.backend_info.bSupportsFramebufferFetch;
   bits.backend_logic_op = g_ActiveConfig.backend_info.bSupportsLogicOp;
   bits.backend_palette_conversion = g_ActiveConfig.backend_info.bSupportsPaletteConversion;
+  bits.enable_validation_layer = g_ActiveConfig.bEnableValidationLayer;
   return bits;
 }
 
@@ -87,24 +87,42 @@ std::string GetDiskShaderCacheFileName(APIType api_type, const char* type, bool 
   return filename;
 }
 
+void WriteIsNanHeader(ShaderCode& out, APIType api_type)
+{
+  if (api_type == APIType::D3D)
+  {
+    out.Write("bool dolphin_isnan(float f) {{\n"
+              "  // Workaround for the HLSL compiler deciding that isnan can never be true and\n"
+              "  // optimising away the call, even though the value can actually be NaN\n"
+              "  // Just look for the bit pattern that indicates NaN instead\n"
+              "  return (asint(f) & 0x7FFFFFFF) > 0x7F800000;\n"
+              "}}\n\n");
+    // If isfinite is needed, (asint(f) & 0x7F800000) != 0x7F800000 can be used
+  }
+  else
+  {
+    out.Write("#define dolphin_isnan(f) isnan(f)\n");
+  }
+}
+
 static void DefineOutputMember(ShaderCode& object, APIType api_type, std::string_view qualifier,
                                std::string_view type, std::string_view name, int var_index,
                                std::string_view semantic = {}, int semantic_index = -1)
 {
-  object.WriteFmt("\t{} {} {}", qualifier, type, name);
+  object.Write("\t{} {} {}", qualifier, type, name);
 
   if (var_index != -1)
-    object.WriteFmt("{}", var_index);
+    object.Write("{}", var_index);
 
   if (api_type == APIType::D3D && !semantic.empty())
   {
     if (semantic_index != -1)
-      object.WriteFmt(" : {}{}", semantic, semantic_index);
+      object.Write(" : {}{}", semantic, semantic_index);
     else
-      object.WriteFmt(" : {}", semantic);
+      object.Write(" : {}", semantic);
   }
 
-  object.WriteFmt(";\n");
+  object.Write(";\n");
 }
 
 void GenerateVSOutputMembers(ShaderCode& object, APIType api_type, u32 texgens,
@@ -138,26 +156,26 @@ void GenerateVSOutputMembers(ShaderCode& object, APIType api_type, u32 texgens,
 void AssignVSOutputMembers(ShaderCode& object, std::string_view a, std::string_view b, u32 texgens,
                            const ShaderHostConfig& host_config)
 {
-  object.WriteFmt("\t{}.pos = {}.pos;\n", a, b);
-  object.WriteFmt("\t{}.colors_0 = {}.colors_0;\n", a, b);
-  object.WriteFmt("\t{}.colors_1 = {}.colors_1;\n", a, b);
+  object.Write("\t{}.pos = {}.pos;\n", a, b);
+  object.Write("\t{}.colors_0 = {}.colors_0;\n", a, b);
+  object.Write("\t{}.colors_1 = {}.colors_1;\n", a, b);
 
   for (unsigned int i = 0; i < texgens; ++i)
-    object.WriteFmt("\t{}.tex{} = {}.tex{};\n", a, i, b, i);
+    object.Write("\t{}.tex{} = {}.tex{};\n", a, i, b, i);
 
   if (!host_config.fast_depth_calc)
-    object.WriteFmt("\t{}.clipPos = {}.clipPos;\n", a, b);
+    object.Write("\t{}.clipPos = {}.clipPos;\n", a, b);
 
   if (host_config.per_pixel_lighting)
   {
-    object.WriteFmt("\t{}.Normal = {}.Normal;\n", a, b);
-    object.WriteFmt("\t{}.WorldPos = {}.WorldPos;\n", a, b);
+    object.Write("\t{}.Normal = {}.Normal;\n", a, b);
+    object.Write("\t{}.WorldPos = {}.WorldPos;\n", a, b);
   }
 
   if (host_config.backend_geometry_shaders)
   {
-    object.WriteFmt("\t{}.clipDist0 = {}.clipDist0;\n", a, b);
-    object.WriteFmt("\t{}.clipDist1 = {}.clipDist1;\n", a, b);
+    object.Write("\t{}.clipDist0 = {}.clipDist0;\n", a, b);
+    object.Write("\t{}.clipDist1 = {}.clipDist1;\n", a, b);
   }
 }
 

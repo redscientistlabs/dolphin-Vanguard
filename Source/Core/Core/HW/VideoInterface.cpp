@@ -1,6 +1,5 @@
 // Copyright 2008 Dolphin Emulator Project
-// Licensed under GPLv2+
-// Refer to the license.txt file included.
+// SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "Core/HW/VideoInterface.h"
 
@@ -14,6 +13,7 @@
 #include "Common/Config/Config.h"
 #include "Common/Logging/Log.h"
 
+#include "Core/Config/GraphicsSettings.h"
 #include "Core/Config/MainSettings.h"
 #include "Core/Config/SYSCONFSettings.h"
 #include "Core/ConfigManager.h"
@@ -60,7 +60,9 @@ static UVIBorderBlankRegister m_BorderHBlank;
 // 0xcc002076 - 0xcc00207f is full of 0x00FF: unknown
 // 0xcc002080 - 0xcc002100 even more unknown
 
-static u32 s_target_refresh_rate = 0;
+static double s_target_refresh_rate = 0;
+static u32 s_target_refresh_rate_numerator = 0;
+static u32 s_target_refresh_rate_denominator = 1;
 
 static constexpr std::array<u32, 2> s_clock_freqs{{
     27000000,
@@ -102,14 +104,11 @@ void DoState(PointerWrap& p)
   p.Do(m_DTVStatus);
   p.Do(m_FBWidth);
   p.Do(m_BorderHBlank);
-  p.Do(s_target_refresh_rate);
   p.Do(s_ticks_last_line_start);
   p.Do(s_half_line_count);
   p.Do(s_half_line_of_next_si_poll);
-  p.Do(s_even_field_first_hl);
-  p.Do(s_odd_field_first_hl);
-  p.Do(s_even_field_last_hl);
-  p.Do(s_odd_field_last_hl);
+
+  UpdateParameters();
 }
 
 // Executed after Init, before game boot
@@ -316,9 +315,9 @@ void RegisterMMIO(MMIO::Mapping* mmio, u32 base)
       base | VI_VERTICAL_BEAM_POSITION,
       MMIO::ComplexRead<u16>([](u32) { return 1 + (s_half_line_count) / 2; }),
       MMIO::ComplexWrite<u16>([](u32, u16 val) {
-        WARN_LOG(VIDEOINTERFACE,
-                 "Changing vertical beam position to 0x%04x - not documented or implemented yet",
-                 val);
+        WARN_LOG_FMT(
+            VIDEOINTERFACE,
+            "Changing vertical beam position to {:#06x} - not documented or implemented yet", val);
       }));
   mmio->Register(
       base | VI_HORIZONTAL_BEAM_POSITION, MMIO::ComplexRead<u16>([](u32) {
@@ -328,9 +327,10 @@ void RegisterMMIO(MMIO::Mapping* mmio, u32 base)
         return std::clamp<u16>(value, 1, m_HTiming0.HLW * 2);
       }),
       MMIO::ComplexWrite<u16>([](u32, u16 val) {
-        WARN_LOG(VIDEOINTERFACE,
-                 "Changing horizontal beam position to 0x%04x - not documented or implemented yet",
-                 val);
+        WARN_LOG_FMT(
+            VIDEOINTERFACE,
+            "Changing horizontal beam position to {:#06x} - not documented or implemented yet",
+            val);
       }));
 
   // The following MMIOs are interrupts related and update interrupt status
@@ -364,13 +364,13 @@ void RegisterMMIO(MMIO::Mapping* mmio, u32 base)
                  MMIO::ComplexRead<u16>([](u32) { return m_UnkAARegister >> 16; }),
                  MMIO::ComplexWrite<u16>([](u32, u16 val) {
                    m_UnkAARegister = (m_UnkAARegister & 0x0000FFFF) | ((u32)val << 16);
-                   WARN_LOG(VIDEOINTERFACE, "Writing to the unknown AA register (hi)");
+                   WARN_LOG_FMT(VIDEOINTERFACE, "Writing to the unknown AA register (hi)");
                  }));
   mmio->Register(base | VI_UNK_AA_REG_LO,
                  MMIO::ComplexRead<u16>([](u32) { return m_UnkAARegister & 0xFFFF; }),
                  MMIO::ComplexWrite<u16>([](u32, u16 val) {
                    m_UnkAARegister = (m_UnkAARegister & 0xFFFF0000) | val;
-                   WARN_LOG(VIDEOINTERFACE, "Writing to the unknown AA register (lo)");
+                   WARN_LOG_FMT(VIDEOINTERFACE, "Writing to the unknown AA register (lo)");
                  }));
 
   // Control register writes only updates some select bits, and additional
@@ -698,13 +698,25 @@ void UpdateParameters()
   s_even_field_first_hl = equ_hl + m_VBlankTimingEven.PRB + GetHalfLinesPerOddField();
   s_even_field_last_hl = s_even_field_first_hl + acv_hl - 1;
 
-  s_target_refresh_rate = lround(2.0 * SystemTimers::GetTicksPerSecond() /
-                                 (GetTicksPerEvenField() + GetTicksPerOddField()));
+  s_target_refresh_rate_numerator = SystemTimers::GetTicksPerSecond() * 2;
+  s_target_refresh_rate_denominator = GetTicksPerEvenField() + GetTicksPerOddField();
+  s_target_refresh_rate =
+      static_cast<double>(s_target_refresh_rate_numerator) / s_target_refresh_rate_denominator;
 }
 
-u32 GetTargetRefreshRate()
+double GetTargetRefreshRate()
 {
   return s_target_refresh_rate;
+}
+
+u32 GetTargetRefreshRateNumerator()
+{
+  return s_target_refresh_rate_numerator;
+}
+
+u32 GetTargetRefreshRateDenominator()
+{
+  return s_target_refresh_rate_denominator;
 }
 
 u32 GetTicksPerSample()
@@ -733,19 +745,20 @@ static void LogField(FieldType field, u32 xfb_address)
 
   const auto field_index = static_cast<size_t>(field);
 
-  DEBUG_LOG(VIDEOINTERFACE,
-            "(VI->BeginField): Address: %.08X | WPL %u | STD %u | EQ %u | PRB %u | "
-            "ACV %u | PSB %u | Field %s",
-            xfb_address, m_PictureConfiguration.WPL, m_PictureConfiguration.STD,
-            m_VerticalTimingRegister.EQU, vert_timing[field_index]->PRB,
-            m_VerticalTimingRegister.ACV, vert_timing[field_index]->PSB,
-            field_type_names[field_index]);
+  DEBUG_LOG_FMT(VIDEOINTERFACE,
+                "(VI->BeginField): Address: {:08X} | WPL {} | STD {} | EQ {} | PRB {} | "
+                "ACV {} | PSB {} | Field {}",
+                xfb_address, m_PictureConfiguration.WPL, m_PictureConfiguration.STD,
+                m_VerticalTimingRegister.EQU, vert_timing[field_index]->PRB,
+                m_VerticalTimingRegister.ACV, vert_timing[field_index]->PSB,
+                field_type_names[field_index]);
 
-  DEBUG_LOG(VIDEOINTERFACE, "HorizScaling: %04x | fbwidth %d | %u | %u", m_HorizontalScaling.Hex,
-            m_FBWidth.Hex, GetTicksPerEvenField(), GetTicksPerOddField());
+  DEBUG_LOG_FMT(VIDEOINTERFACE, "HorizScaling: {:04x} | fbwidth {} | {} | {}",
+                m_HorizontalScaling.Hex, m_FBWidth.Hex, GetTicksPerEvenField(),
+                GetTicksPerOddField());
 }
 
-static void BeginField(FieldType field, u64 ticks)
+static void OutputField(FieldType field, u64 ticks)
 {
   // Could we fit a second line of data in the stride?
   // (Datel's Wii FreeLoaders are the only titles known to set WPL to 0)
@@ -799,16 +812,30 @@ static void BeginField(FieldType field, u64 ticks)
 
   LogField(field, xfbAddr);
 
-  // This assumes the game isn't going to change the VI registers while a
-  // frame is scanning out.
-  // To correctly handle that case we would need to collate all changes
-  // to VI during scanout and delay outputting the frame till then.
+  // Outputting the entire frame using a single set of VI register values isn't accurate, as games
+  // can change the register values during scanout. To correctly emulate the scanout process, we
+  // would need to collate all changes to the VI registers during scanout.
   if (xfbAddr)
-    g_video_backend->Video_BeginField(xfbAddr, fbWidth, fbStride, fbHeight, ticks);
+    g_video_backend->Video_OutputXFB(xfbAddr, fbWidth, fbStride, fbHeight, ticks);
 }
 
-static void EndField()
+static void BeginField(FieldType field, u64 ticks)
 {
+  // Outputting the frame at the beginning of scanout reduces latency. This assumes the game isn't
+  // going to change the VI registers while a frame is scanning out.
+  if (Config::Get(Config::GFX_HACK_EARLY_XFB_OUTPUT))
+    OutputField(field, ticks);
+}
+
+static void EndField(FieldType field, u64 ticks)
+{
+  // If the game does change VI registers while a frame is scanning out, we can defer output
+  // until the end so the last register values are used. This still isn't accurate, but it does
+  // produce more acceptable results in some problematic cases.
+  // Currently, this is only known to be necessary to eliminate flickering in WWE Crush Hour.
+  if (!Config::Get(Config::GFX_HACK_EARLY_XFB_OUTPUT))
+    OutputField(field, ticks);
+
   Core::VideoThrottle();
   Core::OnFrameEnd();
 }
@@ -837,11 +864,11 @@ void Update(u64 ticks)
   }
   else if (s_half_line_count == s_even_field_last_hl)
   {
-    EndField();
+    EndField(FieldType::Even, ticks);
   }
   else if (s_half_line_count == s_odd_field_last_hl)
   {
-    EndField();
+    EndField(FieldType::Odd, ticks);
   }
 
   // If this half-line is at a field boundary, deal with frame stepping before potentially
@@ -854,7 +881,8 @@ void Update(u64 ticks)
 
   if (s_half_line_of_next_si_poll == s_half_line_count)
   {
-    Core::UpdateInputGate(!SConfig::GetInstance().m_BackgroundInput);
+    Core::UpdateInputGate(!SConfig::GetInstance().m_BackgroundInput,
+                          SConfig::GetInstance().bLockCursor);
     SerialInterface::UpdateDevices();
     s_half_line_of_next_si_poll += 2 * SerialInterface::GetPollXLines();
   }

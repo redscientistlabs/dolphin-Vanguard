@@ -1,6 +1,5 @@
 // Copyright 2008 Dolphin Emulator Project
-// Licensed under GPLv2+
-// Refer to the license.txt file included.
+// SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "Core/HW/EXI/EXI_DeviceIPL.h"
 #include "Core/HW/DVD/DVDInterface.h"
@@ -13,15 +12,15 @@
 #include "Common/CommonPaths.h"
 #include "Common/CommonTypes.h"
 #include "Common/Config/Config.h"
-#include "Common/File.h"
 #include "Common/FileUtil.h"
+#include "Common/IOFile.h"
 #include "Common/Logging/Log.h"
 #include "Common/MemoryUtil.h"
 #include "Common/StringUtil.h"
 #include "Common/Swap.h"
 #include "Common/Timer.h"
 
-#include "Core/Config/MainSettings.h"
+#include "Core/Config/SessionSettings.h"
 #include "Core/ConfigManager.h"
 #include "Core/Core.h"
 #include "Core/CoreTiming.h"
@@ -106,13 +105,14 @@ CEXIIPL::CEXIIPL()
 
   // Load whole ROM dump
   // Note: The Wii doesn't have a copy of the IPL, only fonts.
-  if (!SConfig::GetInstance().bWii && Config::Get(Config::MAIN_LOAD_IPL_DUMP) &&
+  if (!SConfig::GetInstance().bWii && Config::Get(Config::SESSION_LOAD_IPL_DUMP) &&
       LoadFileToIPL(SConfig::GetInstance().m_strBootROM, 0))
   {
     // Descramble the encrypted section (contains BS1 and BS2)
     Descrambler(&m_rom[0x100], 0x1afe00);
     // yay for null-terminated strings
-    INFO_LOG(BOOT, "Loaded bootrom: %s", &m_rom[0]);
+    const std::string_view name{reinterpret_cast<char*>(m_rom.get())};
+    INFO_LOG_FMT(BOOT, "Loaded bootrom: {}", name);
   }
   else
   {
@@ -135,8 +135,7 @@ CEXIIPL::CEXIIPL()
   // We Overwrite language selection here since it's possible on the GC to change the language as
   // you please
   g_SRAM.settings.language = SConfig::GetInstance().SelectedLanguage;
-  if (SConfig::GetInstance().bEnableCustomRTC)
-    g_SRAM.settings.rtc_bias = 0;
+  g_SRAM.settings.rtc_bias = 0;
   FixSRAMChecksums();
 }
 
@@ -207,7 +206,7 @@ void CEXIIPL::LoadFontFile(const std::string& filename, u32 offset)
   // in some titles. This function check if the user has IPL dumps available and load the fonts
   // from those dumps instead of loading the bundled fonts
 
-  if (!Config::Get(Config::MAIN_LOAD_IPL_DUMP))
+  if (!Config::Get(Config::SESSION_LOAD_IPL_DUMP))
   {
     // IPL loading disabled, load bundled font instead
     LoadFileToIPL(filename, offset);
@@ -232,10 +231,10 @@ void CEXIIPL::LoadFontFile(const std::string& filename, u32 offset)
 
   // Official Windows-1252 and Shift JIS fonts present on the IPL dumps are 0x2575 and 0x4a24d
   // bytes long respectively, so, determine the size of the font being loaded based on the offset
-  u64 fontsize = (offset == 0x1aff00) ? 0x4a24d : 0x2575;
+  const u64 fontsize = (offset == 0x1aff00) ? 0x4a24d : 0x2575;
 
-  INFO_LOG(BOOT, "Found IPL dump, loading %s font from %s",
-           ((offset == 0x1aff00) ? "Shift JIS" : "Windows-1252"), (ipl_rom_path).c_str());
+  INFO_LOG_FMT(BOOT, "Found IPL dump, loading {} font from {}",
+               (offset == 0x1aff00) ? "Shift JIS" : "Windows-1252", ipl_rom_path);
 
   stream.Seek(offset, 0);
   stream.ReadBytes(&m_rom[offset], fontsize);
@@ -279,17 +278,18 @@ void CEXIIPL::TransferByte(u8& data)
       // This is technically not very accurate :(
       UpdateRTC();
 
-      DEBUG_LOG(EXPANSIONINTERFACE, "IPL-DEV cmd %s %08x %02x",
-                m_command.is_write() ? "write" : "read", m_command.address(), m_command.low_bits());
+      DEBUG_LOG_FMT(EXPANSIONINTERFACE, "IPL-DEV cmd {} {:08x} {:02x}",
+                    m_command.is_write() ? "write" : "read", m_command.address(),
+                    m_command.low_bits());
     }
   }
   else
   {
     // Actually read or write a byte
-    u32 address = m_command.address();
+    const u32 address = m_command.address();
 
-    DEBUG_LOG(EXPANSIONINTERFACE, "IPL-DEV data %s %08x %02x",
-              m_command.is_write() ? "write" : "read", address, data);
+    DEBUG_LOG_FMT(EXPANSIONINTERFACE, "IPL-DEV data {} {:08x} {:02x}",
+                  m_command.is_write() ? "write" : "read", address, data);
 
 #define IN_RANGE(x) (address >= x##_BASE && address < x##_BASE + x##_SIZE)
 #define DEV_ADDR(x) (address - x##_BASE)
@@ -303,7 +303,7 @@ void CEXIIPL::TransferByte(u8& data)
 
         if (data == '\r')
         {
-          NOTICE_LOG(OSREPORT, "%s", SHIFTJISToUTF8(m_buffer).c_str());
+          NOTICE_LOG_FMT(OSREPORT, "{}", SHIFTJISToUTF8(m_buffer));
           m_buffer.clear();
         }
       }
@@ -328,13 +328,13 @@ void CEXIIPL::TransferByte(u8& data)
         {
           if (dev_addr >= 0x001FCF00)
           {
-            PanicAlertT("Error: Trying to access Windows-1252 fonts but they are not loaded. "
-                        "Games may not show fonts correctly, or crash.");
+            PanicAlertFmtT("Error: Trying to access Windows-1252 fonts but they are not loaded. "
+                           "Games may not show fonts correctly, or crash.");
           }
           else
           {
-            PanicAlertT("Error: Trying to access Shift JIS fonts but they are not loaded. "
-                        "Games may not show fonts correctly, or crash.");
+            PanicAlertFmtT("Error: Trying to access Shift JIS fonts but they are not loaded. "
+                           "Games may not show fonts correctly, or crash.");
           }
           // Don't be a nag
           m_fonts_loaded = true;
@@ -361,7 +361,7 @@ void CEXIIPL::TransferByte(u8& data)
         // Seen being written to after reading 4 bytes from barnacle
         break;
       case 0x4c:
-        DEBUG_LOG(OSREPORT, "UART Barnacle %x", data);
+        DEBUG_LOG_FMT(OSREPORT, "UART Barnacle {:x}", data);
         break;
       }
     }
@@ -387,7 +387,7 @@ void CEXIIPL::TransferByte(u8& data)
     }
     else
     {
-      NOTICE_LOG(EXPANSIONINTERFACE, "IPL-DEV Accessing unknown device");
+      NOTICE_LOG_FMT(EXPANSIONINTERFACE, "IPL-DEV Accessing unknown device");
     }
 
 #undef DEV_ADDR_CURSOR

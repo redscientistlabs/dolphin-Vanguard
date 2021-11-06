@@ -1,6 +1,5 @@
 // Copyright 2017 Dolphin Emulator Project
-// Licensed under GPLv2+
-// Refer to the license.txt file included.
+// SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "InputCommon/ControllerEmu/ControlGroup/ControlGroup.h"
 
@@ -28,6 +27,15 @@ ControlGroup::ControlGroup(std::string name_, std::string ui_name_, const GroupT
 {
 }
 
+void ControlGroup::AddVirtualNotchSetting(SettingValue<double>* value, double max_virtual_notch_deg)
+{
+  AddSetting(value,
+             {_trans("Virtual Notches"),
+              // i18n: The degrees symbol.
+              _trans("°"), _trans("Snap the thumbstick position to the nearest octagonal axis.")},
+             0, 0, max_virtual_notch_deg);
+}
+
 void ControlGroup::AddDeadzoneSetting(SettingValue<double>* value, double maximum_deadzone)
 {
   AddSetting(value,
@@ -35,7 +43,7 @@ void ControlGroup::AddDeadzoneSetting(SettingValue<double>* value, double maximu
               // i18n: The percent symbol.
               _trans("%"),
               // i18n: Refers to the dead-zone setting of gamepad inputs.
-              _trans("Input strength to ignore.")},
+              _trans("Input strength to ignore and remap.")},
              0, 0, maximum_deadzone);
 }
 
@@ -108,7 +116,10 @@ void ControlGroup::SaveConfig(IniFile::Section* sec, const std::string& defdev,
   for (auto& c : controls)
   {
     // control expression
-    sec->Set(group + c->name, c->control_ref->GetExpression(), "");
+    std::string expression = c->control_ref->GetExpression();
+    // We can't save line breaks in a single line config. Restoring them is too complicated.
+    ReplaceBreaksWithSpaces(expression);
+    sec->Set(group + c->name, expression, "");
 
     // range
     sec->Set(group + c->name + "/Range", c->control_ref->range * 100.0, 100.0);
@@ -126,7 +137,9 @@ void ControlGroup::SaveConfig(IniFile::Section* sec, const std::string& defdev,
     }
     else
     {
-      sec->Set(base + name, ext->GetSelectionSetting().GetInputReference().GetExpression(), "None");
+      std::string expression = ext->GetSelectionSetting().GetInputReference().GetExpression();
+      ReplaceBreaksWithSpaces(expression);
+      sec->Set(base + name, expression, "None");
     }
 
     for (auto& ai : ext->GetAttachmentList())

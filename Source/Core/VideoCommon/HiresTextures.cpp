@@ -1,6 +1,5 @@
 // Copyright 2009 Dolphin Emulator Project
-// Licensed under GPLv2+
-// Refer to the license.txt file included.
+// SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "VideoCommon/HiresTextures.h"
 
@@ -18,10 +17,10 @@
 #include <fmt/format.h>
 
 #include "Common/CommonPaths.h"
-#include "Common/File.h"
 #include "Common/FileSearch.h"
 #include "Common/FileUtil.h"
 #include "Common/Flag.h"
+#include "Common/IOFile.h"
 #include "Common/Image.h"
 #include "Common/Logging/Log.h"
 #include "Common/MemoryUtil.h"
@@ -51,19 +50,12 @@ static std::thread s_prefetcher;
 
 void HiresTexture::Init()
 {
-  Update();
+  // Note: Update is not called here so that we handle dynamic textures on startup more gracefully
 }
 
 void HiresTexture::Shutdown()
 {
-  if (s_prefetcher.joinable())
-  {
-    s_textureCacheAbortLoading.Set();
-    s_prefetcher.join();
-  }
-
-  s_textureMap.clear();
-  s_textureCache.clear();
+  Clear();
 }
 
 void HiresTexture::Update()
@@ -76,8 +68,7 @@ void HiresTexture::Update()
 
   if (!g_ActiveConfig.bHiresTextures)
   {
-    s_textureMap.clear();
-    s_textureCache.clear();
+    Clear();
     return;
   }
 
@@ -87,7 +78,8 @@ void HiresTexture::Update()
   }
 
   const std::string& game_id = SConfig::GetInstance().GetGameID();
-  const std::set<std::string> texture_directories = GetTextureDirectories(game_id);
+  const std::set<std::string> texture_directories =
+      GetTextureDirectoriesWithGameId(File::GetUserPath(D_HIRESTEXTURES_IDX), game_id);
   const std::vector<std::string> extensions{".png", ".dds"};
 
   for (const auto& texture_directory : texture_directories)
@@ -119,8 +111,8 @@ void HiresTexture::Update()
 
     if (failed_insert)
     {
-      ERROR_LOG(VIDEO, "One or more textures at path '%s' were already inserted",
-                texture_directory.c_str());
+      ERROR_LOG_FMT(VIDEO, "One or more textures at path '{}' were already inserted",
+                    texture_directory);
     }
   }
 
@@ -143,6 +135,17 @@ void HiresTexture::Update()
     s_textureCacheAbortLoading.Clear();
     s_prefetcher = std::thread(Prefetch);
   }
+}
+
+void HiresTexture::Clear()
+{
+  if (s_prefetcher.joinable())
+  {
+    s_textureCacheAbortLoading.Set();
+    s_prefetcher.join();
+  }
+  s_textureMap.clear();
+  s_textureCache.clear();
 }
 
 void HiresTexture::Prefetch()
@@ -210,77 +213,35 @@ void HiresTexture::Prefetch()
                   10000);
 }
 
-std::string HiresTexture::GenBaseName(const u8* texture, size_t texture_size, const u8* tlut,
-                                      size_t tlut_size, u32 width, u32 height, TextureFormat format,
-                                      bool has_mipmaps, bool dump)
+std::string HiresTexture::GenBaseName(TextureInfo& texture_info, bool dump)
 {
   if (!dump && s_textureMap.empty())
     return "";
 
-  // checking for min/max on paletted textures
-  u32 min = 0xffff;
-  u32 max = 0;
-  switch (tlut_size)
-  {
-  case 0:
-    break;
-  case 16 * 2:
-    for (size_t i = 0; i < texture_size; i++)
-    {
-      const u32 low_nibble = texture[i] & 0xf;
-      const u32 high_nibble = texture[i] >> 4;
+  const auto texture_name_details = texture_info.CalculateTextureName();
 
-      min = std::min({min, low_nibble, high_nibble});
-      max = std::max({max, low_nibble, high_nibble});
-    }
-    break;
-  case 256 * 2:
-  {
-    for (size_t i = 0; i < texture_size; i++)
-    {
-      const u32 texture_byte = texture[i];
-
-      min = std::min(min, texture_byte);
-      max = std::max(max, texture_byte);
-    }
-    break;
-  }
-  case 16384 * 2:
-    for (size_t i = 0; i < texture_size; i += sizeof(u16))
-    {
-      const u32 texture_halfword = Common::swap16(texture[i]) & 0x3fff;
-
-      min = std::min(min, texture_halfword);
-      max = std::max(max, texture_halfword);
-    }
-    break;
-  }
-  if (tlut_size > 0)
-  {
-    tlut_size = 2 * (max + 1 - min);
-    tlut += 2 * min;
-  }
-
-  const u64 tex_hash = XXH64(texture, texture_size, 0);
-  const u64 tlut_hash = tlut_size ? XXH64(tlut, tlut_size, 0) : 0;
-
-  const std::string base_name = fmt::format("{}{}x{}{}_{:016x}", s_format_prefix, width, height,
-                                            has_mipmaps ? "_m" : "", tex_hash);
-  const std::string tlut_name = tlut_size ? fmt::format("_{:016x}", tlut_hash) : "";
-  const std::string format_name = fmt::format("_{}", static_cast<int>(format));
-  const std::string full_name = base_name + tlut_name + format_name;
-
-  // try to match a wildcard template
-  if (!dump)
-  {
-    const std::string texture_name = fmt::format("{}_${}", base_name, format_name);
-    if (s_textureMap.find(texture_name) != s_textureMap.end())
-      return texture_name;
-  }
-
-  // else generate the complete texture
+  // look for an exact match first
+  const std::string full_name = texture_name_details.GetFullName();
   if (dump || s_textureMap.find(full_name) != s_textureMap.end())
     return full_name;
+
+  // else try and find a wildcard
+  if (!dump)
+  {
+    // Single wildcard ignoring the tlut hash
+    const std::string texture_name_single_wildcard_tlut =
+        fmt::format("{}_{}_$_{}", texture_name_details.base_name, texture_name_details.texture_name,
+                    texture_name_details.format_name);
+    if (s_textureMap.find(texture_name_single_wildcard_tlut) != s_textureMap.end())
+      return texture_name_single_wildcard_tlut;
+
+    // Single wildcard ignoring the texture hash
+    const std::string texture_name_single_wildcard_tex =
+        fmt::format("{}_${}_{}", texture_name_details.base_name, texture_name_details.tlut_name,
+                    texture_name_details.format_name);
+    if (s_textureMap.find(texture_name_single_wildcard_tex) != s_textureMap.end())
+      return texture_name_single_wildcard_tex;
+  }
 
   return "";
 }
@@ -300,13 +261,9 @@ u32 HiresTexture::CalculateMipCount(u32 width, u32 height)
   return mip_count;
 }
 
-std::shared_ptr<HiresTexture> HiresTexture::Search(const u8* texture, size_t texture_size,
-                                                   const u8* tlut, size_t tlut_size, u32 width,
-                                                   u32 height, TextureFormat format,
-                                                   bool has_mipmaps)
+std::shared_ptr<HiresTexture> HiresTexture::Search(TextureInfo& texture_info)
 {
-  std::string base_filename =
-      GenBaseName(texture, texture_size, tlut, tlut_size, width, height, format, has_mipmaps);
+  const std::string base_filename = GenBaseName(texture_info);
 
   std::lock_guard<std::mutex> lk(s_textureCacheMutex);
 
@@ -316,7 +273,8 @@ std::shared_ptr<HiresTexture> HiresTexture::Search(const u8* texture, size_t tex
     return iter->second;
   }
 
-  std::shared_ptr<HiresTexture> ptr(Load(base_filename, width, height));
+  std::shared_ptr<HiresTexture> ptr(
+      Load(base_filename, texture_info.GetRawWidth(), texture_info.GetRawHeight()));
 
   if (ptr && g_ActiveConfig.bCacheHiresTextures)
   {
@@ -365,7 +323,7 @@ std::unique_ptr<HiresTexture> HiresTexture::Load(const std::string& base_filenam
 
       if (!LoadTexture(level, buffer))
       {
-        ERROR_LOG(VIDEO, "Custom texture %s failed to load", filename.c_str());
+        ERROR_LOG_FMT(VIDEO, "Custom texture {} failed to load", filename);
         break;
       }
     }
@@ -381,19 +339,19 @@ std::unique_ptr<HiresTexture> HiresTexture::Load(const std::string& base_filenam
   const Level& first_mip = ret->m_levels[0];
   if (first_mip.width * height != first_mip.height * width)
   {
-    ERROR_LOG(VIDEO,
-              "Invalid custom texture size %ux%u for texture %s. The aspect differs "
-              "from the native size %ux%u.",
-              first_mip.width, first_mip.height, first_mip_file.path.c_str(), width, height);
+    ERROR_LOG_FMT(VIDEO,
+                  "Invalid custom texture size {}x{} for texture {}. The aspect differs "
+                  "from the native size {}x{}.",
+                  first_mip.width, first_mip.height, first_mip_file.path, width, height);
   }
 
   // Same deal if the custom texture isn't a multiple of the native size.
   if (width != 0 && height != 0 && (first_mip.width % width || first_mip.height % height))
   {
-    ERROR_LOG(VIDEO,
-              "Invalid custom texture size %ux%u for texture %s. Please use an integer "
-              "upscaling factor based on the native size %ux%u.",
-              first_mip.width, first_mip.height, first_mip_file.path.c_str(), width, height);
+    ERROR_LOG_FMT(VIDEO,
+                  "Invalid custom texture size {}x{} for texture {}. Please use an integer "
+                  "upscaling factor based on the native size {}x{}.",
+                  first_mip.width, first_mip.height, first_mip_file.path, width, height);
   }
 
   // Verify that each mip level is the correct size (divide by 2 each time).
@@ -410,16 +368,16 @@ std::unique_ptr<HiresTexture> HiresTexture::Load(const std::string& base_filenam
       if (current_mip_width == level.width && current_mip_height == level.height)
         continue;
 
-      ERROR_LOG(VIDEO,
-                "Invalid custom texture size %dx%d for texture %s. Mipmap level %u must be %dx%d.",
-                level.width, level.height, first_mip_file.path.c_str(), mip_level,
-                current_mip_width, current_mip_height);
+      ERROR_LOG_FMT(
+          VIDEO, "Invalid custom texture size {}x{} for texture {}. Mipmap level {} must be {}x{}.",
+          level.width, level.height, first_mip_file.path, mip_level, current_mip_width,
+          current_mip_height);
     }
     else
     {
       // It is invalid to have more than a single 1x1 mipmap.
-      ERROR_LOG(VIDEO, "Custom texture %s has too many 1x1 mipmaps. Skipping extra levels.",
-                first_mip_file.path.c_str());
+      ERROR_LOG_FMT(VIDEO, "Custom texture {} has too many 1x1 mipmaps. Skipping extra levels.",
+                    first_mip_file.path);
     }
 
     // Drop this mip level and any others after it.
@@ -431,8 +389,8 @@ std::unique_ptr<HiresTexture> HiresTexture::Load(const std::string& base_filenam
   if (std::any_of(ret->m_levels.begin(), ret->m_levels.end(),
                   [&ret](const Level& l) { return l.format != ret->m_levels[0].format; }))
   {
-    ERROR_LOG(VIDEO, "Custom texture %s has inconsistent formats across mip levels.",
-              first_mip_file.path.c_str());
+    ERROR_LOG_FMT(VIDEO, "Custom texture {} has inconsistent formats across mip levels.",
+                  first_mip_file.path);
 
     return nullptr;
   }
@@ -454,10 +412,11 @@ bool HiresTexture::LoadTexture(Level& level, const std::vector<u8>& buffer)
   return true;
 }
 
-std::set<std::string> HiresTexture::GetTextureDirectories(const std::string& game_id)
+std::set<std::string> GetTextureDirectoriesWithGameId(const std::string& root_directory,
+                                                      const std::string& game_id)
 {
   std::set<std::string> result;
-  const std::string texture_directory = File::GetUserPath(D_HIRESTEXTURES_IDX) + game_id;
+  const std::string texture_directory = root_directory + game_id;
 
   if (File::Exists(texture_directory))
   {
@@ -466,8 +425,7 @@ std::set<std::string> HiresTexture::GetTextureDirectories(const std::string& gam
   else
   {
     // If there's no directory with the region-specific ID, look for a 3-character region-free one
-    const std::string region_free_directory =
-        File::GetUserPath(D_HIRESTEXTURES_IDX) + game_id.substr(0, 3);
+    const std::string region_free_directory = root_directory + game_id.substr(0, 3);
 
     if (File::Exists(region_free_directory))
     {
@@ -482,7 +440,6 @@ std::set<std::string> HiresTexture::GetTextureDirectories(const std::string& gam
   };
 
   // Look for any other directories that might be specific to the given gameid
-  const auto root_directory = File::GetUserPath(D_HIRESTEXTURES_IDX);
   const auto files = Common::DoFileSearch({root_directory}, {".txt"}, true);
   for (const auto& file : files)
   {
@@ -490,8 +447,8 @@ std::set<std::string> HiresTexture::GetTextureDirectories(const std::string& gam
     {
       // The following code is used to calculate the top directory
       // of a found gameid.txt file
-      // ex:  <dolphin dir>/Load/Textures/My folder/gameids/<gameid>.txt
-      // would insert "<dolphin dir>/Load/Textures/My folder"
+      // ex:  <root directory>/My folder/gameids/<gameid>.txt
+      // would insert "<root directory>/My folder"
       const auto directory_path = file.substr(root_directory.size());
       const std::size_t first_path_separator_position = directory_path.find_first_of(DIR_SEP_CHR);
       result.insert(root_directory + directory_path.substr(0, first_path_separator_position));

@@ -1,6 +1,5 @@
 // Copyright 2019 Dolphin Emulator Project
-// Licensed under GPLv2+
-// Refer to the license.txt file included.
+// SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "Core/HW/WiimoteEmu/Camera.h"
 
@@ -53,7 +52,7 @@ int CameraLogic::BusWrite(u8 slave_addr, u8 addr, int count, const u8* data_in)
   return RawWrite(&m_reg_data, addr, count, data_in);
 }
 
-void CameraLogic::Update(const Common::Matrix44& transform)
+void CameraLogic::Update(const Common::Matrix44& transform, Common::Vec2 field_of_view)
 {
   // IR data is read from offset 0x37 on real hardware.
   auto& data = m_reg_data.camera_data;
@@ -75,9 +74,6 @@ void CameraLogic::Update(const Common::Matrix44& transform)
   using Common::Vec3;
   using Common::Vec4;
 
-  constexpr auto CAMERA_FOV_Y = float(CAMERA_FOV_Y_DEG * MathUtil::TAU / 360);
-  constexpr auto CAMERA_ASPECT_RATIO = float(CAMERA_FOV_X_DEG) / CAMERA_FOV_Y_DEG;
-
   // FYI: A real wiimote normally only returns 1 point for each LED cluster (2 total).
   // Sending all 4 points can actually cause some stuttering issues.
   constexpr int NUM_POINTS = 2;
@@ -86,23 +82,19 @@ void CameraLogic::Update(const Common::Matrix44& transform)
   // This is reduced based on distance from sensor bar.
   constexpr int MAX_POINT_SIZE = 15;
 
-  // Sensor bar:
-  // Distance in meters between LED clusters.
-  constexpr float SENSOR_BAR_LED_SEPARATION = 0.2f;
-
   const std::array<Vec3, NUM_POINTS> leds{
       Vec3{-SENSOR_BAR_LED_SEPARATION / 2, 0, 0},
       Vec3{SENSOR_BAR_LED_SEPARATION / 2, 0, 0},
   };
 
-  const auto camera_view = Matrix44::Perspective(CAMERA_FOV_Y, CAMERA_ASPECT_RATIO, 0.001f, 1000) *
-                           Matrix44::FromMatrix33(Matrix33::RotateX(float(MathUtil::TAU / 4))) *
-                           transform;
+  const auto camera_view =
+      Matrix44::Perspective(field_of_view.y, field_of_view.x / field_of_view.y, 0.001f, 1000) *
+      Matrix44::FromMatrix33(Matrix33::RotateX(float(MathUtil::TAU / 4))) * transform;
 
   struct CameraPoint
   {
     IRBasic::IRObject position;
-    u8 size;
+    u8 size = 0;
   };
 
   std::array<CameraPoint, leds.size()> camera_points;

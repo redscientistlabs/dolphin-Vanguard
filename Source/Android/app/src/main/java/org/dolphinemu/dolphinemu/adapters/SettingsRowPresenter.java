@@ -1,11 +1,12 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 package org.dolphinemu.dolphinemu.adapters;
 
 import android.content.res.Resources;
+import android.view.ViewGroup;
 
 import androidx.leanback.widget.ImageCardView;
 import androidx.leanback.widget.Presenter;
-
-import android.view.ViewGroup;
 
 import org.dolphinemu.dolphinemu.model.TvSettingsItem;
 import org.dolphinemu.dolphinemu.viewholders.TvSettingsViewHolder;

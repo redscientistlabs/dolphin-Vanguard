@@ -1,10 +1,12 @@
-package org.dolphinemu.dolphinemu.viewholders;
+// SPDX-License-Identifier: GPL-2.0-or-later
 
-import androidx.leanback.widget.ImageCardView;
-import androidx.leanback.widget.Presenter;
+package org.dolphinemu.dolphinemu.viewholders;
 
 import android.view.View;
 import android.widget.ImageView;
+
+import androidx.leanback.widget.ImageCardView;
+import androidx.leanback.widget.Presenter;
 
 import org.dolphinemu.dolphinemu.model.GameFile;
 

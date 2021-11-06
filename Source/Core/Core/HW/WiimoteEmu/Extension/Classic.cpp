@@ -1,13 +1,12 @@
 // Copyright 2010 Dolphin Emulator Project
-// Licensed under GPLv2+
-// Refer to the license.txt file included.
+// SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "Core/HW/WiimoteEmu/Extension/Classic.h"
 
 #include <array>
-#include <cassert>
 #include <string_view>
 
+#include "Common/Assert.h"
 #include "Common/BitUtils.h"
 #include "Common/Common.h"
 #include "Common/CommonTypes.h"
@@ -153,16 +152,6 @@ void Classic::Update()
   Common::BitCastPtr<DataFormat>(&m_reg.controller_data) = classic_data;
 }
 
-bool Classic::IsButtonPressed() const
-{
-  u16 buttons = 0;
-  std::array<ControlState, 2> trigs{};
-  m_buttons->GetState(&buttons, classic_button_bitmasks.data());
-  m_dpad->GetState(&buttons, classic_dpad_bitmasks.data());
-  m_triggers->GetState(&buttons, classic_trigger_bitmasks.data(), trigs.data());
-  return buttons != 0;
-}
-
 void Classic::Reset()
 {
   EncryptedExtension::Reset();
@@ -214,7 +203,7 @@ ControllerEmu::ControlGroup* Classic::GetGroup(ClassicGroup group)
   case ClassicGroup::RightStick:
     return m_right_stick;
   default:
-    assert(false);
+    ASSERT(false);
     return nullptr;
   }
 }

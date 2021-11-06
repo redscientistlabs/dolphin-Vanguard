@@ -1,6 +1,5 @@
 // Copyright 2016 Dolphin Emulator Project
-// Licensed under GPLv2+
-// Refer to the license.txt file included.
+// SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <map>
 #include <string>
@@ -124,6 +123,22 @@ bool IsWii(Platform volume_type)
 bool IsNTSC(Region region)
 {
   return region == Region::NTSC_J || region == Region::NTSC_U || region == Region::NTSC_K;
+}
+
+int ToGameCubeLanguage(Language language)
+{
+  if (language < Language::English || language > Language::Dutch)
+    return 0;
+  else
+    return static_cast<int>(language) - 1;
+}
+
+Language FromGameCubeLanguage(int language)
+{
+  if (language < 0 || language > 5)
+    return Language::Unknown;
+  else
+    return static_cast<Language>(language + 1);
 }
 
 // Increment CACHE_REVISION (GameFileCache.cpp) if the code below is modified
@@ -324,7 +339,7 @@ Country CountryCodeToCountry(u8 country_code, Platform platform, Region region,
 
   default:
     if (country_code > 'A')  // Silently ignore IOS wads
-      WARN_LOG(DISCIO, "Unknown Country Code! %c", country_code);
+      WARN_LOG_FMT(DISCIO, "Unknown Country Code! {}", static_cast<char>(country_code));
     return Country::Unknown;
   }
 }
@@ -366,7 +381,7 @@ std::string GetSysMenuVersionString(u16 title_version)
     region_letter = 'K';
     break;
   case Region::Unknown:
-    WARN_LOG(DISCIO, "Unknown region for Wii Menu version %u", title_version);
+    WARN_LOG_FMT(DISCIO, "Unknown region for Wii Menu version {}", title_version);
     break;
   }
 

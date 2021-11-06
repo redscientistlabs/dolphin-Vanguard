@@ -1,6 +1,5 @@
 // Copyright 2017 Dolphin Emulator Project
-// Licensed under GPLv2+
-// Refer to the license.txt file included.
+// SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "DolphinQt/Settings/AdvancedPane.h"
 
@@ -28,8 +27,8 @@
 static const std::map<PowerPC::CPUCore, const char*> CPU_CORE_NAMES = {
     {PowerPC::CPUCore::Interpreter, QT_TR_NOOP("Interpreter (slowest)")},
     {PowerPC::CPUCore::CachedInterpreter, QT_TR_NOOP("Cached Interpreter (slower)")},
-    {PowerPC::CPUCore::JIT64, QT_TR_NOOP("JIT Recompiler (recommended)")},
-    {PowerPC::CPUCore::JITARM64, QT_TR_NOOP("JIT Arm64 (experimental)")},
+    {PowerPC::CPUCore::JIT64, QT_TR_NOOP("JIT Recompiler for x86-64 (recommended)")},
+    {PowerPC::CPUCore::JITARM64, QT_TR_NOOP("JIT Recompiler for ARM64 (recommended)")},
 };
 
 AdvancedPane::AdvancedPane(QWidget* parent) : QWidget(parent)
@@ -47,26 +46,27 @@ void AdvancedPane::CreateLayout()
   auto* main_layout = new QVBoxLayout();
   setLayout(main_layout);
 
-  auto* cpu_options = new QGroupBox(tr("CPU Options"));
-  auto* cpu_options_layout = new QVBoxLayout();
-  cpu_options->setLayout(cpu_options_layout);
-  main_layout->addWidget(cpu_options);
+  auto* cpu_options_group = new QGroupBox(tr("CPU Options"));
+  auto* cpu_options_group_layout = new QVBoxLayout();
+  cpu_options_group->setLayout(cpu_options_group_layout);
+  main_layout->addWidget(cpu_options_group);
 
-  QGridLayout* cpu_emulation_layout = new QGridLayout();
-  QLabel* cpu_emulation_engine_label = new QLabel(tr("CPU Emulation Engine:"));
+  auto* cpu_emulation_engine_layout = new QFormLayout;
+  cpu_emulation_engine_layout->setFormAlignment(Qt::AlignLeft | Qt::AlignTop);
+  cpu_emulation_engine_layout->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+  cpu_options_group_layout->addLayout(cpu_emulation_engine_layout);
+
   m_cpu_emulation_engine_combobox = new QComboBox(this);
+  cpu_emulation_engine_layout->addRow(tr("CPU Emulation Engine:"), m_cpu_emulation_engine_combobox);
   for (PowerPC::CPUCore cpu_core : PowerPC::AvailableCPUCores())
   {
     m_cpu_emulation_engine_combobox->addItem(tr(CPU_CORE_NAMES.at(cpu_core)));
   }
-  cpu_emulation_layout->addWidget(cpu_emulation_engine_label, 0, 0);
-  cpu_emulation_layout->addWidget(m_cpu_emulation_engine_combobox, 0, 1, Qt::AlignLeft);
-  cpu_options_layout->addLayout(cpu_emulation_layout);
 
   m_enable_mmu_checkbox = new QCheckBox(tr("Enable MMU"));
   m_enable_mmu_checkbox->setToolTip(tr(
       "Enables the Memory Management Unit, needed for some games. (ON = Compatible, OFF = Fast)"));
-  cpu_options_layout->addWidget(m_enable_mmu_checkbox);
+  cpu_options_group_layout->addWidget(m_enable_mmu_checkbox);
 
   auto* clock_override = new QGroupBox(tr("Clock Override"));
   auto* clock_override_layout = new QVBoxLayout();
@@ -129,10 +129,10 @@ void AdvancedPane::CreateLayout()
   mem2_override_slider_layout->addWidget(m_mem2_override_slider_label);
 
   auto* ram_override_description =
-      new QLabel(tr("Adjusts the emulated sizes of MEM1 and MEM2.\n\n"
-                    "Some titles may recognize the larger memory arena(s) and take "
-                    "advantage of it, though retail titles are normally optimized for "
-                    "the retail memory limitations."));
+      new QLabel(tr("Adjusts the amount of RAM in the emulated console.\n\n"
+                    "WARNING: Enabling this will completely break many games. Only a small number "
+                    "of games can benefit from this."));
+
   ram_override_description->setWordWrap(true);
   ram_override_layout->addWidget(ram_override_description);
 
@@ -156,7 +156,9 @@ void AdvancedPane::CreateLayout()
     m_custom_rtc_datetime->setDisplayFormat(m_custom_rtc_datetime->displayFormat().replace(
         QStringLiteral("yy"), QStringLiteral("yyyy")));
   }
-  m_custom_rtc_datetime->setDateRange({2000, 1, 1}, {2099, 12, 31});
+  m_custom_rtc_datetime->setDateTimeRange(QDateTime({2000, 1, 1}, {0, 0, 0}, Qt::UTC),
+                                          QDateTime({2099, 12, 31}, {23, 59, 59}, Qt::UTC));
+  m_custom_rtc_datetime->setTimeSpec(Qt::UTC);
   rtc_options->layout()->addWidget(m_custom_rtc_datetime);
 
   auto* custom_rtc_description =
@@ -219,10 +221,10 @@ void AdvancedPane::ConnectLayout()
   });
 
   QDateTime initial_date_time;
-  initial_date_time.setTime_t(SConfig::GetInstance().m_customRTCValue);
+  initial_date_time.setSecsSinceEpoch(SConfig::GetInstance().m_customRTCValue);
   m_custom_rtc_datetime->setDateTime(initial_date_time);
   connect(m_custom_rtc_datetime, &QDateTimeEdit::dateTimeChanged, [this](QDateTime date_time) {
-    SConfig::GetInstance().m_customRTCValue = date_time.toTime_t();
+    SConfig::GetInstance().m_customRTCValue = static_cast<u32>(date_time.toSecsSinceEpoch());
     Update();
   });
 }
@@ -264,7 +266,7 @@ void AdvancedPane::Update()
     int core_clock = SystemTimers::GetTicksPerSecond() / std::pow(10, 6);
     int percent = static_cast<int>(std::round(SConfig::GetInstance().m_OCFactor * 100.f));
     int clock = static_cast<int>(std::round(SConfig::GetInstance().m_OCFactor * core_clock));
-    return tr("%1 % (%2 MHz)").arg(QString::number(percent), QString::number(clock));
+    return tr("%1% (%2 MHz)").arg(QString::number(percent), QString::number(clock));
   }());
 
   m_ram_override_checkbox->setEnabled(!running);
@@ -280,7 +282,7 @@ void AdvancedPane::Update()
 
   m_mem1_override_slider_label->setText([] {
     const u32 mem1_size = Config::Get(Config::MAIN_MEM1_SIZE) / 0x100000;
-    return tr("%1MB (MEM1)").arg(QString::number(mem1_size));
+    return tr("%1 MB (MEM1)").arg(QString::number(mem1_size));
   }());
 
   m_mem2_override_slider->setEnabled(enable_ram_override_widgets && !running);
@@ -294,7 +296,7 @@ void AdvancedPane::Update()
 
   m_mem2_override_slider_label->setText([] {
     const u32 mem2_size = Config::Get(Config::MAIN_MEM2_SIZE) / 0x100000;
-    return tr("%1MB (MEM2)").arg(QString::number(mem2_size));
+    return tr("%1 MB (MEM2)").arg(QString::number(mem2_size));
   }());
 
   m_custom_rtc_checkbox->setEnabled(!running);

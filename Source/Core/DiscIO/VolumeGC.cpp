@@ -1,8 +1,8 @@
 // Copyright 2008 Dolphin Emulator Project
-// Licensed under GPLv2+
-// Refer to the license.txt file included.
+// SPDX-License-Identifier: GPL-2.0-or-later
 
-#include <cinttypes>
+#include "DiscIO/VolumeGC.h"
+
 #include <cstddef>
 #include <map>
 #include <memory>
@@ -10,6 +10,8 @@
 #include <string>
 #include <utility>
 #include <vector>
+
+#include <mbedtls/sha1.h>
 
 #include "Common/Assert.h"
 #include "Common/ColorUtil.h"
@@ -20,11 +22,11 @@
 
 #include "DiscIO/Blob.h"
 #include "DiscIO/DiscExtractor.h"
+#include "DiscIO/DiscUtils.h"
 #include "DiscIO/Enums.h"
 #include "DiscIO/FileSystemGCWii.h"
 #include "DiscIO/Filesystem.h"
 #include "DiscIO/Volume.h"
-#include "DiscIO/VolumeGC.h"
 
 namespace DiscIO
 {
@@ -137,6 +139,19 @@ bool VolumeGC::IsDatelDisc() const
   return !GetBootDOLOffset(*this, PARTITION_NONE).has_value();
 }
 
+std::array<u8, 20> VolumeGC::GetSyncHash() const
+{
+  mbedtls_sha1_context context;
+  mbedtls_sha1_init(&context);
+  mbedtls_sha1_starts_ret(&context);
+
+  AddGamePartitionToSyncHash(&context);
+
+  std::array<u8, 20> hash;
+  mbedtls_sha1_finish_ret(&context, hash.data());
+  return hash;
+}
+
 VolumeGC::ConvertedGCBanner VolumeGC::LoadBannerFile() const
 {
   GCBanner banner_file;
@@ -144,7 +159,7 @@ VolumeGC::ConvertedGCBanner VolumeGC::LoadBannerFile() const
                                  reinterpret_cast<u8*>(&banner_file), sizeof(GCBanner));
   if (file_size < 4)
   {
-    WARN_LOG(DISCIO, "Could not read opening.bnr.");
+    WARN_LOG_FMT(DISCIO, "Could not read opening.bnr.");
     return {};  // Return early so that we don't access the uninitialized banner_file.id
   }
 
@@ -161,7 +176,8 @@ VolumeGC::ConvertedGCBanner VolumeGC::LoadBannerFile() const
   }
   else
   {
-    WARN_LOG(DISCIO, "Invalid opening.bnr. Type: %0x Size: %0" PRIx64, banner_file.id, file_size);
+    WARN_LOG_FMT(DISCIO, "Invalid opening.bnr. Type: {:#0x} Size: {:#0x}", banner_file.id,
+                 file_size);
     return {};
   }
 

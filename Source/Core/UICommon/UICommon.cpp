@@ -1,6 +1,5 @@
 // Copyright 2014 Dolphin Emulator Project
-// Licensed under GPLv2+
-// Refer to the license.txt file included.
+// SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <algorithm>
 #include <clocale>
@@ -39,7 +38,7 @@
 #include "UICommon/UICommon.h"
 #include "UICommon/USBUtils.h"
 
-#if defined(HAVE_XRANDR) && HAVE_XRANDR
+#ifdef HAVE_X11
 #include "UICommon/X11Utils.h"
 #endif
 
@@ -68,6 +67,7 @@ static void CreateLoadPath(const std::string& path)
   if (!path.empty())
     File::SetUserPath(D_LOAD_IDX, path + '/');
   File::CreateFullPath(File::GetUserPath(D_HIRESTEXTURES_IDX));
+  File::CreateFullPath(File::GetUserPath(D_RIIVOLUTION_IDX));
 }
 
 static void CreateResourcePackPath(const std::string& path)
@@ -82,9 +82,10 @@ static void InitCustomPaths()
   CreateLoadPath(Config::Get(Config::MAIN_LOAD_PATH));
   CreateDumpPath(Config::Get(Config::MAIN_DUMP_PATH));
   CreateResourcePackPath(Config::Get(Config::MAIN_RESOURCEPACK_PATH));
-  const std::string sd_path = Config::Get(Config::MAIN_SD_PATH);
-  if (!sd_path.empty())
-    File::SetUserPath(F_WIISDCARD_IDX, sd_path);
+  File::SetUserPath(F_WIISDCARD_IDX, Config::Get(Config::MAIN_SD_PATH));
+  File::SetUserPath(F_GBABIOS_IDX, Config::Get(Config::MAIN_GBA_BIOS_PATH));
+  File::SetUserPath(D_GBASAVES_IDX, Config::Get(Config::MAIN_GBA_SAVES_PATH));
+  File::CreateFullPath(File::GetUserPath(D_GBASAVES_IDX));
 }
 
 void Init()
@@ -97,19 +98,18 @@ void Init()
   SConfig::Init();
   Discord::Init();
   Common::Log::LogManager::Init();
-  VideoBackendBase::PopulateList();
   WiimoteReal::LoadSettings();
   GCAdapter::Init();
   VideoBackendBase::ActivateBackend(Config::Get(Config::MAIN_GFX_BACKEND));
 
-  Common::SetEnableAlert(SConfig::GetInstance().bUsePanicHandlers);
+  Common::SetEnableAlert(Config::Get(Config::MAIN_USE_PANIC_HANDLERS));
+  Common::SetAbortOnPanicAlert(Config::Get(Config::MAIN_ABORT_ON_PANIC_ALERT));
 }
 
 void Shutdown()
 {
   GCAdapter::Shutdown();
   WiimoteReal::Shutdown();
-  VideoBackendBase::ClearList();
   Common::Log::LogManager::Shutdown();
   Discord::Shutdown();
   SConfig::Shutdown();
@@ -389,7 +389,7 @@ bool TriggerSTMPowerEvent()
     return false;
 
   const auto stm = ios->GetDeviceByName("/dev/stm/eventhook");
-  if (!stm || !std::static_pointer_cast<IOS::HLE::Device::STMEventHook>(stm)->HasHookInstalled())
+  if (!stm || !std::static_pointer_cast<IOS::HLE::STMEventHookDevice>(stm)->HasHookInstalled())
     return false;
 
   Core::DisplayMessage("Shutting down", 30000);
@@ -398,58 +398,43 @@ bool TriggerSTMPowerEvent()
   return true;
 }
 
-#if defined(HAVE_XRANDR) && HAVE_XRANDR
-void EnableScreenSaver(Window win, bool enable)
+#ifdef HAVE_X11
+void InhibitScreenSaver(Window win, bool inhibit)
 #else
-void EnableScreenSaver(bool enable)
+void InhibitScreenSaver(bool inhibit)
 #endif
 {
   // Inhibit the screensaver. Depending on the operating system this may also
   // disable low-power states and/or screen dimming.
 
-#if defined(HAVE_X11) && HAVE_X11
-  if (Config::Get(Config::MAIN_DISABLE_SCREENSAVER))
-  {
-    X11Utils::InhibitScreensaver(win, !enable);
-  }
+#ifdef HAVE_X11
+  X11Utils::InhibitScreensaver(win, inhibit);
 #endif
 
 #ifdef _WIN32
   // Prevents Windows from sleeping, turning off the display, or idling
-  if (enable)
-  {
-    SetThreadExecutionState(ES_CONTINUOUS);
-  }
-  else
-  {
-    EXECUTION_STATE should_screen_save =
-        Config::Get(Config::MAIN_DISABLE_SCREENSAVER) ? ES_DISPLAY_REQUIRED : 0;
-    SetThreadExecutionState(ES_CONTINUOUS | should_screen_save | ES_SYSTEM_REQUIRED);
-  }
+  SetThreadExecutionState(ES_CONTINUOUS |
+                          (inhibit ? (ES_DISPLAY_REQUIRED | ES_SYSTEM_REQUIRED) : 0));
 #endif
 
 #ifdef __APPLE__
   static IOPMAssertionID s_power_assertion = kIOPMNullAssertionID;
-
-  if (Config::Get(Config::MAIN_DISABLE_SCREENSAVER))
+  if (inhibit)
   {
-    if (enable)
+    CFStringRef reason_for_activity = CFSTR("Emulation Running");
+    if (IOPMAssertionCreateWithName(kIOPMAssertionTypePreventUserIdleDisplaySleep,
+                                    kIOPMAssertionLevelOn, reason_for_activity,
+                                    &s_power_assertion) != kIOReturnSuccess)
     {
-      if (s_power_assertion != kIOPMNullAssertionID)
-      {
-        IOPMAssertionRelease(s_power_assertion);
-        s_power_assertion = kIOPMNullAssertionID;
-      }
+      s_power_assertion = kIOPMNullAssertionID;
     }
-    else
+  }
+  else
+  {
+    if (s_power_assertion != kIOPMNullAssertionID)
     {
-      CFStringRef reason_for_activity = CFSTR("Emulation Running");
-      if (IOPMAssertionCreateWithName(kIOPMAssertionTypePreventUserIdleDisplaySleep,
-                                      kIOPMAssertionLevelOn, reason_for_activity,
-                                      &s_power_assertion) != kIOReturnSuccess)
-      {
-        s_power_assertion = kIOPMNullAssertionID;
-      }
+      IOPMAssertionRelease(s_power_assertion);
+      s_power_assertion = kIOPMNullAssertionID;
     }
   }
 #endif

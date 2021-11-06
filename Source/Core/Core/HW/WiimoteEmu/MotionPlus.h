@@ -1,6 +1,5 @@
 // Copyright 2019 Dolphin Emulator Project
-// Licensed under GPLv2+
-// Refer to the license.txt file included.
+// SPDX-License-Identifier: GPL-2.0-or-later
 
 #pragma once
 
@@ -230,7 +229,6 @@ private:
   int BusWrite(u8 slave_addr, u8 addr, int count, const u8* data_in) override;
 
   bool ReadDeviceDetectPin() const override;
-  bool IsButtonPressed() const override;
 
   Register m_reg_data = {};
 

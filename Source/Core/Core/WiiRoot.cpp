@@ -1,10 +1,10 @@
 // Copyright 2016 Dolphin Emulator Project
-// Licensed under GPLv2+
-// Refer to the license.txt file included.
+// SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "Core/WiiRoot.h"
 
 #include <cinttypes>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -12,12 +12,13 @@
 
 #include "Common/CommonPaths.h"
 #include "Common/CommonTypes.h"
-#include "Common/File.h"
 #include "Common/FileUtil.h"
+#include "Common/IOFile.h"
 #include "Common/Logging/Log.h"
 #include "Common/NandPaths.h"
 #include "Common/StringUtil.h"
 #include "Core/CommonTitles.h"
+#include "Core/Config/SessionSettings.h"
 #include "Core/ConfigManager.h"
 #include "Core/HW/WiiSave.h"
 #include "Core/IOS/ES/ES.h"
@@ -33,6 +34,13 @@ namespace Core
 namespace FS = IOS::HLE::FS;
 
 static std::string s_temp_wii_root;
+static bool s_wii_root_initialized = false;
+static std::vector<IOS::HLE::FS::NandRedirect> s_nand_redirects;
+
+const std::vector<IOS::HLE::FS::NandRedirect>& GetActiveNandRedirects()
+{
+  return s_nand_redirects;
+}
 
 static bool CopyBackupFile(const std::string& path_from, const std::string& path_to)
 {
@@ -141,7 +149,7 @@ static void InitializeDeterministicWiiSaves(FS::FileSystem* session_fs)
       if (!CopyNandFile(sync_fs, Common::GetMiiDatabasePath(), session_fs,
                         Common::GetMiiDatabasePath()))
       {
-        WARN_LOG(CORE, "Failed to copy Mii database to the NAND");
+        WARN_LOG_FMT(CORE, "Failed to copy Mii database to the NAND");
       }
     }
     else
@@ -162,7 +170,7 @@ static void InitializeDeterministicWiiSaves(FS::FileSystem* session_fs)
       if (!CopyNandFile(configured_fs.get(), Common::GetMiiDatabasePath(), session_fs,
                         Common::GetMiiDatabasePath()))
       {
-        WARN_LOG(CORE, "Failed to copy Mii database to the NAND");
+        WARN_LOG_FMT(CORE, "Failed to copy Mii database to the NAND");
       }
     }
   }
@@ -170,22 +178,24 @@ static void InitializeDeterministicWiiSaves(FS::FileSystem* session_fs)
 
 void InitializeWiiRoot(bool use_temporary)
 {
+  ASSERT(!s_wii_root_initialized);
+
   if (use_temporary)
   {
     s_temp_wii_root = File::GetUserPath(D_USER_IDX) + "WiiSession" DIR_SEP;
-    WARN_LOG(IOS_FS, "Using temporary directory %s for minimal Wii FS", s_temp_wii_root.c_str());
+    WARN_LOG_FMT(IOS_FS, "Using temporary directory {} for minimal Wii FS", s_temp_wii_root);
 
     // If directory exists, make a backup
     if (File::Exists(s_temp_wii_root))
     {
       const std::string backup_path =
           s_temp_wii_root.substr(0, s_temp_wii_root.size() - 1) + ".backup" DIR_SEP;
-      WARN_LOG(IOS_FS, "Temporary Wii FS directory exists, moving to backup...");
+      WARN_LOG_FMT(IOS_FS, "Temporary Wii FS directory exists, moving to backup...");
 
       // If backup exists, delete it as we don't want a mess
       if (File::Exists(backup_path))
       {
-        WARN_LOG(IOS_FS, "Temporary Wii FS backup directory exists, deleting...");
+        WARN_LOG_FMT(IOS_FS, "Temporary Wii FS backup directory exists, deleting...");
         File::DeleteDirRecursively(backup_path);
       }
 
@@ -198,15 +208,31 @@ void InitializeWiiRoot(bool use_temporary)
   {
     File::SetUserPath(D_SESSION_WIIROOT_IDX, File::GetUserPath(D_WIIROOT_IDX));
   }
+
+  s_nand_redirects.clear();
+  s_wii_root_initialized = true;
 }
 
 void ShutdownWiiRoot()
 {
-  if (!s_temp_wii_root.empty())
+  if (WiiRootIsTemporary())
   {
     File::DeleteDirRecursively(s_temp_wii_root);
     s_temp_wii_root.clear();
   }
+
+  s_nand_redirects.clear();
+  s_wii_root_initialized = false;
+}
+
+bool WiiRootIsInitialized()
+{
+  return s_wii_root_initialized;
+}
+
+bool WiiRootIsTemporary()
+{
+  return !s_temp_wii_root.empty();
 }
 
 void BackupWiiSettings()
@@ -271,7 +297,8 @@ static bool CopySysmenuFilesToFS(FS::FileSystem* fs, const std::string& host_sou
   return true;
 }
 
-void InitializeWiiFileSystemContents()
+void InitializeWiiFileSystemContents(
+    std::optional<DiscIO::Riivolution::SavegameRedirect> save_redirect)
 {
   const auto fs = IOS::HLE::GetIOS()->GetFS();
 
@@ -280,21 +307,38 @@ void InitializeWiiFileSystemContents()
   // Because we do not require the system menu to be run, WiiConnect24 files must be copied
   // to the NAND manually.
   if (!CopySysmenuFilesToFS(fs.get(), File::GetSysDirectory() + WII_USER_DIR, ""))
-    WARN_LOG(CORE, "Failed to copy initial System Menu files to the NAND");
+    WARN_LOG_FMT(CORE, "Failed to copy initial System Menu files to the NAND");
 
-  if (s_temp_wii_root.empty())
-    return;
+  if (WiiRootIsTemporary())
+  {
+    // Generate a SYSCONF with default settings for the temporary Wii NAND.
+    SysConf sysconf{fs};
+    sysconf.Save();
 
-  // Generate a SYSCONF with default settings for the temporary Wii NAND.
-  SysConf sysconf{fs};
-  sysconf.Save();
-
-  InitializeDeterministicWiiSaves(fs.get());
+    InitializeDeterministicWiiSaves(fs.get());
+  }
+  else if (save_redirect)
+  {
+    const u64 title_id = SConfig::GetInstance().GetTitleID();
+    std::string source_path = Common::GetTitleDataPath(title_id);
+    if (!File::IsDirectory(save_redirect->m_target_path))
+    {
+      File::CreateFullPath(save_redirect->m_target_path + "/");
+      if (save_redirect->m_clone)
+      {
+        File::CopyDir(Common::GetTitleDataPath(title_id, Common::FROM_CONFIGURED_ROOT),
+                      save_redirect->m_target_path);
+      }
+    }
+    s_nand_redirects.emplace_back(IOS::HLE::FS::NandRedirect{
+        std::move(source_path), std::move(save_redirect->m_target_path)});
+    fs->SetNandRedirects(s_nand_redirects);
+  }
 }
 
 void CleanUpWiiFileSystemContents()
 {
-  if (s_temp_wii_root.empty() || !SConfig::GetInstance().bEnableMemcardSdWriting ||
+  if (!WiiRootIsTemporary() || !Config::Get(Config::SESSION_SAVE_DATA_WRITABLE) ||
       NetPlay::GetWiiSyncFS())
   {
     return;
@@ -307,7 +351,7 @@ void CleanUpWiiFileSystemContents()
   if (!CopyNandFile(ios->GetFS().get(), Common::GetMiiDatabasePath(), configured_fs.get(),
                     Common::GetMiiDatabasePath()))
   {
-    WARN_LOG(CORE, "Failed to copy Mii database to the NAND");
+    WARN_LOG_FMT(CORE, "Failed to copy Mii database to the NAND");
   }
 
   for (const u64 title_id : ios->GetES()->GetInstalledTitles())

@@ -1,6 +1,5 @@
 // Copyright 2019 Dolphin Emulator Project
-// Licensed under GPLv2+
-// Refer to the license.txt file included.
+// SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "DolphinQt/TAS/TASCheckBox.h"
 
@@ -20,7 +19,7 @@ bool TASCheckBox::GetValue() const
   if (checkState() == Qt::PartiallyChecked)
   {
     const u64 frames_elapsed = Movie::GetCurrentFrame() - m_frame_turbo_started;
-    return frames_elapsed % m_turbo_total_frames < m_turbo_press_frames;
+    return static_cast<int>(frames_elapsed % m_turbo_total_frames) < m_turbo_press_frames;
   }
 
   return isChecked();

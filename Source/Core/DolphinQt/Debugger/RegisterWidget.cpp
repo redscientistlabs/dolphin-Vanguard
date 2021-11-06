@@ -1,11 +1,11 @@
 // Copyright 2017 Dolphin Emulator Project
-// Licensed under GPLv2+
-// Refer to the license.txt file included.
+// SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "DolphinQt/Debugger/RegisterWidget.h"
 
 #include <utility>
 
+#include <QActionGroup>
 #include <QHeaderView>
 #include <QMenu>
 #include <QTableWidget>
@@ -41,10 +41,10 @@ RegisterWidget::RegisterWidget(QWidget* parent) : QDockWidget(parent)
 
   connect(Host::GetInstance(), &Host::UpdateDisasmDialog, this, &RegisterWidget::Update);
 
-  connect(&Settings::Instance(), &Settings::RegistersVisibilityChanged,
+  connect(&Settings::Instance(), &Settings::RegistersVisibilityChanged, this,
           [this](bool visible) { setHidden(!visible); });
 
-  connect(&Settings::Instance(), &Settings::DebugModeToggled, [this](bool enabled) {
+  connect(&Settings::Instance(), &Settings::DebugModeToggled, this, [this](bool enabled) {
     setHidden(!enabled || !Settings::Instance().IsRegistersVisible());
   });
 }
@@ -101,6 +101,7 @@ void RegisterWidget::ConnectWidgets()
   connect(m_table, &QTableWidget::customContextMenuRequested, this,
           &RegisterWidget::ShowContextMenu);
   connect(m_table, &QTableWidget::itemChanged, this, &RegisterWidget::OnItemChanged);
+  connect(&Settings::Instance(), &Settings::DebugFontChanged, m_table, &QWidget::setFont);
 }
 
 void RegisterWidget::OnItemChanged(QTableWidgetItem* item)
@@ -123,7 +124,12 @@ void RegisterWidget::ShowContextMenu()
 
     // i18n: This kind of "watch" is used for watching emulated memory.
     // It's not related to timekeeping devices.
-    menu->addAction(tr("Add to &watch"), this,
+    menu->addAction(tr("Add to &watch"), this, [this, item] {
+      const u32 address = item->GetValue();
+      const QString name = QStringLiteral("reg_%1").arg(address, 8, 16, QLatin1Char('0'));
+      emit RequestWatch(name, address);
+    });
+    menu->addAction(tr("Add memory &breakpoint"), this,
                     [this, item] { emit RequestMemoryBreakpoint(item->GetValue()); });
     menu->addAction(tr("View &memory"), this,
                     [this, item] { emit RequestViewInMemory(item->GetValue()); });
@@ -242,7 +248,10 @@ void RegisterWidget::PopulateTable()
         [i](u64 value) { rPS(i).SetPS1(value); });
   }
 
-  for (int i = 0; i < 8; i++)
+  // The IBAT and DBAT registers have a large gap between
+  // registers 3 and 4 so we can't just use SPR_IBAT0U or
+  // SPR_DBAT0U as low-index the entire way
+  for (int i = 0; i < 4; i++)
   {
     // IBAT registers
     AddRegister(
@@ -252,6 +261,14 @@ void RegisterWidget::PopulateTable()
                  PowerPC::ppcState.spr[SPR_IBAT0L + i * 2];
         },
         nullptr);
+    AddRegister(
+        i + 4, 5, RegisterType::ibat, "IBAT" + std::to_string(4 + i),
+        [i] {
+          return (static_cast<u64>(PowerPC::ppcState.spr[SPR_IBAT4U + i * 2]) << 32) +
+                 PowerPC::ppcState.spr[SPR_IBAT4L + i * 2];
+        },
+        nullptr);
+
     // DBAT registers
     AddRegister(
         i + 8, 5, RegisterType::dbat, "DBAT" + std::to_string(i),
@@ -260,6 +277,17 @@ void RegisterWidget::PopulateTable()
                  PowerPC::ppcState.spr[SPR_DBAT0L + i * 2];
         },
         nullptr);
+    AddRegister(
+        i + 12, 5, RegisterType::dbat, "DBAT" + std::to_string(4 + i),
+        [i] {
+          return (static_cast<u64>(PowerPC::ppcState.spr[SPR_DBAT4U + i * 2]) << 32) +
+                 PowerPC::ppcState.spr[SPR_DBAT4L + i * 2];
+        },
+        nullptr);
+  }
+
+  for (int i = 0; i < 8; i++)
+  {
     // Graphics quantization registers
     AddRegister(
         i + 16, 7, RegisterType::gqr, "GQR" + std::to_string(i),

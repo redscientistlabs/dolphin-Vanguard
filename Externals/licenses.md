@@ -38,6 +38,8 @@ Dolphin includes or links code of the following third-party software projects:
    [University of Illinois/NCSA Open Source license](http://llvm.org/docs/DeveloperPolicy.html#license)
 - [LZO](http://www.oberhumer.com/opensource/lzo/):
    [GPLv2+](http://www.oberhumer.com/opensource/gpl.html)
+- [mGBA](http://mgba.io)
+   [MPL 2.0](https://github.com/mgba-emu/mgba/blob/master/LICENSE)
 - [MiniUPnPc](http://miniupnp.free.fr/):
    [3-clause BSD](https://github.com/miniupnp/miniupnp/blob/master/miniupnpc/LICENSE)
 - [Microsoft Visual C++ Runtime Library](http://www.microsoft.com/en-us/download/details.aspx?id=40784):
@@ -56,6 +58,8 @@ Dolphin includes or links code of the following third-party software projects:
    [LGPLv2.1+](http://cgit.freedesktop.org/pulseaudio/pulseaudio/tree/LICENSE)
 - [Qt5](http://qt-project.org/):
    [LGPLv3 and other licenses](http://doc.qt.io/qt-5/licensing.html)
+- [rangeset](https://github.com/AdmiralCurtiss/rangeset)
+   [zlib license](https://github.com/AdmiralCurtiss/rangeset/blob/master/LICENSE)
 - [SDL](https://www.libsdl.org/):
    [zlib license](http://hg.libsdl.org/SDL/file/tip/COPYING.txt)
 - [SFML](http://www.sfml-dev.org/):

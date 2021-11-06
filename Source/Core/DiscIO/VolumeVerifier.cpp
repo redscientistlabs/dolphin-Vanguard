@@ -1,16 +1,12 @@
 // Copyright 2019 Dolphin Emulator Project
-// Licensed under GPLv2+
-// Refer to the license.txt file included.
+// SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "DiscIO/VolumeVerifier.h"
 
 #include <algorithm>
-#include <cassert>
-#include <cinttypes>
 #include <future>
 #include <limits>
 #include <memory>
-#include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -26,9 +22,9 @@
 #include "Common/Assert.h"
 #include "Common/CommonPaths.h"
 #include "Common/CommonTypes.h"
-#include "Common/File.h"
 #include "Common/FileUtil.h"
 #include "Common/HttpRequest.h"
+#include "Common/IOFile.h"
 #include "Common/Logging/Log.h"
 #include "Common/MinizipUtil.h"
 #include "Common/MsgHandler.h"
@@ -42,8 +38,8 @@
 #include "Core/IOS/IOS.h"
 #include "Core/IOS/IOSC.h"
 #include "DiscIO/Blob.h"
-#include "DiscIO/DiscExtractor.h"
 #include "DiscIO/DiscScrubber.h"
+#include "DiscIO/DiscUtils.h"
 #include "DiscIO/Enums.h"
 #include "DiscIO/Filesystem.h"
 #include "DiscIO/Volume.h"
@@ -97,7 +93,7 @@ void RedumpVerifier::Start(const Volume& volume)
     switch (download_state->status)
     {
     case DownloadStatus::FailButOldCacheAvailable:
-      ERROR_LOG(DISCIO, "Failed to fetch data from Redump.org, using old cached data instead");
+      ERROR_LOG_FMT(DISCIO, "Failed to fetch data from Redump.org, using old cached data instead");
       [[fallthrough]];
     case DownloadStatus::Success:
       return ScanDatfile(ReadDatfile(system), system);
@@ -156,7 +152,7 @@ RedumpVerifier::DownloadStatus RedumpVerifier::DownloadDatfile(const std::string
 
   File::CreateFullPath(output_path);
   if (!File::IOFile(output_path, "wb").WriteBytes(result->data(), result->size()))
-    ERROR_LOG(DISCIO, "Failed to write downloaded datfile to %s", output_path.c_str());
+    ERROR_LOG_FMT(DISCIO, "Failed to write downloaded datfile to {}", output_path);
   return DownloadStatus::Success;
 }
 
@@ -275,7 +271,7 @@ std::vector<RedumpVerifier::PotentialMatch> RedumpVerifier::ScanDatfile(const st
 
         if (game_id_start == std::string::npos || serial.size() < game_id_start + 4)
         {
-          ERROR_LOG(DISCIO, "Invalid serial in redump datfile: %s", serial_str.c_str());
+          ERROR_LOG_FMT(DISCIO, "Invalid serial in redump datfile: {}", serial_str);
           continue;
         }
 
@@ -313,7 +309,11 @@ std::vector<RedumpVerifier::PotentialMatch> RedumpVerifier::ScanDatfile(const st
     // so show a panic alert rather than just using ERROR_LOG
 
     // i18n: "Serial" refers to serial numbers, e.g. RVL-RSBE-USA
-    PanicAlertT("Serial and/or version data is missing from %s", GetPathForSystem(system).c_str());
+    PanicAlertFmtT(
+        "Serial and/or version data is missing from {0}\n"
+        "Please append \"{1}\" (without the quotes) to the datfile URL when downloading\n"
+        "Example: {2}",
+        GetPathForSystem(system), "serial,version", "http://redump.org/datfile/gc/serial,version");
     m_result = {Status::Error, Common::GetStringT("Failed to parse Redump.org data")};
     return {};
   }
@@ -355,13 +355,7 @@ RedumpVerifier::Result RedumpVerifier::Finish(const Hashes<std::vector<u8>>& has
   return {Status::Unknown, Common::GetStringT("Unknown disc")};
 }
 
-constexpr u64 MINI_DVD_SIZE = 1459978240;  // GameCube
-constexpr u64 SL_DVD_SIZE = 4699979776;    // Wii retail
-constexpr u64 SL_DVD_R_SIZE = 4707319808;  // Wii RVT-R
-constexpr u64 DL_DVD_SIZE = 8511160320;    // Wii retail
-constexpr u64 DL_DVD_R_SIZE = 8543666176;  // Wii RVT-R
-
-constexpr u64 BLOCK_SIZE = 0x20000;
+constexpr u64 DEFAULT_READ_SIZE = 0x20000;  // Arbitrary value
 
 VolumeVerifier::VolumeVerifier(const Volume& volume, bool redump_verification,
                                Hashes<bool> hashes_to_calculate)
@@ -375,7 +369,10 @@ VolumeVerifier::VolumeVerifier(const Volume& volume, bool redump_verification,
     m_redump_verification = false;
 }
 
-VolumeVerifier::~VolumeVerifier() = default;
+VolumeVerifier::~VolumeVerifier()
+{
+  WaitForAsyncOperations();
+}
 
 void VolumeVerifier::Start()
 {
@@ -391,9 +388,11 @@ void VolumeVerifier::Start()
       (m_volume.GetVolumeType() == Platform::WiiDisc && !m_volume.IsEncryptedAndHashed()) ||
       IsDebugSigned();
 
-  if (m_volume.GetVolumeType() == Platform::WiiWAD)
-    CheckCorrectlySigned(PARTITION_NONE, Common::GetStringT("This title is not correctly signed."));
-  CheckDiscSize(CheckPartitions());
+  const std::vector<Partition> partitions = CheckPartitions();
+
+  if (IsDisc(m_volume.GetVolumeType()))
+    m_biggest_referenced_offset = GetBiggestReferencedOffset(m_volume, partitions);
+
   CheckMisc();
 
   SetUpHashing();
@@ -481,8 +480,8 @@ std::vector<Partition> VolumeVerifier::CheckPartitions()
       AddProblem(Severity::Low,
                  Common::GetStringT(
                      "The data partition is not at its normal position. This will affect the "
-                     "emulated loading times. When using NetPlay or sending input recordings to "
-                     "other people, you will experience desyncs if anyone is using a good dump."));
+                     "emulated loading times. You will be unable to share input recordings and use "
+                     "NetPlay with anyone who is using a good dump."));
     }
   }
 
@@ -517,77 +516,98 @@ bool VolumeVerifier::CheckPartition(const Partition& partition)
   if (partition.offset % VolumeWii::BLOCK_TOTAL_SIZE != 0 ||
       m_volume.PartitionOffsetToRawOffset(0, partition) % VolumeWii::BLOCK_TOTAL_SIZE != 0)
   {
-    AddProblem(
-        Severity::Medium,
-        StringFromFormat(Common::GetStringT("The %s partition is not properly aligned.").c_str(),
-                         name.c_str()));
+    AddProblem(Severity::Medium,
+               Common::FmtFormatT("The {0} partition is not properly aligned.", name));
   }
 
-  if (!m_is_datel)
-  {
-    CheckCorrectlySigned(
-        partition,
-        StringFromFormat(Common::GetStringT("The %s partition is not correctly signed.").c_str(),
-                         name.c_str()));
-  }
-
-  if (m_volume.SupportsIntegrityCheck() && !m_volume.CheckH3TableIntegrity(partition))
-  {
-    std::string text = StringFromFormat(
-        Common::GetStringT("The H3 hash table for the %s partition is not correct.").c_str(),
-        name.c_str());
-    AddProblem(Severity::Low, std::move(text));
-  }
-
-  bool invalid_disc_header = false;
+  bool invalid_header = false;
+  bool blank_contents = false;
   std::vector<u8> disc_header(0x80);
-  constexpr u32 WII_MAGIC = 0x5D1C9EA3;
   if (!m_volume.Read(0, disc_header.size(), disc_header.data(), partition))
   {
-    invalid_disc_header = true;
+    invalid_header = true;
   }
-  else if (Common::swap32(disc_header.data() + 0x18) != WII_MAGIC)
+  else if (Common::swap32(disc_header.data() + 0x18) != WII_DISC_MAGIC)
   {
     for (size_t i = 0; i < disc_header.size(); i += 4)
     {
       if (Common::swap32(disc_header.data() + i) != i)
       {
-        invalid_disc_header = true;
+        invalid_header = true;
         break;
       }
     }
 
-    // The loop above ends without setting invalid_disc_header for discs that legitimately lack
+    // The loop above ends without setting invalid_header for discs that legitimately lack
     // updates. No such discs have been released to end users. Most such discs are debug signed,
     // but there is apparently at least one that is retail signed, the Movie-Ch Install Disc.
-    if (!invalid_disc_header)
-      return false;
+    if (!invalid_header)
+      blank_contents = true;
   }
-  if (invalid_disc_header)
+  if (invalid_header)
   {
     // This can happen when certain programs that create WBFS files scrub the entirety of
     // the Masterpiece partitions in Super Smash Bros. Brawl without removing them from
     // the partition table. https://bugs.dolphin-emu.org/issues/8733
-    std::string text = StringFromFormat(
-        Common::GetStringT("The %s partition does not seem to contain valid data.").c_str(),
-        name.c_str());
-    AddProblem(severity, std::move(text));
+    AddProblem(severity,
+               Common::FmtFormatT("The {0} partition does not seem to contain valid data.", name));
     return false;
+  }
+
+  if (!m_is_datel)
+  {
+    IOS::HLE::Kernel ios;
+    const auto es = ios.GetES();
+    const std::vector<u8>& cert_chain = m_volume.GetCertificateChain(partition);
+
+    if (IOS::HLE::IPC_SUCCESS !=
+            es->VerifyContainer(IOS::HLE::ESDevice::VerifyContainerType::Ticket,
+                                IOS::HLE::ESDevice::VerifyMode::DoNotUpdateCertStore,
+                                m_volume.GetTicket(partition), cert_chain) ||
+        IOS::HLE::IPC_SUCCESS !=
+            es->VerifyContainer(IOS::HLE::ESDevice::VerifyContainerType::TMD,
+                                IOS::HLE::ESDevice::VerifyMode::DoNotUpdateCertStore,
+                                m_volume.GetTMD(partition), cert_chain))
+    {
+      AddProblem(Severity::Low,
+                 Common::FmtFormatT("The {0} partition is not correctly signed.", name));
+    }
+  }
+
+  if (m_volume.SupportsIntegrityCheck() && !m_volume.CheckH3TableIntegrity(partition))
+  {
+    AddProblem(Severity::Low,
+               Common::FmtFormatT("The H3 hash table for the {0} partition is not correct.", name));
   }
 
   // Prepare for hash verification in the Process step
   if (m_volume.SupportsIntegrityCheck())
   {
-    u64 offset = m_volume.PartitionOffsetToRawOffset(0, partition);
-    const std::optional<u64> size =
-        m_volume.ReadSwappedAndShifted(partition.offset + 0x2bc, PARTITION_NONE);
-    const u64 end_offset = offset + size.value_or(0);
+    const u64 data_size =
+        m_volume.ReadSwappedAndShifted(partition.offset + 0x2bc, PARTITION_NONE).value_or(0);
+    const size_t blocks = static_cast<size_t>(data_size / VolumeWii::BLOCK_TOTAL_SIZE);
 
-    for (size_t i = 0; offset < end_offset; ++i, offset += VolumeWii::BLOCK_TOTAL_SIZE)
-      m_blocks.emplace_back(BlockToVerify{partition, offset, i});
+    if (data_size % VolumeWii::BLOCK_TOTAL_SIZE != 0)
+    {
+      std::string text = Common::FmtFormatT(
+          "The data size for the {0} partition is not evenly divisible by the block size.", name);
+      AddProblem(Severity::Low, std::move(text));
+    }
+
+    u64 offset = m_volume.PartitionOffsetToRawOffset(0, partition);
+    for (size_t block_index = 0; block_index < blocks;
+         block_index += VolumeWii::BLOCKS_PER_GROUP, offset += VolumeWii::GROUP_TOTAL_SIZE)
+    {
+      m_groups.emplace_back(
+          GroupToVerify{partition, offset, block_index,
+                        std::min(block_index + VolumeWii::BLOCKS_PER_GROUP, blocks)});
+    }
 
     m_block_errors.emplace(partition, 0);
   }
+
+  if (blank_contents)
+    return false;
 
   const DiscIO::FileSystem* filesystem = m_volume.GetFileSystem(partition);
   if (!filesystem)
@@ -598,10 +618,8 @@ bool VolumeVerifier::CheckPartition(const Partition& partition)
       return true;
     }
 
-    std::string text = StringFromFormat(
-        Common::GetStringT("The %s partition does not have a valid file system.").c_str(),
-        name.c_str());
-    AddProblem(severity, std::move(text));
+    AddProblem(severity,
+               Common::FmtFormatT("The {0} partition does not have a valid file system.", name));
     return false;
   }
 
@@ -612,14 +630,17 @@ bool VolumeVerifier::CheckPartition(const Partition& partition)
     // IOS9 is the only IOS which can be assumed to exist in a working state on any Wii
     // regardless of what updates have been installed. At least Mario Party 8
     // (RM8E01, revision 2) uses IOS9 without having it in its update partition.
-    bool has_correct_ios = tmd.IsValid() && (tmd.GetIOSId() & 0xFF) == 9;
+    const u64 ios_ver = tmd.GetIOSId() & 0xFF;
+    bool has_correct_ios = tmd.IsValid() && ios_ver == 9;
 
     if (!has_correct_ios && tmd.IsValid())
     {
       std::unique_ptr<FileInfo> file_info = filesystem->FindFileInfo("_sys");
       if (file_info)
       {
-        const std::string correct_ios = "IOS" + std::to_string(tmd.GetIOSId() & 0xFF) + "-";
+        const std::string ios_ver_str = std::to_string(ios_ver);
+        const std::string correct_ios =
+            IsDebugSigned() ? ("firmware.64." + ios_ver_str + ".") : ("IOS" + ios_ver_str + "-");
         for (const FileInfo& f : *file_info)
         {
           if (StringBeginsWith(f.GetName(), correct_ios))
@@ -659,28 +680,9 @@ std::string VolumeVerifier::GetPartitionName(std::optional<u32> type) const
     // (French), Clásicos (Spanish), Capolavori (Italian), 클래식 게임 체험판 (Korean).
     // If your language is not one of the languages above, consider leaving the string untranslated
     // so that people will recognize it as the name of the game mode.
-    name = StringFromFormat(Common::GetStringT("%s (Masterpiece)").c_str(), name.c_str());
+    name = Common::FmtFormatT("{0} (Masterpiece)", name);
   }
   return name;
-}
-
-void VolumeVerifier::CheckCorrectlySigned(const Partition& partition, std::string error_text)
-{
-  IOS::HLE::Kernel ios;
-  const auto es = ios.GetES();
-  const std::vector<u8> cert_chain = m_volume.GetCertificateChain(partition);
-
-  if (IOS::HLE::IPC_SUCCESS !=
-          es->VerifyContainer(IOS::HLE::Device::ES::VerifyContainerType::Ticket,
-                              IOS::HLE::Device::ES::VerifyMode::DoNotUpdateCertStore,
-                              m_volume.GetTicket(partition), cert_chain) ||
-      IOS::HLE::IPC_SUCCESS !=
-          es->VerifyContainer(IOS::HLE::Device::ES::VerifyContainerType::TMD,
-                              IOS::HLE::Device::ES::VerifyMode::DoNotUpdateCertStore,
-                              m_volume.GetTMD(partition), cert_chain))
-  {
-    AddProblem(Severity::Low, std::move(error_text));
-  }
 }
 
 bool VolumeVerifier::IsDebugSigned() const
@@ -695,7 +697,7 @@ bool VolumeVerifier::ShouldHaveChannelPartition() const
       "RFNE01", "RFNJ01", "RFNK01", "RFNP01", "RFNW01", "RFPE01", "RFPJ01", "RFPK01", "RFPP01",
       "RFPW01", "RGWE41", "RGWJ41", "RGWP41", "RGWX41", "RMCE01", "RMCJ01", "RMCK01", "RMCP01",
   };
-  assert(std::is_sorted(channel_discs.cbegin(), channel_discs.cend()));
+  DEBUG_ASSERT(std::is_sorted(channel_discs.cbegin(), channel_discs.cend()));
 
   return std::binary_search(channel_discs.cbegin(), channel_discs.cend(),
                             std::string_view(m_volume.GetGameID()));
@@ -728,19 +730,20 @@ bool VolumeVerifier::ShouldBeDualLayer() const
       "SLSEXJ", "SLSP01", "SQIE4Q", "SQIP4Q", "SQIY4Q", "SR5E41", "SR5P41", "SUOE41", "SUOP41",
       "SVXX52", "SVXY52", "SX4E01", "SX4P01", "SZ3EGT", "SZ3PGT",
   };
-  assert(std::is_sorted(dual_layer_discs.cbegin(), dual_layer_discs.cend()));
+  DEBUG_ASSERT(std::is_sorted(dual_layer_discs.cbegin(), dual_layer_discs.cend()));
 
   return std::binary_search(dual_layer_discs.cbegin(), dual_layer_discs.cend(),
                             std::string_view(m_volume.GetGameID()));
 }
 
-void VolumeVerifier::CheckDiscSize(const std::vector<Partition>& partitions)
+void VolumeVerifier::CheckVolumeSize()
 {
-  if (!IsDisc(m_volume.GetVolumeType()))
-    return;
+  u64 volume_size = m_volume.GetSize();
+  const bool is_disc = IsDisc(m_volume.GetVolumeType());
+  const bool should_be_dual_layer = is_disc && ShouldBeDualLayer();
+  const bool is_size_accurate = m_volume.IsSizeAccurate();
+  bool volume_size_roughly_known = is_size_accurate;
 
-  m_biggest_referenced_offset = GetBiggestReferencedOffset(partitions);
-  const bool should_be_dual_layer = ShouldBeDualLayer();
   if (should_be_dual_layer && m_biggest_referenced_offset <= SL_DVD_R_SIZE)
   {
     AddProblem(Severity::Medium,
@@ -750,21 +753,44 @@ void VolumeVerifier::CheckDiscSize(const std::vector<Partition>& partitions)
                    "This problem generally only exists in illegal copies of games."));
   }
 
-  if (!m_volume.IsSizeAccurate())
+  if (!is_size_accurate)
   {
     AddProblem(Severity::Low,
                Common::GetStringT("The format that the disc image is saved in does not "
                                   "store the size of the disc image."));
+
+    if (m_volume.SupportsIntegrityCheck())
+    {
+      volume_size = m_biggest_verified_offset;
+      volume_size_roughly_known = true;
+    }
   }
-  else if (!m_is_tgc)
+
+  if (m_content_index != m_content_offsets.size() || m_group_index != m_groups.size() ||
+      (volume_size_roughly_known && m_biggest_referenced_offset > volume_size))
+  {
+    const bool second_layer_missing = is_disc && volume_size_roughly_known &&
+                                      volume_size >= SL_DVD_SIZE && volume_size <= SL_DVD_R_SIZE;
+    std::string text =
+        second_layer_missing ?
+            Common::GetStringT("This disc image is too small and lacks some data. The problem is "
+                               "most likely that this is a dual-layer disc that has been dumped "
+                               "as a single-layer disc.") :
+            Common::GetStringT("This disc image is too small and lacks some data. If your "
+                               "dumping program saved the disc image as several parts, you need "
+                               "to merge them into one file.");
+    AddProblem(Severity::High, std::move(text));
+    return;
+  }
+
+  if (is_disc && is_size_accurate && !m_is_tgc)
   {
     const Platform platform = m_volume.GetVolumeType();
     const bool should_be_gc_size = platform == Platform::GameCubeDisc || m_is_datel;
-    const u64 size = m_volume.GetSize();
 
-    const bool valid_gamecube = size == MINI_DVD_SIZE;
-    const bool valid_retail_wii = size == SL_DVD_SIZE || size == DL_DVD_SIZE;
-    const bool valid_debug_wii = size == SL_DVD_R_SIZE || size == DL_DVD_R_SIZE;
+    const bool valid_gamecube = volume_size == MINI_DVD_SIZE;
+    const bool valid_retail_wii = volume_size == SL_DVD_SIZE || volume_size == DL_DVD_SIZE;
+    const bool valid_debug_wii = volume_size == SL_DVD_R_SIZE || volume_size == DL_DVD_R_SIZE;
 
     const bool debug = IsDebugSigned();
     if ((should_be_gc_size && !valid_gamecube) ||
@@ -786,14 +812,14 @@ void VolumeVerifier::CheckDiscSize(const std::vector<Partition>& partitions)
         else
           normal_size = DL_DVD_SIZE;
 
-        if (size < normal_size)
+        if (volume_size < normal_size)
         {
           AddProblem(
               Severity::Low,
-              Common::GetStringT("This disc image has an unusual size. This will likely make the "
-                                 "emulated loading times longer. When using NetPlay or sending "
-                                 "input recordings to other people, you will likely experience "
-                                 "desyncs if anyone is using a good dump."));
+              Common::GetStringT(
+                  "This disc image has an unusual size. This will likely make the emulated "
+                  "loading times longer. You will likely be unable to share input recordings "
+                  "and use NetPlay with anyone who is using a good dump."));
         }
         else
         {
@@ -801,63 +827,6 @@ void VolumeVerifier::CheckDiscSize(const std::vector<Partition>& partitions)
         }
       }
     }
-  }
-}
-
-u64 VolumeVerifier::GetBiggestReferencedOffset(const std::vector<Partition>& partitions) const
-{
-  const u64 disc_header_size = m_volume.GetVolumeType() == Platform::GameCubeDisc ? 0x460 : 0x50000;
-  u64 biggest_offset = disc_header_size;
-  for (const Partition& partition : partitions)
-  {
-    if (partition != PARTITION_NONE)
-    {
-      const u64 offset = m_volume.PartitionOffsetToRawOffset(0x440, partition);
-      biggest_offset = std::max(biggest_offset, offset);
-    }
-
-    const std::optional<u64> dol_offset = GetBootDOLOffset(m_volume, partition);
-    if (dol_offset)
-    {
-      const std::optional<u64> dol_size = GetBootDOLSize(m_volume, partition, *dol_offset);
-      if (dol_size)
-      {
-        const u64 offset = m_volume.PartitionOffsetToRawOffset(*dol_offset + *dol_size, partition);
-        biggest_offset = std::max(biggest_offset, offset);
-      }
-    }
-
-    const std::optional<u64> fst_offset = GetFSTOffset(m_volume, partition);
-    const std::optional<u64> fst_size = GetFSTSize(m_volume, partition);
-    if (fst_offset && fst_size)
-    {
-      const u64 offset = m_volume.PartitionOffsetToRawOffset(*fst_offset + *fst_size, partition);
-      biggest_offset = std::max(biggest_offset, offset);
-    }
-
-    const FileSystem* fs = m_volume.GetFileSystem(partition);
-    if (fs)
-    {
-      const u64 offset =
-          m_volume.PartitionOffsetToRawOffset(GetBiggestReferencedOffset(fs->GetRoot()), partition);
-      biggest_offset = std::max(biggest_offset, offset);
-    }
-  }
-  return biggest_offset;
-}
-
-u64 VolumeVerifier::GetBiggestReferencedOffset(const FileInfo& file_info) const
-{
-  if (file_info.IsDirectory())
-  {
-    u64 biggest_offset = 0;
-    for (const FileInfo& f : file_info)
-      biggest_offset = std::max(biggest_offset, GetBiggestReferencedOffset(f));
-    return biggest_offset;
-  }
-  else
-  {
-    return file_info.GetOffset() + file_info.GetSize();
   }
 }
 
@@ -882,10 +851,8 @@ void VolumeVerifier::CheckMisc()
         // Hacked version of the Wii Backup Disc (aka "pinkfish" disc).
         std::string proper_game_id = game_id_unencrypted;
         proper_game_id[0] = '4';
-        AddProblem(
-            Severity::Low,
-            StringFromFormat(Common::GetStringT("The game ID is %s but should be %s.").c_str(),
-                             game_id_unencrypted.c_str(), proper_game_id.c_str()));
+        AddProblem(Severity::Low, Common::FmtFormatT("The game ID is {0} but should be {1}.",
+                                                     game_id_unencrypted, proper_game_id));
         inconsistent_game_id = false;
       }
     }
@@ -939,9 +906,9 @@ void VolumeVerifier::CheckMisc()
     if (region == Region::NTSC_K && ios_id < 40 && ios_id != 4 && ios_id != 9 && ios_id != 21 &&
         ios_id != 37)
     {
-      // This is intended to catch pirated Korean games that have had the IOS slot set to 36
-      // as a side effect of having to fakesign after changing the common key slot to 0.
-      // (IOS36 was the last IOS to have the Trucha bug.) https://bugs.dolphin-emu.org/issues/10319
+      // This is intended to catch Korean games (usually but not always pirated) that have the IOS
+      // slot set to 36 as a side effect of having to fakesign after changing the common key slot to
+      // 0. (IOS36 was the last IOS with the Trucha bug.) https://bugs.dolphin-emu.org/issues/10319
       AddProblem(
           Severity::High,
           // i18n: You may want to leave the term "ERROR #002" untranslated,
@@ -952,7 +919,7 @@ void VolumeVerifier::CheckMisc()
 
     if (ios_id >= 0x80)
     {
-      // This is also intended to catch fakesigned pirated Korean games,
+      // This is intended to catch the same kind of fakesigned Korean games,
       // but this time with the IOS slot set to cIOS instead of IOS36.
       AddProblem(Severity::High, Common::GetStringT("This title is set to use an invalid IOS."));
     }
@@ -979,31 +946,53 @@ void VolumeVerifier::CheckMisc()
       {
         // Many fakesigned WADs have the common key index set to a (random?) bogus value.
         // For WADs, Dolphin will detect this and use the correct key, making this low severity.
-        std::string text = StringFromFormat(
-            // i18n: This is "common" as in "shared", not the opposite of "uncommon"
-            Common::GetStringT("The specified common key index is %u but should be %u.").c_str(),
-            specified_common_key_index, fixed_common_key_index);
-        AddProblem(Severity::Low, std::move(text));
+        AddProblem(Severity::Low,
+                   // i18n: This is "common" as in "shared", not the opposite of "uncommon"
+                   Common::FmtFormatT("The specified common key index is {0} but should be {1}.",
+                                      specified_common_key_index, fixed_common_key_index));
       }
     }
   }
 
-  if (IsDisc(m_volume.GetVolumeType()))
+  if (m_volume.GetVolumeType() == Platform::WiiWAD)
   {
-    constexpr u32 NKIT_MAGIC = 0x4E4B4954;  // "NKIT"
-    if (m_volume.ReadSwapped<u32>(0x200, PARTITION_NONE) == NKIT_MAGIC)
+    IOS::HLE::Kernel ios;
+    const auto es = ios.GetES();
+    const std::vector<u8>& cert_chain = m_volume.GetCertificateChain(PARTITION_NONE);
+
+    if (IOS::HLE::IPC_SUCCESS !=
+        es->VerifyContainer(IOS::HLE::ESDevice::VerifyContainerType::Ticket,
+                            IOS::HLE::ESDevice::VerifyMode::DoNotUpdateCertStore, m_ticket,
+                            cert_chain))
     {
-      AddProblem(
-          Severity::Low,
-          Common::GetStringT("This disc image is in the NKit format. It is not a good dump in its "
-                             "current form, but it might become a good dump if converted back. "
-                             "The CRC32 of this file might match the CRC32 of a good dump even "
-                             "though the files are not identical."));
+      // i18n: "Ticket" here is a kind of digital authorization to use a certain title (e.g. a game)
+      AddProblem(Severity::Low, Common::GetStringT("The ticket is not correctly signed."));
     }
 
-    if (StringBeginsWith(game_id_unencrypted, "R8P"))
-      CheckSuperPaperMario();
+    if (IOS::HLE::IPC_SUCCESS !=
+        es->VerifyContainer(IOS::HLE::ESDevice::VerifyContainerType::TMD,
+                            IOS::HLE::ESDevice::VerifyMode::DoNotUpdateCertStore, tmd, cert_chain))
+    {
+      AddProblem(
+          Severity::Medium,
+          Common::GetStringT("The TMD is not correctly signed. If you move or copy this title to "
+                             "the SD Card, the Wii System Menu will not launch it anymore and will "
+                             "also refuse to copy or move it back to the NAND."));
+    }
   }
+
+  if (m_volume.IsNKit())
+  {
+    AddProblem(
+        Severity::Low,
+        Common::GetStringT("This disc image is in the NKit format. It is not a good dump in its "
+                           "current form, but it might become a good dump if converted back. "
+                           "The CRC32 of this file might match the CRC32 of a good dump even "
+                           "though the files are not identical."));
+  }
+
+  if (IsDisc(m_volume.GetVolumeType()) && StringBeginsWith(game_id_unencrypted, "R8P"))
+    CheckSuperPaperMario();
 }
 
 void VolumeVerifier::CheckSuperPaperMario()
@@ -1048,8 +1037,8 @@ void VolumeVerifier::SetUpHashing()
     m_scrubber.SetupScrub(&m_volume);
   }
 
-  std::sort(m_blocks.begin(), m_blocks.end(),
-            [](const BlockToVerify& b1, const BlockToVerify& b2) { return b1.offset < b2.offset; });
+  std::sort(m_groups.begin(), m_groups.end(),
+            [](const GroupToVerify& a, const GroupToVerify& b) { return a.offset < b.offset; });
 
   if (m_hashes_to_calculate.crc32)
     m_crc32_context = crc32(0, nullptr, 0);
@@ -1077,17 +1066,26 @@ void VolumeVerifier::WaitForAsyncOperations() const
     m_sha1_future.wait();
   if (m_content_future.valid())
     m_content_future.wait();
-  if (m_block_future.valid())
-    m_block_future.wait();
+  if (m_group_future.valid())
+    m_group_future.wait();
 }
 
 bool VolumeVerifier::ReadChunkAndWaitForAsyncOperations(u64 bytes_to_read)
 {
   std::vector<u8> data(bytes_to_read);
+
+  const u64 bytes_to_copy = std::min(m_excess_bytes, bytes_to_read);
+  if (bytes_to_copy > 0)
+    std::memcpy(data.data(), m_data.data() + m_data.size() - m_excess_bytes, bytes_to_copy);
+  bytes_to_read -= bytes_to_copy;
+
+  if (bytes_to_read > 0)
   {
-    std::lock_guard lk(m_volume_mutex);
-    if (!m_volume.Read(m_progress, bytes_to_read, data.data(), PARTITION_NONE))
+    if (!m_volume.Read(m_progress + bytes_to_copy, bytes_to_read, data.data() + bytes_to_copy,
+                       PARTITION_NONE))
+    {
       return false;
+    }
   }
 
   WaitForAsyncOperations();
@@ -1105,65 +1103,91 @@ void VolumeVerifier::Process()
 
   IOS::ES::Content content{};
   bool content_read = false;
-  bool block_read = false;
-  u64 bytes_to_read = BLOCK_SIZE;
+  bool group_read = false;
+  u64 bytes_to_read = DEFAULT_READ_SIZE;
+  u64 excess_bytes = 0;
   if (m_content_index < m_content_offsets.size() &&
       m_content_offsets[m_content_index] == m_progress)
   {
     m_volume.GetTMD(PARTITION_NONE).GetContent(m_content_index, &content);
     bytes_to_read = Common::AlignUp(content.size, 0x40);
     content_read = true;
+
+    if (m_content_index + 1 < m_content_offsets.size() &&
+        m_content_offsets[m_content_index + 1] < m_progress + bytes_to_read)
+    {
+      excess_bytes = m_progress + bytes_to_read - m_content_offsets[m_content_index + 1];
+    }
   }
   else if (m_content_index < m_content_offsets.size() &&
            m_content_offsets[m_content_index] > m_progress)
   {
     bytes_to_read = std::min(bytes_to_read, m_content_offsets[m_content_index] - m_progress);
   }
-  else if (m_block_index < m_blocks.size() && m_blocks[m_block_index].offset == m_progress)
+  else if (m_group_index < m_groups.size() && m_groups[m_group_index].offset == m_progress)
   {
-    bytes_to_read = VolumeWii::BLOCK_TOTAL_SIZE;
-    block_read = true;
-  }
-  else if (m_block_index < m_blocks.size() && m_blocks[m_block_index].offset > m_progress)
-  {
-    bytes_to_read = std::min(bytes_to_read, m_blocks[m_block_index].offset - m_progress);
-  }
-  bytes_to_read = std::min(bytes_to_read, m_max_progress - m_progress);
+    const size_t blocks =
+        m_groups[m_group_index].block_index_end - m_groups[m_group_index].block_index_start;
+    bytes_to_read = VolumeWii::BLOCK_TOTAL_SIZE * blocks;
+    group_read = true;
 
-  const bool is_data_needed = m_calculating_any_hash || content_read || block_read;
+    if (m_group_index + 1 < m_groups.size() &&
+        m_groups[m_group_index + 1].offset < m_progress + bytes_to_read)
+    {
+      excess_bytes = m_progress + bytes_to_read - m_groups[m_group_index + 1].offset;
+    }
+  }
+  else if (m_group_index < m_groups.size() && m_groups[m_group_index].offset > m_progress)
+  {
+    bytes_to_read = std::min(bytes_to_read, m_groups[m_group_index].offset - m_progress);
+  }
+
+  if (m_progress + bytes_to_read > m_max_progress)
+  {
+    const u64 bytes_over_max = m_progress + bytes_to_read - m_max_progress;
+    bytes_to_read -= bytes_over_max;
+    if (excess_bytes < bytes_over_max)
+      excess_bytes = 0;
+    else
+      excess_bytes -= bytes_over_max;
+  }
+
+  const bool is_data_needed = m_calculating_any_hash || content_read || group_read;
   const bool read_succeeded = is_data_needed && ReadChunkAndWaitForAsyncOperations(bytes_to_read);
 
   if (!read_succeeded)
   {
-    ERROR_LOG(DISCIO, "Read failed at 0x%" PRIx64 " to 0x%" PRIx64, m_progress,
-              m_progress + bytes_to_read);
+    ERROR_LOG_FMT(DISCIO, "Read failed at {:#x} to {:#x}", m_progress, m_progress + bytes_to_read);
 
     m_read_errors_occurred = true;
     m_calculating_any_hash = false;
   }
 
+  m_excess_bytes = excess_bytes;
+  const u64 byte_increment = bytes_to_read - excess_bytes;
+
   if (m_calculating_any_hash)
   {
     if (m_hashes_to_calculate.crc32)
     {
-      m_crc32_future = std::async(std::launch::async, [this] {
+      m_crc32_future = std::async(std::launch::async, [this, byte_increment] {
         // It would be nice to use crc32_z here instead of crc32, but it isn't available on Android
         m_crc32_context =
-            crc32(m_crc32_context, m_data.data(), static_cast<unsigned int>(m_data.size()));
+            crc32(m_crc32_context, m_data.data(), static_cast<unsigned int>(byte_increment));
       });
     }
 
     if (m_hashes_to_calculate.md5)
     {
-      m_md5_future = std::async(std::launch::async, [this] {
-        mbedtls_md5_update_ret(&m_md5_context, m_data.data(), m_data.size());
+      m_md5_future = std::async(std::launch::async, [this, byte_increment] {
+        mbedtls_md5_update_ret(&m_md5_context, m_data.data(), byte_increment);
       });
     }
 
     if (m_hashes_to_calculate.sha1)
     {
-      m_sha1_future = std::async(std::launch::async, [this] {
-        mbedtls_sha1_update_ret(&m_sha1_context, m_data.data(), m_data.size());
+      m_sha1_future = std::async(std::launch::async, [this, byte_increment] {
+        mbedtls_sha1_update_ret(&m_sha1_context, m_data.data(), byte_increment);
       });
     }
   }
@@ -1173,70 +1197,50 @@ void VolumeVerifier::Process()
     m_content_future = std::async(std::launch::async, [this, read_succeeded, content] {
       if (!read_succeeded || !m_volume.CheckContentIntegrity(content, m_data, m_ticket))
       {
-        AddProblem(
-            Severity::High,
-            StringFromFormat(Common::GetStringT("Content %08x is corrupt.").c_str(), content.id));
+        AddProblem(Severity::High, Common::FmtFormatT("Content {0:08x} is corrupt.", content.id));
       }
     });
 
     m_content_index++;
   }
 
-  if (m_block_index < m_blocks.size() &&
-      m_blocks[m_block_index].offset < m_progress + bytes_to_read)
+  if (group_read)
   {
-    m_block_future = std::async(
-        std::launch::async,
-        [this, read_succeeded, bytes_to_read](size_t block_index, u64 progress) {
-          while (block_index < m_blocks.size() &&
-                 m_blocks[block_index].offset < progress + bytes_to_read)
+    m_group_future = std::async(std::launch::async, [this, read_succeeded,
+                                                     group_index = m_group_index] {
+      const GroupToVerify& group = m_groups[group_index];
+      u64 offset_in_group = 0;
+      for (u64 block_index = group.block_index_start; block_index < group.block_index_end;
+           ++block_index, offset_in_group += VolumeWii::BLOCK_TOTAL_SIZE)
+      {
+        const u64 block_offset = group.offset + offset_in_group;
+
+        if (read_succeeded && m_volume.CheckBlockIntegrity(
+                                  block_index, m_data.data() + offset_in_group, group.partition))
+        {
+          m_biggest_verified_offset =
+              std::max(m_biggest_verified_offset, block_offset + VolumeWii::BLOCK_TOTAL_SIZE);
+        }
+        else
+        {
+          if (m_scrubber.CanBlockBeScrubbed(block_offset))
           {
-            bool success;
-            if (m_blocks[block_index].offset == progress)
-            {
-              success = read_succeeded &&
-                        m_volume.CheckBlockIntegrity(m_blocks[block_index].block_index, m_data,
-                                                     m_blocks[block_index].partition);
-            }
-            else
-            {
-              std::lock_guard lk(m_volume_mutex);
-              success = m_volume.CheckBlockIntegrity(m_blocks[block_index].block_index,
-                                                     m_blocks[block_index].partition);
-            }
-
-            const u64 offset = m_blocks[block_index].offset;
-            if (success)
-            {
-              m_biggest_verified_offset =
-                  std::max(m_biggest_verified_offset, offset + VolumeWii::BLOCK_TOTAL_SIZE);
-            }
-            else
-            {
-              if (m_scrubber.CanBlockBeScrubbed(offset))
-              {
-                WARN_LOG(DISCIO, "Integrity check failed for unused block at 0x%" PRIx64, offset);
-                m_unused_block_errors[m_blocks[block_index].partition]++;
-              }
-              else
-              {
-                WARN_LOG(DISCIO, "Integrity check failed for block at 0x%" PRIx64, offset);
-                m_block_errors[m_blocks[block_index].partition]++;
-              }
-            }
-            block_index++;
+            WARN_LOG_FMT(DISCIO, "Integrity check failed for unused block at {:#x}", block_offset);
+            m_unused_block_errors[group.partition]++;
           }
-        },
-        m_block_index, m_progress);
+          else
+          {
+            WARN_LOG_FMT(DISCIO, "Integrity check failed for block at {:#x}", block_offset);
+            m_block_errors[group.partition]++;
+          }
+        }
+      }
+    });
 
-    while (m_block_index < m_blocks.size() &&
-           m_blocks[m_block_index].offset < m_progress + bytes_to_read)
-    {
-      m_block_index++;
-    }
+    m_group_index++;
   }
 
-  m_progress += bytes_to_read;
+  m_progress += byte_increment;
 }
 
 u64 VolumeVerifier::GetBytesProcessed() const
@@ -1283,43 +1287,16 @@ void VolumeVerifier::Finish()
   if (m_read_errors_occurred)
     AddProblem(Severity::Medium, Common::GetStringT("Some of the data could not be read."));
 
-  bool file_too_small = false;
-
-  if (m_content_index != m_content_offsets.size() || m_block_index != m_blocks.size())
-    file_too_small = true;
-
-  if (IsDisc(m_volume.GetVolumeType()) &&
-      (m_volume.IsSizeAccurate() || m_volume.SupportsIntegrityCheck()))
-  {
-    u64 volume_size = m_volume.IsSizeAccurate() ? m_volume.GetSize() : m_biggest_verified_offset;
-    if (m_biggest_referenced_offset > volume_size)
-      file_too_small = true;
-  }
-
-  if (file_too_small)
-  {
-    const bool second_layer_missing =
-        m_biggest_referenced_offset > SL_DVD_SIZE && m_volume.GetSize() >= SL_DVD_SIZE;
-    std::string text =
-        second_layer_missing ?
-            Common::GetStringT("This disc image is too small and lacks some data. The problem is "
-                               "most likely that this is a dual-layer disc that has been dumped "
-                               "as a single-layer disc.") :
-            Common::GetStringT("This disc image is too small and lacks some data. If your "
-                               "dumping program saved the disc image as several parts, you need "
-                               "to merge them into one file.");
-    AddProblem(Severity::High, std::move(text));
-  }
+  CheckVolumeSize();
 
   for (auto [partition, blocks] : m_block_errors)
   {
     if (blocks > 0)
     {
       const std::string name = GetPartitionName(m_volume.GetPartitionType(partition));
-      std::string text = StringFromFormat(
-          Common::GetStringT("Errors were found in %zu blocks in the %s partition.").c_str(),
-          blocks, name.c_str());
-      AddProblem(Severity::Medium, std::move(text));
+      AddProblem(Severity::Medium,
+                 Common::FmtFormatT("Errors were found in {0} blocks in the {1} partition.", blocks,
+                                    name));
     }
   }
 
@@ -1328,10 +1305,9 @@ void VolumeVerifier::Finish()
     if (blocks > 0)
     {
       const std::string name = GetPartitionName(m_volume.GetPartitionType(partition));
-      std::string text = StringFromFormat(
-          Common::GetStringT("Errors were found in %zu unused blocks in the %s partition.").c_str(),
-          blocks, name.c_str());
-      AddProblem(Severity::Low, std::move(text));
+      AddProblem(Severity::Low,
+                 Common::FmtFormatT("Errors were found in {0} unused blocks in the {1} partition.",
+                                    blocks, name));
     }
   }
 

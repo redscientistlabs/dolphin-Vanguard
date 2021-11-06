@@ -1,6 +1,5 @@
 // Copyright 2019 Dolphin Emulator Project
-// Licensed under GPLv2+
-// Refer to the license.txt file included.
+// SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <fstream>
 #include <wrl/client.h>
@@ -119,15 +118,15 @@ std::optional<Shader::BinaryData> Shader::CompileShader(D3D_FEATURE_LEVEL featur
     file << "Video Backend: " + g_video_backend->GetDisplayName();
     file.close();
 
-    PanicAlert("Failed to compile %s:\nDebug info (%s):\n%s", filename.c_str(), target,
-               static_cast<const char*>(errors->GetBufferPointer()));
+    PanicAlertFmt("Failed to compile {}:\nDebug info ({}):\n{}", filename, target,
+                  static_cast<const char*>(errors->GetBufferPointer()));
     return std::nullopt;
   }
 
   if (errors && errors->GetBufferSize() > 0)
   {
-    WARN_LOG(VIDEO, "%s compilation succeeded with warnings:\n%s", target,
-             static_cast<const char*>(errors->GetBufferPointer()));
+    WARN_LOG_FMT(VIDEO, "{} compilation succeeded with warnings:\n{}", target,
+                 static_cast<const char*>(errors->GetBufferPointer()));
   }
 
   return CreateByteCode(code->GetBufferPointer(), code->GetBufferSize());

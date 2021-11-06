@@ -1,12 +1,12 @@
 // Copyright 2020 Dolphin Emulator Project
-// Licensed under GPLv2+
-// Refer to the license.txt file included.
+// SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "DiscIO/WIACompression.h"
 
 #include <algorithm>
 #include <cstddef>
 #include <cstring>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -18,6 +18,7 @@
 
 #include "Common/Assert.h"
 #include "Common/CommonTypes.h"
+#include "Common/MathUtil.h"
 #include "Common/Swap.h"
 #include "DiscIO/LaggedFibonacciGenerator.h"
 
@@ -165,18 +166,13 @@ bool Bzip2Decompressor::Decompress(const DecompressionBuffer& in, DecompressionB
     m_started = true;
   }
 
-  constexpr auto clamped_cast = [](size_t x) {
-    return static_cast<unsigned int>(
-        std::min<size_t>(std::numeric_limits<unsigned int>().max(), x));
-  };
-
   char* const in_ptr = reinterpret_cast<char*>(const_cast<u8*>(in.data.data() + *in_bytes_read));
   m_stream.next_in = in_ptr;
-  m_stream.avail_in = clamped_cast(in.bytes_written - *in_bytes_read);
+  m_stream.avail_in = MathUtil::SaturatingCast<u32>(in.bytes_written - *in_bytes_read);
 
   char* const out_ptr = reinterpret_cast<char*>(out->data.data() + out->bytes_written);
   m_stream.next_out = out_ptr;
-  m_stream.avail_out = clamped_cast(out->data.size() - out->bytes_written);
+  m_stream.avail_out = MathUtil::SaturatingCast<u32>(out->data.size() - out->bytes_written);
 
   const int result = BZ2_bzDecompress(&m_stream);
 
@@ -446,7 +442,7 @@ PurgeCompressor::PurgeCompressor()
 
 PurgeCompressor::~PurgeCompressor() = default;
 
-bool PurgeCompressor::Start()
+bool PurgeCompressor::Start(std::optional<u64> size)
 {
   m_buffer.clear();
   m_bytes_written = 0;
@@ -550,7 +546,7 @@ Bzip2Compressor::~Bzip2Compressor()
   BZ2_bzCompressEnd(&m_stream);
 }
 
-bool Bzip2Compressor::Start()
+bool Bzip2Compressor::Start(std::optional<u64> size)
 {
   ASSERT_MSG(DISCIO, m_stream.state == nullptr,
              "Called Bzip2Compressor::Start() twice without calling Bzip2Compressor::End()");
@@ -674,7 +670,7 @@ LZMACompressor::~LZMACompressor()
   lzma_end(&m_stream);
 }
 
-bool LZMACompressor::Start()
+bool LZMACompressor::Start(std::optional<u64> size)
 {
   if (m_initialization_failed)
     return false;
@@ -745,8 +741,11 @@ ZstdCompressor::ZstdCompressor(int compression_level)
 {
   m_stream = ZSTD_createCStream();
 
-  if (ZSTD_isError(ZSTD_CCtx_setParameter(m_stream, ZSTD_c_compressionLevel, compression_level)))
+  if (ZSTD_isError(ZSTD_CCtx_setParameter(m_stream, ZSTD_c_compressionLevel, compression_level)) ||
+      ZSTD_isError(ZSTD_CCtx_setParameter(m_stream, ZSTD_c_contentSizeFlag, 0)))
+  {
     m_stream = nullptr;
+  }
 }
 
 ZstdCompressor::~ZstdCompressor()
@@ -754,7 +753,7 @@ ZstdCompressor::~ZstdCompressor()
   ZSTD_freeCStream(m_stream);
 }
 
-bool ZstdCompressor::Start()
+bool ZstdCompressor::Start(std::optional<u64> size)
 {
   if (!m_stream)
     return false;
@@ -762,7 +761,16 @@ bool ZstdCompressor::Start()
   m_buffer.clear();
   m_out_buffer = {};
 
-  return !ZSTD_isError(ZSTD_CCtx_reset(m_stream, ZSTD_reset_session_only));
+  if (ZSTD_isError(ZSTD_CCtx_reset(m_stream, ZSTD_reset_session_only)))
+    return false;
+
+  if (size)
+  {
+    if (ZSTD_isError(ZSTD_CCtx_setPledgedSrcSize(m_stream, *size)))
+      return false;
+  }
+
+  return true;
 }
 
 bool ZstdCompressor::Compress(const u8* data, size_t size)

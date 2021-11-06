@@ -2,13 +2,19 @@
 # General setup
 #
 cmake_minimum_required(VERSION 3.10)
-set(CMAKE_OSX_ARCHITECTURES "x86_64")
+
 # Minimum OS X version.
 # This is inserted into the Info.plist as well.
 
-# MacOS prior to 10.12 did not fully support C++17, which is used to
-# handle configuration options
-set(CMAKE_OSX_DEPLOYMENT_TARGET "10.12.0" CACHE STRING "")
+# MacOS prior to 10.14 did not support aligned alloc which is used to implement
+# std::unique_ptr in the arm64 C++ standard library. x86_64 builds can override
+# this to 10.13.0 using -DCMAKE_OSX_DEPLOYMENT_TARGET="10.13.0" without issue.
+# This is done in the universal binary building script to build a binary that 
+# runs on 10.13 on x86_64 computers, while still containing an arm64 slice.
+
+set(CMAKE_OSX_DEPLOYMENT_TARGET "10.14.0" CACHE STRING "")
+
+set(CMAKE_USER_MAKE_RULES_OVERRIDE "CMake/FlagsOverride.cmake")
 
 project(dolphin-emu)
 
@@ -17,10 +23,12 @@ project(dolphin-emu)
 # unique name here.
 set(DISTRIBUTOR "None" CACHE STRING "Name of the distributor.")
 
+set(DOLPHIN_DEFAULT_UPDATE_TRACK "" CACHE STRING "Name of the default update track. If empty, disables auto-update.")
+
 if(UNIX AND NOT APPLE AND NOT ANDROID)
   option(ENABLE_X11 "Enables X11 Support" ON)
 endif()
-if(NOT WIN32 AND NOT APPLE)
+if(NOT WIN32 AND NOT APPLE AND NOT HAIKU)
   option(ENABLE_EGL "Enables EGL OpenGL Interface" ON)
 endif()
 
@@ -35,7 +43,9 @@ option(ENABLE_ALSA "Enables ALSA sound backend" ON)
 option(ENABLE_PULSEAUDIO "Enables PulseAudio sound backend" ON)
 option(ENABLE_LLVM "Enables LLVM support, for disassembly" ON)
 option(ENABLE_TESTS "Enables building the unit tests" ON)
+option(ENABLE_VULKAN "Enables vulkan video backend" ON)
 option(USE_DISCORD_PRESENCE "Enables Discord Rich Presence, show the current game on Discord" ON)
+option(USE_MGBA "Enables GBA controllers emulation using libmgba" ON)
 
 # Maintainers: if you consider blanket disabling this for your users, please
 # consider the following points:
@@ -49,7 +59,6 @@ option(ENCODE_FRAMEDUMPS "Encode framedumps in AVI format" ON)
 
 option(ENABLE_GPROF "Enable gprof profiling (must be using Debug build)" OFF)
 option(FASTLOG "Enable all logs" OFF)
-option(GDBSTUB "Enable gdb stub for remote debugging." OFF)
 option(OPROFILING "Enable profiling" OFF)
 
 # TODO: Add DSPSpy
@@ -63,8 +72,12 @@ else()
 endif()
 
 if(APPLE)
-  option(OSX_USE_DEFAULT_SEARCH_PATH "Don't prioritize system library paths" OFF)
-  option(SKIP_POSTPROCESS_BUNDLE "Skip postprocessing bundle for redistributability" OFF)
+  option(MACOS_USE_DEFAULT_SEARCH_PATH "Don't prioritize system library paths" OFF)
+  option(SKIP_POSTPROCESS_BUNDLE "Skip postprocessing bundle for redistributability" OFF) 
+  # Enable adhoc code signing by default (otherwise makefile builds on ARM will not work)
+  option(MACOS_CODE_SIGNING "Enable codesigning" ON)
+  set(MACOS_CODE_SIGNING_IDENTITY "-" CACHE STRING "The identity used for codesigning.")
+  set(MACOS_CODE_SIGNING_IDENTITY_UPDATER "-" CACHE STRING "The identity used for codesigning, for the updater.")
 endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
@@ -114,14 +127,11 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/Binaries)
 if (WIN32)
   set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/Binary)
 
-	if (CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
-	  string(APPEND CMAKE_RUNTIME_OUTPUT_DIRECTORY /ARM64)
+  if (CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
+    string(APPEND CMAKE_RUNTIME_OUTPUT_DIRECTORY /x64)
+  elseif (CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
+    string(APPEND CMAKE_RUNTIME_OUTPUT_DIRECTORY /ARM64)
   endif()
-
-  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
-  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
-  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
-  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 endif()
 
 # setup CCache
@@ -205,7 +215,7 @@ elseif(_ARCH_64 AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
   add_definitions(-D_M_X86=1)
   add_definitions(-D_M_X86_64=1)
   check_and_add_flag(HAVE_SSE2 -msse2)
-elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
+elseif(_ARCH_64 AND CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
   set(_M_ARM_64 1)
   add_definitions(-D_M_ARM_64=1)
   # CRC instruction set is used in the CRC32 hash function
@@ -233,6 +243,12 @@ if(CMAKE_C_COMPILER_ID MATCHES "MSVC")
   check_and_add_flag(EXCEPTIONS /EHsc)
   dolphin_compile_definitions(_DEBUG DEBUG_ONLY)
 
+  # Enable function-level linking
+  add_compile_options(/Gy)
+  # Generate intrinsic functions
+  add_compile_options(/Oi)
+  # Disable buffer security check
+  add_compile_options(/GS-)
   # Enforce C++ standard conforming conversion rules to catch possible bugs
   add_compile_options(/permissive-)
   # Remove unreferenced inline functions/data to reduce link time and catch bugs
@@ -243,27 +259,21 @@ if(CMAKE_C_COMPILER_ID MATCHES "MSVC")
   add_compile_options(/volatile:iso)
   # Fix non-conformant lambda behavior (constexpr variables shouldn't need capturing)
   add_compile_options(/experimental:newLambdaProcessor)
+  # Fix various other non-conformant behaviors
+  add_compile_options(/Zc:externConstexpr,lambda,preprocessor)
+
+  # Temporarily disable warnings to enable /Zc:preprocessor compatibility with WinSDK headers.
+  add_compile_options(
+    /wd5105 # macro expansion producing 'defined' has undefined behavior
+  )
 
   string(APPEND CMAKE_EXE_LINKER_FLAGS " /NXCOMPAT")
+  # Generate debug data
+  string(APPEND CMAKE_EXE_LINKER_FLAGS " /DEBUG")
+  # Eliminate dead code and data
+  string(APPEND CMAKE_EXE_LINKER_FLAGS " /OPT:REF /OPT:ICF")
 else()
   add_definitions(-D_DEFAULT_SOURCE)
-  check_and_add_flag(HAVE_WALL -Wall)
-  # TODO: would like these but they produce overwhelming amounts of warnings
-  #check_and_add_flag(EXTRA -Wextra)
-  #check_and_add_flag(MISSING_FIELD_INITIALIZERS -Wmissing-field-initializers)
-  #check_and_add_flag(SWITCH_DEFAULT -Wswitch-default)
-  #check_and_add_flag(FLOAT_EQUAL -Wfloat-equal)
-  #check_and_add_flag(CONVERSION -Wconversion)
-  #check_and_add_flag(ZERO_AS_NULL_POINTER_CONSTANT -Wzero-as-null-pointer-constant)
-  check_and_add_flag(TYPE_LIMITS -Wtype-limits)
-  check_and_add_flag(SIGN_COMPARE -Wsign-compare)
-  check_and_add_flag(IGNORED_QUALIFIERS -Wignored-qualifiers)
-  check_and_add_flag(UNINITIALIZED -Wuninitialized)
-  check_and_add_flag(LOGICAL_OP -Wlogical-op)
-  check_and_add_flag(SHADOW -Wshadow)
-  check_and_add_flag(INIT_SELF -Winit-self)
-  check_and_add_flag(MISSING_DECLARATIONS -Wmissing-declarations)
-  check_and_add_flag(MISSING_VARIABLE_DECLARATIONS -Wmissing-variable-declarations)
 
   # gcc uses some optimizations which might break stuff without this flag
   check_and_add_flag(NO_STRICT_ALIASING -fno-strict-aliasing)
@@ -288,7 +298,7 @@ else()
 endif()
 
 if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
-  if(NOT OSX_USE_DEFAULT_SEARCH_PATH)
+  if(NOT MACOS_USE_DEFAULT_SEARCH_PATH)
     # Hack up the path to prioritize the path to built-in OS libraries to
     # increase the chance of not depending on a bunch of copies of them
     # installed by MacPorts, Fink, Homebrew, etc, and ending up copying
@@ -300,13 +310,22 @@ if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
     list(APPEND CMAKE_PREFIX_PATH "/usr")
   endif()
 
-  # Specify target CPUs.
-  check_and_add_flag(HAVE_MSSSE3 -mssse3)
-  check_and_add_flag(HAVE_ARCH_CORE2 -march=core2)
+  # Prevents Xcode from overriding the -fno-strict-aliasing flag
+  set(CMAKE_XCODE_ATTRIBUTE_GCC_STRICT_ALIASING NO)
 
+  # Specify target CPUs.
+  if(_ARCH_64 AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64")
+    check_and_add_flag(HAVE_MSSSE3 -mssse3)
+    check_and_add_flag(HAVE_ARCH_CORE2 -march=core2)
+  endif()
   # Linker flags.
   # Drop unreachable code and data.
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-dead_strip,-dead_strip_dylibs")
+
+  # Set FMT_EXCEPTIONS = 0, for consistency with -fno-exceptions earlier.
+  # If we set only -fno-exceptions, fmt fails to compile when included from
+  # Objective-C++ because fmt tries try to use throw because __EXCEPTIONS is defined.
+  add_definitions(-DFMT_EXCEPTIONS=0)
 
   find_library(APPKIT_LIBRARY AppKit)
   find_library(APPSERV_LIBRARY ApplicationServices)
@@ -322,10 +341,15 @@ if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
 endif()
 
 if(ENABLE_LTO)
-  check_and_add_flag(LTO -flto)
-  if(CMAKE_CXX_COMPILER_ID STREQUAL GNU)
-    set(CMAKE_AR gcc-ar)
-    set(CMAKE_RANLIB gcc-ranlib)
+  if(CMAKE_C_COMPILER_ID MATCHES "MSVC")
+    add_compile_options(/GL)
+    string(APPEND CMAKE_EXE_LINKER_FLAGS " /LTCG")
+  else()
+    check_and_add_flag(LTO -flto)
+    if(CMAKE_CXX_COMPILER_ID STREQUAL GNU)
+      set(CMAKE_AR gcc-ar)
+      set(CMAKE_RANLIB gcc-ranlib)
+    endif()
   endif()
 endif()
 
@@ -362,10 +386,6 @@ endif()
 
 if(FASTLOG)
   add_definitions(-DDEBUGFAST)
-endif()
-
-if(GDBSTUB)
-  add_definitions(-DUSE_GDBSTUB)
 endif()
 
 if(ENABLE_VTUNE)
@@ -441,8 +461,6 @@ if(ENABLE_X11)
     check_lib(XRANDR xrandr Xrandr)
     if(XRANDR_FOUND)
       add_definitions(-DHAVE_XRANDR=1)
-    else()
-      add_definitions(-DHAVE_XRANDR=0)
     endif()
     pkg_check_modules(X11_INPUT REQUIRED xi>=1.5.0)
     message(STATUS "X11 support enabled")
@@ -465,8 +483,14 @@ if(ENCODE_FRAMEDUMPS)
   if(WIN32 AND _M_X86_64)
     set(FFMPEG_DIR Externals/ffmpeg)
   endif()
-  find_package(FFmpeg COMPONENTS avcodec avformat avutil swscale)
+  find_package(FFmpeg COMPONENTS avcodec avformat avutil swresample swscale)
   if(FFmpeg_FOUND)
+    if(APPLE) 
+      find_library(COREMEDIA_LIBRARY CoreMedia)
+      find_library(VIDEOTOOLBOX_LIBRARY VideoToolbox)
+      find_library(COREVIDEO_LIBRARY CoreVideo)
+      find_library(AUDIOTOOLBOX_LIBRARY AudioToolbox)
+    endif()
     message(STATUS "libav/ffmpeg found, enabling AVI frame dumps")
     add_definitions(-DHAVE_FFMPEG)
   else()
@@ -485,8 +509,8 @@ if(OPROFILING)
 endif()
 
 if(ENABLE_EVDEV)
-  find_package(Libudev REQUIRED)
-  find_package(Libevdev REQUIRED)
+  find_package(LIBUDEV REQUIRED)
+  find_package(LIBEVDEV REQUIRED)
   if(LIBUDEV_FOUND AND LIBEVDEV_FOUND)
     message(STATUS "libevdev/libudev found, enabling evdev controller backend")
     add_definitions(-DHAVE_LIBUDEV=1)
@@ -535,7 +559,8 @@ if (_M_X86)
   add_subdirectory(Externals/Bochs_disasm)
 endif()
 add_subdirectory(Externals/cpp-optparse)
-find_package(fmt 6.0)
+
+find_package(fmt 7.1)
 if(fmt_FOUND)
   message(STATUS "Using shared fmt ${fmt_VERSION}")
 else()
@@ -543,8 +568,17 @@ else()
   message(STATUS "Using static fmt from Externals")
   add_subdirectory(Externals/fmt EXCLUDE_FROM_ALL)
 endif()
-add_subdirectory(Externals/glslang)
 add_subdirectory(Externals/imgui)
+add_subdirectory(Externals/glslang)
+
+if(ENABLE_VULKAN)
+  add_definitions(-DHAS_VULKAN)
+endif()
+
+if(NOT WIN32 OR (NOT (CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")))
+  # OpenGL is available on all platforms except windows-arm64
+  add_definitions(-DHAS_OPENGL)
+endif()
 
 find_package(pugixml)
 if(NOT pugixml_FOUND)
@@ -610,12 +644,17 @@ else()
   add_subdirectory(Externals/liblzma)
 endif()
 
-pkg_search_module(ZSTD QUIET libzstd)
-if(ZSTD_FOUND)
-  message(STATUS "Using shared zstd")
+pkg_check_modules(ZSTD QUIET libzstd>=1.4.0)
+check_include_file(zstd.h HAVE_ZSTD_H)
+if(ZSTD_FOUND AND HAVE_ZSTD_H)
+  message(STATUS "Using shared zstd version: " ${ZSTD_VERSION})
 else()
   check_vendoring_approved(zstd)
-  message(STATUS "Shared zstd not found, falling back to the static library")
+  if(ZSTD_FOUND AND NOT HAVE_ZSTD_H)
+    message(STATUS "Shared zstd found but lacks headers, falling back to the static library")
+  else()
+    message(STATUS "Shared zstd not found, falling back to the static library")
+  endif()
   add_subdirectory(Externals/zstd)
 endif()
 
@@ -679,7 +718,7 @@ endif()
 add_subdirectory(Externals/soundtouch)
 include_directories(Externals/soundtouch)
 
-find_package(Cubeb)
+find_package(CUBEB)
 if(CUBEB_FOUND)
   message(STATUS "Using the system cubeb")
 else()
@@ -721,7 +760,7 @@ endif()
 
 if(USE_UPNP)
   if(NOT APPLE)
-    find_package(Miniupnpc)
+    find_package(MINIUPNPC)
   endif()
   if(MINIUPNPC_FOUND AND MINIUPNPC_API_VERSION GREATER 8)
     message(STATUS "Using shared miniupnpc")
@@ -734,7 +773,7 @@ if(USE_UPNP)
 endif()
 
 if(NOT APPLE)
-  find_package(MbedTLS)
+  find_package(MBEDTLS)
 endif()
 if(MBEDTLS_FOUND)
   message(STATUS "Using shared mbed TLS")
@@ -785,11 +824,19 @@ endif()
 
 if(USE_DISCORD_PRESENCE)
   message(STATUS "Using static DiscordRPC from Externals")
-  add_subdirectory(Externals/discord-rpc)
+  add_subdirectory(Externals/discord-rpc EXCLUDE_FROM_ALL)
   include_directories(Externals/discord-rpc/include)
 endif()
 
-find_package(Libsystemd)
+if(NOT ENABLE_QT)
+  set(USE_MGBA 0)
+endif()
+if(USE_MGBA)
+  message(STATUS "Using static libmgba from Externals")
+  add_subdirectory(Externals/mGBA)
+endif()
+
+find_package(SYSTEMD)
 if(SYSTEMD_FOUND)
   message(STATUS "libsystemd found, enabling traversal server watchdog support")
   add_definitions(-DHAVE_LIBSYSTEMD)
@@ -798,10 +845,13 @@ else()
 endif()
 
 if (WIN32)
+  include_directories(Externals/WIL/include)
   include_directories(Externals/OpenAL/include)
 endif()
 
 include_directories(Externals/picojson)
+
+add_subdirectory(Externals/rangeset)
 
 ########################################
 # Pre-build events: Define configuration variables and write SCM info header
@@ -823,6 +873,8 @@ include_directories("${PROJECT_BINARY_DIR}/Source/Core")
 #
 if(ENABLE_TESTS)
   message(STATUS "Using static gtest from Externals")
+  # Force gtest to link the C runtime dynamically on Windows in order to avoid runtime mismatches.
+  set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
   add_subdirectory(Externals/gtest EXCLUDE_FROM_ALL)
 else()
   message(STATUS "Unit tests are disabled")
@@ -873,6 +925,10 @@ set(CPACK_RPM_PACKAGE_LICENSE GPL-2.0)
 # TODO: CPACK_PACKAGE_ICON
 # TODO: CPACK_NSIS_*
 # TODO: Use CPack components for DSPSpy, etc => cpack_add_component
+
+# Debian Specific. Install dpkg-dev for automatic deps generation
+set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+set(CPACK_DEBIAN_PACKAGE_SECTION "Games")
 
 set(CPACK_SET_DESTDIR ON)
 set(CPACK_SOURCE_GENERATOR "TGZ;TBZ2;ZIP")

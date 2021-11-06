@@ -1,6 +1,5 @@
 // Copyright 2018 Dolphin Emulator Project
-// Licensed under GPLv2+
-// Refer to the license.txt file included.
+// SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "DolphinQt/Debugger/CodeWidget.h"
 
@@ -43,7 +42,7 @@ CodeWidget::CodeWidget(QWidget* parent) : QDockWidget(parent)
   // according to Settings
   setFloating(settings.value(QStringLiteral("codewidget/floating")).toBool());
 
-  connect(&Settings::Instance(), &Settings::CodeVisibilityChanged,
+  connect(&Settings::Instance(), &Settings::CodeVisibilityChanged, this,
           [this](bool visible) { setHidden(!visible); });
 
   connect(Host::GetInstance(), &Host::UpdateDisasmDialog, this, [this] {
@@ -54,7 +53,7 @@ CodeWidget::CodeWidget(QWidget* parent) : QDockWidget(parent)
 
   connect(Host::GetInstance(), &Host::NotifyMapLoaded, this, &CodeWidget::UpdateSymbols);
 
-  connect(&Settings::Instance(), &Settings::DebugModeToggled,
+  connect(&Settings::Instance(), &Settings::DebugModeToggled, this,
           [this](bool enabled) { setHidden(!enabled || !Settings::Instance().IsCodeVisible()); });
 
   connect(&Settings::Instance(), &Settings::EmulationStateChanged, this, &CodeWidget::Update);
@@ -170,6 +169,7 @@ void CodeWidget::ConnectWidgets()
   connect(m_code_view, &CodeViewWidget::SymbolsChanged, this, &CodeWidget::UpdateSymbols);
   connect(m_code_view, &CodeViewWidget::BreakpointsChanged, this,
           [this] { emit BreakpointsChanged(); });
+  connect(m_code_view, &CodeViewWidget::UpdateCodeWidget, this, &CodeWidget::Update);
 
   connect(m_code_view, &CodeViewWidget::RequestPPCComparison, this,
           &CodeWidget::RequestPPCComparison);

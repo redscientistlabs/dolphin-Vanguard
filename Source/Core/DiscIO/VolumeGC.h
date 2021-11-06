@@ -1,6 +1,5 @@
 // Copyright 2008 Dolphin Emulator Project
-// Licensed under GPLv2+
-// Refer to the license.txt file included.
+// SPDX-License-Identifier: GPL-2.0-or-later
 
 #pragma once
 
@@ -50,6 +49,8 @@ public:
   bool IsSizeAccurate() const override;
   u64 GetRawSize() const override;
   const BlobReader& GetBlobReader() const override;
+
+  std::array<u8, 20> GetSyncHash() const override;
 
 private:
   static const u32 GC_BANNER_WIDTH = 96;

@@ -1,13 +1,10 @@
 // Copyright 2009 Dolphin Emulator Project
-// Licensed under GPLv2+
-// Refer to the license.txt file included.
+// SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "DiscIO/DiscScrubber.h"
 
 #include <algorithm>
-#include <cinttypes>
 #include <cstddef>
-#include <cstdio>
 #include <memory>
 #include <optional>
 #include <string>
@@ -16,10 +13,9 @@
 #include "Common/Align.h"
 #include "Common/Assert.h"
 #include "Common/CommonTypes.h"
-#include "Common/File.h"
 #include "Common/Logging/Log.h"
 
-#include "DiscIO/DiscExtractor.h"
+#include "DiscIO/DiscUtils.h"
 #include "DiscIO/Filesystem.h"
 #include "DiscIO/Volume.h"
 
@@ -59,7 +55,7 @@ void DiscScrubber::MarkAsUsed(u64 offset, u64 size)
   u64 current_offset = Common::AlignDown(offset, CLUSTER_SIZE);
   const u64 end_offset = offset + size;
 
-  DEBUG_LOG(DISCIO, "Marking 0x%016" PRIx64 " - 0x%016" PRIx64 " as used", offset, end_offset);
+  DEBUG_LOG_FMT(DISCIO, "Marking {:#018x} - {:#018x} as used", offset, end_offset);
 
   while (current_offset < end_offset && current_offset < m_file_size)
   {
@@ -136,11 +132,16 @@ bool DiscScrubber::ParseDisc()
     u64 h3_offset;
     // The H3 size is always 0x18000
 
-    if (!ReadFromVolume(partition.offset + 0x2a4, tmd_size, PARTITION_NONE) ||
-        !ReadFromVolume(partition.offset + 0x2a8, tmd_offset, PARTITION_NONE) ||
-        !ReadFromVolume(partition.offset + 0x2ac, cert_chain_size, PARTITION_NONE) ||
-        !ReadFromVolume(partition.offset + 0x2b0, cert_chain_offset, PARTITION_NONE) ||
-        !ReadFromVolume(partition.offset + 0x2b4, h3_offset, PARTITION_NONE))
+    if (!ReadFromVolume(partition.offset + WII_PARTITION_TMD_SIZE_ADDRESS, tmd_size,
+                        PARTITION_NONE) ||
+        !ReadFromVolume(partition.offset + WII_PARTITION_TMD_OFFSET_ADDRESS, tmd_offset,
+                        PARTITION_NONE) ||
+        !ReadFromVolume(partition.offset + WII_PARTITION_CERT_CHAIN_SIZE_ADDRESS, cert_chain_size,
+                        PARTITION_NONE) ||
+        !ReadFromVolume(partition.offset + WII_PARTITION_CERT_CHAIN_OFFSET_ADDRESS,
+                        cert_chain_offset, PARTITION_NONE) ||
+        !ReadFromVolume(partition.offset + WII_PARTITION_H3_OFFSET_ADDRESS, h3_offset,
+                        PARTITION_NONE))
     {
       return false;
     }
@@ -149,7 +150,7 @@ bool DiscScrubber::ParseDisc()
 
     MarkAsUsed(partition.offset + tmd_offset, tmd_size);
     MarkAsUsed(partition.offset + cert_chain_offset, cert_chain_size);
-    MarkAsUsed(partition.offset + h3_offset, 0x18000);
+    MarkAsUsed(partition.offset + h3_offset, WII_PARTITION_H3_SIZE);
 
     // Parse Data! This is where the big gain is
     if (!ParsePartitionData(partition))
@@ -165,8 +166,8 @@ bool DiscScrubber::ParsePartitionData(const Partition& partition)
   const FileSystem* filesystem = m_disc->GetFileSystem(partition);
   if (!filesystem)
   {
-    ERROR_LOG(DISCIO, "Failed to read file system for the partition at 0x%" PRIx64,
-              partition.offset);
+    ERROR_LOG_FMT(DISCIO, "Failed to read file system for the partition at {:#x}",
+                  partition.offset);
     return false;
   }
 
@@ -221,7 +222,7 @@ void DiscScrubber::ParseFileSystemData(u64 partition_data_offset, const FileInfo
 {
   for (const DiscIO::FileInfo& file_info : directory)
   {
-    DEBUG_LOG(DISCIO, "Scrubbing %s", file_info.GetPath().c_str());
+    DEBUG_LOG_FMT(DISCIO, "Scrubbing {}", file_info.GetPath());
     if (file_info.IsDirectory())
       ParseFileSystemData(partition_data_offset, file_info);
     else

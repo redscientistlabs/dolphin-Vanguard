@@ -1,12 +1,17 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 package org.dolphinemu.dolphinemu.model;
 
 import android.content.Context;
-import android.os.Environment;
+
+import androidx.annotation.Keep;
 
 public class GameFile
 {
-  private long mPointer;  // Do not rename or move without editing the native code
+  @Keep
+  private long mPointer;
 
+  @Keep
   private GameFile(long pointer)
   {
     mPointer = pointer;
@@ -39,7 +44,9 @@ public class GameFile
 
   public native int getRevision();
 
-  public native String getBlobTypeString();
+  public native int getBlobType();
+
+  public native String getFileFormatName();
 
   public native long getBlockSize();
 
@@ -47,7 +54,13 @@ public class GameFile
 
   public native boolean shouldShowFileFormatDetails();
 
+  public native boolean shouldAllowConversion();
+
   public native long getFileSize();
+
+  public native boolean isDatelDisc();
+
+  public native boolean isNKit();
 
   public native int[] getBanner();
 
