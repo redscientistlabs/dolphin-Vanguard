@@ -93,6 +93,12 @@ public final class SettingsFragmentPresenter
   public void onViewCreated(MenuTag menuTag, Settings settings)
   {
     this.mMenuTag = menuTag;
+
+    if (!TextUtils.isEmpty(mGameID))
+    {
+      mView.getActivity().setTitle(mContext.getString(R.string.game_settings, mGameID));
+    }
+
     setSettings(settings);
   }
 
@@ -122,10 +128,6 @@ public final class SettingsFragmentPresenter
 
   private void loadSettingsList()
   {
-    if (!TextUtils.isEmpty(mGameID))
-    {
-      mView.getActivity().setTitle(mContext.getString(R.string.game_settings, mGameID));
-    }
     ArrayList<SettingsItem> sl = new ArrayList<>();
 
     switch (mMenuTag)
@@ -542,6 +544,8 @@ public final class SettingsFragmentPresenter
     }
     sl.add(new SingleChoiceSetting(mContext, IntSetting.MAIN_CPU_CORE, R.string.cpu_core, 0,
             emuCoresEntries, emuCoresValues));
+    sl.add(new CheckBoxSetting(mContext, BooleanSetting.MAIN_MMU, R.string.mmu_enable,
+            R.string.mmu_enable_description));
     sl.add(new CheckBoxSetting(mContext, BooleanSetting.MAIN_OVERCLOCK_ENABLE,
             R.string.overclock_enable, R.string.overclock_enable_description));
     sl.add(new PercentSliderSetting(mContext, FloatSetting.MAIN_OVERCLOCK, R.string.overclock_title,
@@ -742,6 +746,8 @@ public final class SettingsFragmentPresenter
             R.string.backend_multithreading, R.string.backend_multithreading_description));
     sl.add(new CheckBoxSetting(mContext, BooleanSetting.GFX_HACK_EFB_DEFER_INVALIDATION,
             R.string.defer_efb_invalidation, R.string.defer_efb_invalidation_description));
+    sl.add(new InvertedCheckBoxSetting(mContext, BooleanSetting.GFX_HACK_FAST_TEXTURE_SAMPLING,
+            R.string.manual_texture_sampling, R.string.manual_texture_sampling_description));
     sl.add(new CheckBoxSetting(mContext, BooleanSetting.GFX_INTERNAL_RESOLUTION_FRAME_DUMPS,
             R.string.internal_resolution_dumps, R.string.internal_resolution_dumps_description));
 

@@ -1,6 +1,8 @@
 // Copyright 2016 Dolphin Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include "VideoBackends/Vulkan/VulkanContext.h"
+
 #include <algorithm>
 #include <array>
 #include <cstring>
@@ -11,7 +13,6 @@
 #include "Common/MsgHandler.h"
 #include "Common/StringUtil.h"
 
-#include "VideoBackends/Vulkan/VulkanContext.h"
 #include "VideoCommon/DriverDetails.h"
 #include "VideoCommon/VideoCommon.h"
 
@@ -286,6 +287,8 @@ void VulkanContext::PopulateBackendInfo(VideoConfig* config)
   config->backend_info.bSupportsLogicOp = false;                   // Dependent on features.
   config->backend_info.bSupportsLargePoints = false;               // Dependent on features.
   config->backend_info.bSupportsFramebufferFetch = false;          // No support.
+  config->backend_info.bSupportsCoarseDerivatives = true;          // Assumed support.
+  config->backend_info.bSupportsTextureQueryLevels = true;         // Assumed support.
 }
 
 void VulkanContext::PopulateBackendInfoAdapters(VideoConfig* config, const GPUList& gpu_list)

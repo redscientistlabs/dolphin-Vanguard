@@ -1,3 +1,6 @@
+// Copyright 2016 Dolphin Emulator Project
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 #include "Core/DolphinAnalytics.h"
 
 #include <array>
@@ -424,7 +427,7 @@ void DolphinAnalytics::MakePerGameBuilder()
   // Controller information
   // We grab enough to tell what percentage of our users are playing with keyboard/mouse, some kind
   // of gamepad
-  // or the official gamecube adapter.
+  // or the official GameCube adapter.
   builder.AddData("gcadapter-detected", GCAdapter::IsDetected(nullptr));
   builder.AddData("has-controller", Pad::GetConfig()->IsControllerControlledByGamepadDevice(0) ||
                                         GCAdapter::IsDetected(nullptr));

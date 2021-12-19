@@ -1,6 +1,8 @@
 // Copyright 2008 Dolphin Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include "Core/PowerPC/Jit64/Jit.h"
+
 #include <array>
 #include <limits>
 #include <vector>
@@ -14,7 +16,6 @@
 
 #include "Core/CoreTiming.h"
 #include "Core/PowerPC/Interpreter/ExceptionUtils.h"
-#include "Core/PowerPC/Jit64/Jit.h"
 #include "Core/PowerPC/Jit64/RegCache/JitRegCache.h"
 #include "Core/PowerPC/Jit64Common/Jit64PowerPCState.h"
 #include "Core/PowerPC/JitCommon/DivUtils.h"
@@ -1984,7 +1985,7 @@ void Jit64::rlwimix(UGeckoInstruction inst)
     else if (mask == 0xFFFFFFFF)
     {
       RCOpArg Rs = gpr.Use(s, RCMode::Read);
-      RCX64Reg Ra = gpr.Bind(a, RCMode::Read);
+      RCX64Reg Ra = gpr.Bind(a, RCMode::Write);
       RegCache::Realize(Rs, Ra);
       RotateLeft(32, Ra, Rs, inst.SH);
       needs_test = true;
@@ -2558,9 +2559,11 @@ void Jit64::twX(UGeckoInstruction inst)
       fixups.push_back(f);
     }
   }
-  FixupBranch dont_trap = J();
 
+  if (!fixups.empty())
   {
+    SwitchToFarCode();
+
     RCForkGuard gpr_guard = gpr.Fork();
     RCForkGuard fpr_guard = fpr.Fork();
 
@@ -2576,9 +2579,9 @@ void Jit64::twX(UGeckoInstruction inst)
     fpr.Flush();
 
     WriteExceptionExit();
-  }
 
-  SetJumpTarget(dont_trap);
+    SwitchToNearCode();
+  }
 
   if (!analyzer.HasOption(PPCAnalyst::PPCAnalyzer::OPTION_CONDITIONAL_CONTINUE))
   {

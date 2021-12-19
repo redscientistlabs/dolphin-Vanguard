@@ -1,6 +1,8 @@
 // Copyright 2014 Dolphin Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include "UICommon/UICommon.h"
+
 #include <algorithm>
 #include <clocale>
 #include <cmath>
@@ -35,7 +37,6 @@
 #include "InputCommon/GCAdapter.h"
 
 #include "UICommon/DiscordPresence.h"
-#include "UICommon/UICommon.h"
 #include "UICommon/USBUtils.h"
 
 #ifdef HAVE_X11
@@ -76,12 +77,19 @@ static void CreateResourcePackPath(const std::string& path)
     File::SetUserPath(D_RESOURCEPACK_IDX, path + '/');
 }
 
+static void CreateWFSPath(const std::string& path)
+{
+  if (!path.empty())
+    File::SetUserPath(D_WFSROOT_IDX, path + '/');
+}
+
 static void InitCustomPaths()
 {
   File::SetUserPath(D_WIIROOT_IDX, Config::Get(Config::MAIN_FS_PATH));
   CreateLoadPath(Config::Get(Config::MAIN_LOAD_PATH));
   CreateDumpPath(Config::Get(Config::MAIN_DUMP_PATH));
   CreateResourcePackPath(Config::Get(Config::MAIN_RESOURCEPACK_PATH));
+  CreateWFSPath(Config::Get(Config::MAIN_WFS_PATH));
   File::SetUserPath(F_WIISDCARD_IDX, Config::Get(Config::MAIN_SD_PATH));
   File::SetUserPath(F_GBABIOS_IDX, Config::Get(Config::MAIN_GBA_BIOS_PATH));
   File::SetUserPath(D_GBASAVES_IDX, Config::Get(Config::MAIN_GBA_SAVES_PATH));

@@ -492,8 +492,10 @@ static void EmuThread(std::unique_ptr<BootParameters> boot, WindowSystemInfo wsi
     Keyboard::LoadConfig();
   }
 
-  const std::optional<std::string> savestate_path = boot->savestate_path;
-  const bool delete_savestate = boot->delete_savestate;
+  BootSessionData boot_session_data = std::move(boot->boot_session_data);
+  const std::optional<std::string>& savestate_path = boot_session_data.GetSavestatePath();
+  const bool delete_savestate =
+      boot_session_data.GetDeleteSavestate() == DeleteSavestateAfterBoot::Yes;
 
   // Load and Init Wiimotes - only if we are booting in Wii mode
   bool init_wiimotes = false;
@@ -629,9 +631,12 @@ static void EmuThread(std::unique_ptr<BootParameters> boot, WindowSystemInfo wsi
   // Initialise Wii filesystem contents.
   // This is done here after Boot and not in BootManager to ensure that we operate
   // with the correct title context since save copying requires title directories to exist.
-  Common::ScopeGuard wiifs_guard{&Core::CleanUpWiiFileSystemContents};
+  Common::ScopeGuard wiifs_guard{[&boot_session_data] {
+    Core::CleanUpWiiFileSystemContents(boot_session_data);
+    boot_session_data.InvokeWiiSyncCleanup();
+  }};
   if (SConfig::GetInstance().bWii)
-    Core::InitializeWiiFileSystemContents(savegame_redirect);
+    Core::InitializeWiiFileSystemContents(savegame_redirect, boot_session_data);
   else
     wiifs_guard.Dismiss();
 
@@ -762,7 +767,7 @@ static std::string GenerateScreenshotName()
 
   const std::time_t cur_time = std::time(nullptr);
   const std::string base_name =
-      fmt::format("{}_{:%Y-%m-%d_%H-%M-%S}", path_prefix, *std::localtime(&cur_time));
+      fmt::format("{}_{:%Y-%m-%d_%H-%M-%S}", path_prefix, fmt::localtime(cur_time));
 
   // First try a filename without any suffixes, if already exists then append increasing numbers
   std::string name = fmt::format("{}.png", base_name);

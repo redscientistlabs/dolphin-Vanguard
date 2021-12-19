@@ -1,6 +1,8 @@
 // Copyright 2015 Dolphin Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include "Core/PowerPC/JitArm64/Jit.h"
+
 #include "Common/Arm64Emitter.h"
 #include "Common/CPUDetect.h"
 #include "Common/CommonTypes.h"
@@ -10,7 +12,6 @@
 #include "Core/Core.h"
 #include "Core/CoreTiming.h"
 #include "Core/PowerPC/Gekko.h"
-#include "Core/PowerPC/JitArm64/Jit.h"
 #include "Core/PowerPC/JitArm64/JitArm64_RegCache.h"
 #include "Core/PowerPC/PPCTables.h"
 #include "Core/PowerPC/PowerPC.h"
@@ -507,7 +508,7 @@ void JitArm64::fcmpX(UGeckoInstruction inst)
   FloatCompare(inst);
 }
 
-void JitArm64::fctiwzx(UGeckoInstruction inst)
+void JitArm64::fctiwx(UGeckoInstruction inst)
 {
   INSTRUCTION_START
   JITDISABLE(bJITFloatingPointOff);
@@ -518,19 +519,32 @@ void JitArm64::fctiwzx(UGeckoInstruction inst)
   const u32 d = inst.FD;
 
   const bool single = fpr.IsSingle(b, true);
+  const bool is_fctiwzx = inst.SUBOP10 == 15;
 
   const ARM64Reg VB = fpr.R(b, single ? RegType::LowerPairSingle : RegType::LowerPair);
   const ARM64Reg VD = fpr.RW(d, RegType::LowerPair);
+
+  // TODO: The upper 32 bits of the result are set to 0xfff80000, except for -0.0 where should be
+  // set to 0xfff80001 (TODO).
 
   if (single)
   {
     const ARM64Reg V0 = fpr.GetReg();
 
+    if (is_fctiwzx)
+    {
+      m_float_emit.FCVTS(EncodeRegToSingle(VD), EncodeRegToSingle(VB), RoundingMode::Z);
+    }
+    else
+    {
+      m_float_emit.FRINTI(EncodeRegToSingle(VD), EncodeRegToSingle(VB));
+      m_float_emit.FCVTS(EncodeRegToSingle(VD), EncodeRegToSingle(VD), RoundingMode::Z);
+    }
+
     // Generate 0xFFF8'0000'0000'0000ULL
     m_float_emit.MOVI(64, EncodeRegToDouble(V0), 0xFFFF'0000'0000'0000ULL);
     m_float_emit.BIC(16, EncodeRegToDouble(V0), 0x7);
 
-    m_float_emit.FCVTS(EncodeRegToSingle(VD), EncodeRegToSingle(VB), RoundingMode::Z);
     m_float_emit.ORR(EncodeRegToDouble(VD), EncodeRegToDouble(VD), EncodeRegToDouble(V0));
 
     fpr.Unlock(V0);
@@ -539,7 +553,16 @@ void JitArm64::fctiwzx(UGeckoInstruction inst)
   {
     const ARM64Reg WA = gpr.GetReg();
 
-    m_float_emit.FCVTS(WA, EncodeRegToDouble(VB), RoundingMode::Z);
+    if (is_fctiwzx)
+    {
+      m_float_emit.FCVTS(WA, EncodeRegToDouble(VB), RoundingMode::Z);
+    }
+    else
+    {
+      m_float_emit.FRINTI(EncodeRegToDouble(VD), EncodeRegToDouble(VB));
+      m_float_emit.FCVTS(WA, EncodeRegToDouble(VD), RoundingMode::Z);
+    }
+
     ORR(EncodeRegTo64(WA), EncodeRegTo64(WA), LogicalImm(0xFFF8'0000'0000'0000ULL, 64));
     m_float_emit.FMOV(EncodeRegToDouble(VD), EncodeRegTo64(WA));
 

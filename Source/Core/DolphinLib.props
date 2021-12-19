@@ -21,6 +21,7 @@
     <ClInclude Include="Common\BitUtils.h" />
     <ClInclude Include="Common\BlockingLoop.h" />
     <ClInclude Include="Common\CDUtils.h" />
+    <ClInclude Include="Common\CRC32.h" />
     <ClInclude Include="Common\ChunkFile.h" />
     <ClInclude Include="Common\CodeBlock.h" />
     <ClInclude Include="Common\ColorUtil.h" />
@@ -109,6 +110,7 @@
     <ClInclude Include="Common\Hash.h" />
     <ClInclude Include="Common\HttpRequest.h" />
     <ClInclude Include="Common\Image.h" />
+    <ClInclude Include="Common\ImageC.h" />
     <ClInclude Include="Common\IniFile.h" />
     <ClInclude Include="Common\Inline.h" />
     <ClInclude Include="Common\Intrinsics.h" />
@@ -643,7 +645,6 @@
     <ClInclude Include="VideoCommon\PostProcessing.h" />
     <ClInclude Include="VideoCommon\RenderBase.h" />
     <ClInclude Include="VideoCommon\RenderState.h" />
-    <ClInclude Include="VideoCommon\SamplerCommon.h" />
     <ClInclude Include="VideoCommon\ShaderCache.h" />
     <ClInclude Include="VideoCommon\ShaderGenCommon.h" />
     <ClInclude Include="VideoCommon\Statistics.h" />
@@ -689,6 +690,7 @@
     <ClCompile Include="AudioCommon\WaveFile.cpp" />
     <ClCompile Include="Common\Analytics.cpp" />
     <ClCompile Include="Common\CDUtils.cpp" />
+    <ClCompile Include="Common\CRC32.cpp" />
     <ClCompile Include="Common\ColorUtil.cpp" />
     <ClCompile Include="Common\CommonFuncs.cpp" />
     <ClCompile Include="Common\CompatPatches.cpp" />
@@ -713,6 +715,11 @@
     <ClCompile Include="Common\Hash.cpp" />
     <ClCompile Include="Common\HttpRequest.cpp" />
     <ClCompile Include="Common\Image.cpp" />
+    <ClCompile Include="Common\ImageC.c">
+      <!-- This is a C file, not a C++ file, so we can't use the C++ pre-compiled header -->
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <ForcedIncludeFiles />
+    </ClCompile>
     <ClCompile Include="Common\IniFile.cpp" />
     <ClCompile Include="Common\IOFile.cpp" />
     <ClCompile Include="Common\JitRegister.cpp" />

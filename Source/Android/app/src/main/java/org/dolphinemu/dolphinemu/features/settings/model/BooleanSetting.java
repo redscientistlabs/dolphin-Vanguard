@@ -23,6 +23,7 @@ public enum BooleanSetting implements AbstractBooleanSetting
           "WiimoteContinuousScanning", false),
   MAIN_WIIMOTE_ENABLE_SPEAKER(Settings.FILE_DOLPHIN, Settings.SECTION_INI_CORE,
           "WiimoteEnableSpeaker", false),
+  MAIN_MMU(Settings.FILE_DOLPHIN, Settings.SECTION_INI_CORE, "MMU", false),
   MAIN_SYNC_GPU(Settings.FILE_DOLPHIN, Settings.SECTION_INI_CORE, "SyncGPU", false),
   MAIN_OVERCLOCK_ENABLE(Settings.FILE_DOLPHIN, Settings.SECTION_INI_CORE, "OverclockEnable", false),
   MAIN_AUTO_DISC_CHANGE(Settings.FILE_DOLPHIN, Settings.SECTION_INI_CORE, "AutoDiscChange", false),
@@ -198,6 +199,8 @@ public enum BooleanSetting implements AbstractBooleanSetting
   GFX_HACK_EFB_EMULATE_FORMAT_CHANGES(Settings.FILE_GFX, Settings.SECTION_GFX_HACKS,
           "EFBEmulateFormatChanges", false),
   GFX_HACK_VERTEX_ROUDING(Settings.FILE_GFX, Settings.SECTION_GFX_HACKS, "VertexRounding", false),
+  GFX_HACK_FAST_TEXTURE_SAMPLING(Settings.FILE_GFX, Settings.SECTION_GFX_HACKS,
+          "FastTextureSampling", true),
 
   LOGGER_WRITE_TO_FILE(Settings.FILE_LOGGER, Settings.SECTION_LOGGER_OPTIONS, "WriteToFile", false),
 
@@ -224,8 +227,9 @@ public enum BooleanSetting implements AbstractBooleanSetting
           MAIN_CPU_THREAD,
           MAIN_ENABLE_CHEATS,
           MAIN_OVERRIDE_REGION_SETTINGS,
-          MAIN_WII_SD_CARD,  // Can actually be changed, but specific code is required
-          MAIN_DSP_JIT
+          MAIN_WII_SD_CARD,  // Can actually be changed, but specialized code is required
+          MAIN_MMU,
+          MAIN_DSP_JIT,
   };
 
   private static final Set<BooleanSetting> NOT_RUNTIME_EDITABLE =

@@ -9,7 +9,6 @@ import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -26,10 +25,9 @@ import org.dolphinemu.dolphinemu.activities.EmulationActivity;
 import org.dolphinemu.dolphinemu.adapters.PlatformPagerAdapter;
 import org.dolphinemu.dolphinemu.features.settings.model.IntSetting;
 import org.dolphinemu.dolphinemu.features.settings.model.NativeConfig;
-import org.dolphinemu.dolphinemu.features.settings.model.Settings;
 import org.dolphinemu.dolphinemu.features.settings.ui.MenuTag;
 import org.dolphinemu.dolphinemu.features.settings.ui.SettingsActivity;
-import org.dolphinemu.dolphinemu.services.GameFileCacheService;
+import org.dolphinemu.dolphinemu.services.GameFileCacheManager;
 import org.dolphinemu.dolphinemu.ui.platform.Platform;
 import org.dolphinemu.dolphinemu.ui.platform.PlatformGamesView;
 import org.dolphinemu.dolphinemu.utils.Action1;
@@ -75,7 +73,7 @@ public final class MainActivity extends AppCompatActivity
     if (!DirectoryInitialization.isWaitingForWriteAccess(this))
     {
       new AfterDirectoryInitializationRunner()
-              .run(this, false, this::setPlatformTabsAndStartGameFileCacheService);
+              .runWithLifecycle(this, false, this::setPlatformTabsAndStartGameFileCacheService);
     }
   }
 
@@ -88,7 +86,7 @@ public final class MainActivity extends AppCompatActivity
     {
       DirectoryInitialization.start(this);
       new AfterDirectoryInitializationRunner()
-              .run(this, false, this::setPlatformTabsAndStartGameFileCacheService);
+              .runWithLifecycle(this, false, this::setPlatformTabsAndStartGameFileCacheService);
     }
 
     mPresenter.onResume();
@@ -256,7 +254,7 @@ public final class MainActivity extends AppCompatActivity
 
       DirectoryInitialization.start(this);
       new AfterDirectoryInitializationRunner()
-              .run(this, false, this::setPlatformTabsAndStartGameFileCacheService);
+              .runWithLifecycle(this, false, this::setPlatformTabsAndStartGameFileCacheService);
     }
   }
 
@@ -279,7 +277,7 @@ public final class MainActivity extends AppCompatActivity
   public void onRefresh()
   {
     setRefreshing(true);
-    GameFileCacheService.startRescan(this);
+    GameFileCacheManager.startRescan(this);
   }
 
   /**
@@ -341,6 +339,6 @@ public final class MainActivity extends AppCompatActivity
     mViewPager.setCurrentItem(IntSetting.MAIN_LAST_PLATFORM_TAB.getIntGlobal());
 
     showGames();
-    GameFileCacheService.startLoad(this);
+    GameFileCacheManager.startLoad(this);
   }
 }

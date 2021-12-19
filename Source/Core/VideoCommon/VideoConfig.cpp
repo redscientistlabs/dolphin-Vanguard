@@ -1,6 +1,8 @@
 // Copyright 2008 Dolphin Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include "VideoCommon/VideoConfig.h"
+
 #include <algorithm>
 
 #include "Common/CPUDetect.h"
@@ -12,7 +14,6 @@
 #include "Core/Movie.h"
 #include "VideoCommon/OnScreenDisplay.h"
 #include "VideoCommon/VideoCommon.h"
-#include "VideoCommon/VideoConfig.h"
 
 VideoConfig g_Config;
 VideoConfig g_ActiveConfig;
@@ -137,6 +138,7 @@ void VideoConfig::Refresh()
   bVertexRounding = Config::Get(Config::GFX_HACK_VERTEX_ROUDING);
   iEFBAccessTileSize = Config::Get(Config::GFX_HACK_EFB_ACCESS_TILE_SIZE);
   iMissingColorValue = Config::Get(Config::GFX_HACK_MISSING_COLOR_VALUE);
+  bFastTextureSampling = Config::Get(Config::GFX_HACK_FAST_TEXTURE_SAMPLING);
 
   bPerfQueriesEnable = Config::Get(Config::GFX_PERF_QUERIES_ENABLE);
 
